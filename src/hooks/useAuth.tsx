@@ -62,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       loading,
-      isAdmin: readIsAdmin(user),
+      isAdmin: readIsAdmin(user) || isMockMode,
       displayName: isMockMode ? 'GM Demo' : readDisplayName(user),
       signIn: async (email, password) => {
         if (!supabase) return 'Supabase non configuré';

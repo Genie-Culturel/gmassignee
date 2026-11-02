@@ -47,8 +47,37 @@ export interface ProcedureFiche {
   is_placeholder: boolean;
   tags: string[] | null;
   is_active: boolean;
+  version?: number;
+  is_required?: boolean;
+  skip_version_bump?: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface QuizChoice {
+  id: string;
+  text: string;
+}
+
+export interface QuizQuestionPublic {
+  id: string;
+  fiche_id: string;
+  prompt: string;
+  choices: QuizChoice[];
+  order_index: number;
+  is_example: boolean;
+}
+
+export interface QuizQuestionAdmin extends QuizQuestionPublic {
+  correct_choice_ids: string[];
+}
+
+export interface FicheValidation {
+  id?: string;
+  gm_id: string;
+  fiche_id: string;
+  version: number;
+  validated_at: string;
 }
 
 export interface SalesProduct {

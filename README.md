@@ -25,6 +25,8 @@ Bibliothèque de fiches en **3 catégories** :
 
 Les fiches marquées **🚧** sont des placeholders « à compléter ».
 
+**Ma formation** (dans le même onglet) : le GM valide chaque fiche requise (« J’ai lu et compris » + QCM s’il y en a). Progression par module, statut à faire / validée / à revalider. Une modification de procédure incrémente `version` (trigger SQL) et force une revalidation, sauf « Correction mineure ».
+
 Le bouton **« Comment faire ? »** dans une session ouvre la fiche associée sans quitter le flux.
 
 ## Lancer l'app
@@ -131,8 +133,9 @@ VITE_FORCE_DEMO=true
 | `009_add_depannage_bugs_enum.sql` | `ALTER TYPE` : `depannage_bugs` (fichier séparé) |
 | `010_move_troubleshooting_to_depannage.sql` | Déplace les fiches Dépannage vers `depannage_bugs` |
 | `011_session_persistence.sql` | Colonnes de reprise (`game`, `session_date`, `session_time`, `player_count`, `parcours_id`, `assignment_id`, `gm_name`), `event_id` nullable, unique étape |
+| `012_gm_training.sql` | Formation obligatoire : `version` / `is_required` sur les fiches, `quiz_questions`, `fiche_validations`, triggers de version, RPC quiz sans exposer les bonnes réponses |
 
-Sur **gm-vrcenter**, 001–011 sont déjà appliqués. Toute nouvelle schema = **012+**.
+Sur **gm-vrcenter**, 001–011 sont déjà appliqués. **`012_gm_training.sql` n’est pas encore appliqué** — à lancer dans le SQL Editor.
 
 Pour qu'un compte soit admin, dans Authentication → user → `app_metadata` :
 
@@ -142,8 +145,9 @@ Pour qu'un compte soit admin, dans Authentication → user → `app_metadata` :
 
 ### RLS
 
-- GMs : leurs check-ins, completions, sessions
-- Admins (`app_metadata.role = admin`) : lecture globale + édition templates / fiches / produits
+- GMs : leurs check-ins, completions, sessions, leurs propres `fiche_validations`
+- Admins (`app_metadata.role = admin`) : lecture globale + édition templates / fiches / produits / questions
+- Quiz : les GM lisent les questions via `get_quiz_questions` (sans `correct_choice_ids`) ; la notation passe par `submit_fiche_validation`
 - `auth.jwt() ->> 'role'` n'est **pas** le rôle applicatif (toujours `authenticated` sur Supabase hébergé)
 
 ## Tech

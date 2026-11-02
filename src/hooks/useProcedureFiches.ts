@@ -1,34 +1,38 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase, isMockMode } from '@/lib/supabase';
 import { ProcedureFiche, SessionStep } from '@/lib/database.types';
 import { mockFiches, mockStepFichesMapping } from '@/lib/mockData';
+import { hydrateTrainingFiche, loadDemoFiches } from '@/lib/trainingRepository';
 
-export function useProcedureFiches() {
+export function useProcedureFiches(opts?: { includeInactive?: boolean }) {
   const [fiches, setFiches] = useState<ProcedureFiche[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [tick, setTick] = useState(0);
+  const includeInactive = Boolean(opts?.includeInactive);
+
+  const reload = useCallback(() => setTick((value) => value + 1), []);
 
   useEffect(() => {
     async function fetchFiches() {
       if (isMockMode) {
-        // Mock mode: use local data
-        setTimeout(() => {
-          setFiches(mockFiches);
-          setIsLoading(false);
-        }, 300);
+        const rows = loadDemoFiches().map(hydrateTrainingFiche);
+        setFiches(includeInactive ? rows : rows.filter((fiche) => fiche.is_active));
+        setIsLoading(false);
         return;
       }
 
       try {
-        const { data, error: fetchError } = await supabase!
+        let query = supabase!
           .from('procedure_fiches')
           .select('*')
-          .eq('is_active', true)
           .order('category', { ascending: true })
           .order('title', { ascending: true });
+        if (!includeInactive) query = query.eq('is_active', true);
+        const { data, error: fetchError } = await query;
 
         if (fetchError) throw fetchError;
-        setFiches(data || []);
+        setFiches((data || []).map(hydrateTrainingFiche));
       } catch (err) {
         setError(err as Error);
       } finally {
@@ -37,9 +41,9 @@ export function useProcedureFiches() {
     }
 
     fetchFiches();
-  }, []);
+  }, [tick, includeInactive]);
 
-  return { fiches, isLoading, error };
+  return { fiches, isLoading, error, reload };
 }
 
 export function useFichesByStep(step: SessionStep) {
