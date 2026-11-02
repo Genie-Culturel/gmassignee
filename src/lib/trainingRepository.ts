@@ -234,7 +234,8 @@ export async function saveFiche(params: {
     is_active: params.fiche.is_active ?? true,
     is_required: params.fiche.is_required ?? true,
   };
-  if (params.minorCorrection) body.skip_version_bump = true;
+  // Always explicit so a stale flag from an earlier minor save never blocks a real version bump.
+  body.skip_version_bump = params.minorCorrection;
 
   if (isMockMode || !supabase) {
     const list = loadDemoFiches();

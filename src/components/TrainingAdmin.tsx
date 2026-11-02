@@ -302,6 +302,7 @@ function AdminFicheEditor({
               },
               minorCorrection: true,
             });
+            await clearSkipVersionBump(created.id);
             onFichesChanged();
             setSelectedId(created.id);
           }}
