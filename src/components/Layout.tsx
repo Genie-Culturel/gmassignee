@@ -51,9 +51,9 @@ export function Layout() {
               </Link>
             </TabsTrigger>
             <TabsTrigger value="formation" asChild>
-              <Link to="/formation" className="flex items-center gap-2" aria-label="Formations">
+              <Link to="/formation" className="flex items-center gap-2" aria-label="Formations et procédures">
                 <BookOpen className="h-4 w-4" />
-                <span className="hidden sm:inline">Formations</span>
+                <span className="hidden sm:inline">Formations et procédures</span>
               </Link>
             </TabsTrigger>
           </TabsList>
