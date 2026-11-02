@@ -12,6 +12,7 @@ import {
 } from '@/lib/assignedSessions';
 import { assignmentKey, PersistedSession } from '@/lib/sessionRepository';
 import { formatLongWeekdayDate } from '@/lib/utils';
+import { SessionStartNotice } from '@/components/SessionStartNotice';
 
 interface AssignedActivitiesProps {
   sessions: AssignedSession[];
@@ -168,6 +169,7 @@ function ActivityRow({
       </div>
       {open && (
         <div className="space-y-3 border-t bg-muted/30 px-4 py-3 sm:px-6">
+          <SessionStartNotice compact />
           {session.groupName && (
             <p className="text-sm">
               <span className="text-muted-foreground">Groupe · </span>

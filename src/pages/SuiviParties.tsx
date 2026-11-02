@@ -21,6 +21,7 @@ import { useFichesByStep, useFichesByIncidentType } from '@/hooks/useProcedureFi
 import { formatDate, formatTime } from '@/lib/utils';
 import { SessionSales } from '@/components/SessionSales';
 import { AssignedActivities } from '@/components/AssignedActivities';
+import { SessionStartNotice } from '@/components/SessionStartNotice';
 import {
   AssignedSession,
   DEMO_GM_ID,
@@ -59,6 +60,7 @@ interface ActiveSession {
   date: string;
   time: string;
   endTime?: string;
+  startedAt: string;
   groupName: string;
   playerCount: number;
   gmName: string;
@@ -86,6 +88,7 @@ function toActive(row: PersistedSession, endTime?: string): ActiveSession {
     date: row.date,
     time: row.time,
     endTime,
+    startedAt: row.startedAt,
     groupName: row.groupName,
     playerCount: row.playerCount,
     gmName: row.gmName,
@@ -115,7 +118,7 @@ export function SuiviParties() {
   const [assigned, setAssigned] = useState<AssignedSession[]>([]);
   const [openSessions, setOpenSessions] = useState<PersistedSession[]>([]);
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
-  const [completedSteps, setCompletedSteps] = useState<Set<SessionStep>>(new Set());
+  const [stepTimes, setStepTimes] = useState<Partial<Record<SessionStep, string>>>({});
   const [incidentType, setIncidentType] = useState<IncidentType | null>(null);
   const [incidentDetails, setIncidentDetails] = useState('');
   const [salesItems, setSalesItems] = useState<SaleItem[]>([]);
@@ -134,7 +137,7 @@ export function SuiviParties() {
 
   const applyLoaded = useCallback((row: PersistedSession, endTime?: string) => {
     setActiveSession(toActive(row, endTime));
-    setCompletedSteps(new Set(row.completedSteps));
+    setStepTimes(row.stepTimes || {});
     setIncidentType(row.incidentType);
     setIncidentDetails(row.incidentDetails);
     setSalesItems(row.sales);
@@ -250,7 +253,7 @@ export function SuiviParties() {
     try {
       await persistEndSession(activeSession.sessionId);
       setActiveSession(null);
-      setCompletedSteps(new Set());
+      setStepTimes({});
       setIncidentType(null);
       setIncidentDetails('');
       setSalesItems([]);
@@ -268,11 +271,11 @@ export function SuiviParties() {
 
   const toggleStep = async (step: SessionStep) => {
     if (!activeSession) return;
-    const next = new Set(completedSteps);
-    const completing = !next.has(step);
-    if (completing) next.add(step);
-    else next.delete(step);
-    setCompletedSteps(next);
+    const completing = !stepTimes[step];
+    const next = { ...stepTimes };
+    if (completing) next[step] = new Date().toISOString();
+    else delete next[step];
+    setStepTimes(next);
     try {
       await setStepCompleted(activeSession.sessionId, step, completing);
     } catch (err) {
@@ -384,6 +387,7 @@ export function SuiviParties() {
               Tes parties assignées. Clique une ligne pour démarrer, déjà pré-remplie.
             </p>
           </div>
+          <SessionStartNotice />
           <AssignedActivities
             sessions={assigned}
             openByAssignment={openByAssignment}
@@ -401,6 +405,7 @@ export function SuiviParties() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              <SessionStartNotice compact />
               <div>
                 <Label htmlFor="parcours">Parcours</Label>
                 <select
@@ -495,10 +500,13 @@ export function SuiviParties() {
                     {` · ${activeSession.playerCount} joueur${activeSession.playerCount > 1 ? 's' : ''}`}
                   </span>
                   <span className="block">{parcours.name}</span>
+                  <span className="mt-2 inline-flex items-center rounded-md bg-primary/10 px-2.5 py-1 text-sm font-semibold text-foreground">
+                    Arrivée GM : {formatTime(activeSession.startedAt)}
+                  </span>
                 </CardDescription>
               </div>
               <Badge variant="success" className="text-sm shrink-0">
-                {completedSteps.size} / {sessionSteps.length} étapes
+                {Object.keys(stepTimes).length} / {sessionSteps.length} étapes
               </Badge>
             </div>
           </CardHeader>
@@ -526,7 +534,8 @@ export function SuiviParties() {
               <SessionStepItem
                 key={step}
                 step={step}
-                isCompleted={completedSteps.has(step)}
+                isCompleted={Boolean(stepTimes[step])}
+                completedAt={stepTimes[step]}
                 onToggle={() => toggleStep(step)}
               />
             ))}
@@ -651,10 +660,12 @@ export function SuiviParties() {
 function SessionStepItem({
   step,
   isCompleted,
+  completedAt,
   onToggle,
 }: {
   step: SessionStep;
   isCompleted: boolean;
+  completedAt?: string;
   onToggle: () => void;
 }) {
   const { fiches, isLoading } = useFichesByStep(step);
@@ -672,17 +683,19 @@ function SessionStepItem({
         className="mt-1"
       />
       <div className="flex-1 min-w-0">
-        <Label
-          htmlFor={`step-${step}`}
-          className={`cursor-pointer ${isCompleted ? 'line-through text-muted-foreground' : ''}`}
-        >
-          {SESSION_STEP_LABELS[step]}
-        </Label>
-        {isCompleted && (
-          <p className="text-xs text-muted-foreground mt-1">
-            Complété à {formatTime(new Date())}
-          </p>
-        )}
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          <Label
+            htmlFor={`step-${step}`}
+            className={`cursor-pointer ${isCompleted ? 'line-through text-muted-foreground' : ''}`}
+          >
+            {SESSION_STEP_LABELS[step]}
+          </Label>
+          {isCompleted && completedAt && (
+            <span className="text-xs tabular-nums text-muted-foreground">
+              {formatTime(completedAt)}
+            </span>
+          )}
+        </div>
       </div>
       {!isLoading && fiches.length > 0 && (
         <FicheButton fiches={fiches} />

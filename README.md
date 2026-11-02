@@ -8,7 +8,7 @@ Deux parties liées :
 
 ### 1. Suivi des parties (opérationnel)
 
-- **Mes sessions** : même structure que le dashboard GM GMassignee — **Mes Activités Aujourd'hui** (état vide : « Aucune activité aujourd'hui ») et **Mes Prochaines Activités**. Chaque ligne : jeu + `[nb joueurs]`, badge Assigné, date, créneau début–fin. Un clic démarre / reprend la session pré-remplie.
+- **Mes sessions** : même structure que le dashboard GM GMassignee — **Mes Activités Aujourd'hui** et **Mes Prochaines Activités**. Chaque ligne : jeu + `[nb joueurs]`, badge Assigné, date, créneau début–fin. Un clic démarre / reprend la session pré-remplie. Un bandeau rappelle de démarrer **à l'arrivée** : `started_at` = heure d'arrivée GM, chaque étape cochée garde `completed_at`.
 - **Démarrage manuel** : fallback si la partie n'est pas dans le planning. Le GM choisit le **parcours** (aujourd'hui un seul : « Parcours client VR au centre », 14 étapes).
 - **Incidents** : Bug / Freeze ouvre le [Bug reporter](https://genie-culturel.github.io/Bug_report_VR/) pré-rempli + la fiche de dépannage. Malaise / Casse / Autre gardent fiche + note ; Autre affiche aussi le lien bug reporter.
 - **Ventes & encaissement** : lignes, CHF, Twint / Espèces / Carte / Facture.
@@ -78,7 +78,7 @@ Ce module passe par une petite abstraction :
 getAssignedSessions(gmId): Promise<AssignedSession[]>
 ```
 
-- **Mode démo** : mock dans `src/lib/assignedSessions.ts`, même forme que le dashboard GM GMassignee (aujourd'hui vide + prochaines activités).
+- **Mode démo** : mock dans `src/lib/assignedSessions.ts` — au moins une session **aujourd'hui** (date calculée dynamiquement, créneau proche de l'heure actuelle) + les prochaines activités.
 - **Plus tard** : remplacer `fetchFromGmassigneePlanning()` pour lire les tables planning (events / assignments) et mapper vers `AssignedSession` (`game`, `playerCount`, `date`, `startTime`, `endTime`, `status`). L'UI « Mes Activités Aujourd'hui / Mes Prochaines Activités » n'a pas besoin de changer.
 
 Chaque ligne affiche `Jeu [nb joueurs]`, badge **Assigné**, date longue (`vendredi 6 novembre 2026`) et créneau (`14:30 - 16:25`). Un clic démarre / reprend la session pré-remplie ; le chevron déplie le détail.

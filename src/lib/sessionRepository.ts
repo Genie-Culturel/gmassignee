@@ -25,6 +25,8 @@ export interface PersistedSession {
   game: string;
   date: string;
   time: string;
+  /** Real GM arrival / session start (vr_sessions.started_at). */
+  startedAt: string;
   groupName: string;
   playerCount: number;
   gmName: string;
@@ -33,6 +35,8 @@ export interface PersistedSession {
   incidentType: IncidentType | null;
   incidentDetails: string;
   completedSteps: SessionStep[];
+  /** ISO timestamps keyed by step (session_steps.completed_at). */
+  stepTimes: Partial<Record<SessionStep, string>>;
   sales: SaleItem[];
   salesComment: string;
   endedAt: string | null;
@@ -73,19 +77,34 @@ function throwIfError(error: { message: string } | null, context: string) {
   if (error) throw new Error(`${context}: ${error.message}`);
 }
 
+type LoadedStep = { step: SessionStep; completedAt: string };
+
+function stepsPayload(steps: LoadedStep[]): {
+  completedSteps: SessionStep[];
+  stepTimes: Partial<Record<SessionStep, string>>;
+} {
+  const stepTimes: Partial<Record<SessionStep, string>> = {};
+  for (const item of steps) {
+    stepTimes[item.step] = item.completedAt;
+  }
+  return { completedSteps: steps.map((item) => item.step), stepTimes };
+}
+
 function rowToSession(
   row: Record<string, unknown>,
-  steps: SessionStep[],
+  steps: LoadedStep[],
   sales: SaleItem[],
   salesComment: string
 ): PersistedSession {
   const time = String(row.session_time || '00:00').slice(0, 5);
+  const loaded = stepsPayload(steps);
   return {
     sessionId: String(row.id),
     assignmentId: (row.assignment_id as string) || null,
     game: (row.game as string) || 'VR Session',
     date: String(row.session_date || '').slice(0, 10),
     time,
+    startedAt: String(row.started_at || new Date().toISOString()),
     groupName: (row.group_name as string) || '',
     playerCount: Number(row.player_count || 0) || 8,
     gmName: (row.gm_name as string) || 'GM',
@@ -93,7 +112,8 @@ function rowToSession(
     notes: (row.notes as string) || '',
     incidentType: (row.incident_type as IncidentType) || null,
     incidentDetails: (row.incident_details as string) || '',
-    completedSteps: steps,
+    completedSteps: loaded.completedSteps,
+    stepTimes: loaded.stepTimes,
     sales,
     salesComment,
     endedAt: (row.ended_at as string) || null,
@@ -101,12 +121,12 @@ function rowToSession(
 }
 
 async function loadParts(sessionId: string): Promise<{
-  steps: SessionStep[];
+  steps: LoadedStep[];
   sales: SaleItem[];
   salesComment: string;
 }> {
   const [stepsRes, salesRes, sessionRes] = await Promise.all([
-    supabase!.from('session_steps').select('step').eq('session_id', sessionId),
+    supabase!.from('session_steps').select('step, completed_at').eq('session_id', sessionId),
     supabase!.from('session_sales').select('*').eq('session_id', sessionId),
     supabase!.from('vr_sessions').select('sales_comment').eq('id', sessionId).maybeSingle(),
   ]);
@@ -114,7 +134,10 @@ async function loadParts(sessionId: string): Promise<{
   throwIfError(salesRes.error, 'Chargement des ventes');
 
   return {
-    steps: (stepsRes.data || []).map((s) => s.step as SessionStep),
+    steps: (stepsRes.data || []).map((s) => ({
+      step: s.step as SessionStep,
+      completedAt: String(s.completed_at || new Date().toISOString()),
+    })),
     sales: (salesRes.data || []).map((s) => ({
       id: s.id,
       productId: s.product_id,
@@ -169,6 +192,27 @@ export async function listOpenSessions(gmId: string): Promise<PersistedSession[]
   return loaded;
 }
 
+const demoSessions = new Map<string, PersistedSession>();
+
+function emptyDemoSession(partial: Omit<PersistedSession, 'startedAt' | 'completedSteps' | 'stepTimes' | 'sales' | 'salesComment' | 'endedAt' | 'incidentType' | 'incidentDetails' | 'notes'> & {
+  notes?: string;
+}): PersistedSession {
+  const session: PersistedSession = {
+    ...partial,
+    notes: partial.notes || '',
+    startedAt: new Date().toISOString(),
+    incidentType: null,
+    incidentDetails: '',
+    completedSteps: [],
+    stepTimes: {},
+    sales: [],
+    salesComment: '',
+    endedAt: null,
+  };
+  demoSessions.set(session.sessionId, session);
+  return session;
+}
+
 export async function createOrResumeFromAssignment(params: {
   assignment: AssignedSession;
   gmId: string;
@@ -176,8 +220,11 @@ export async function createOrResumeFromAssignment(params: {
 }): Promise<PersistedSession> {
   const key = assignmentKey(params.assignment);
   if (isMockMode || !supabase) {
-    return {
-      sessionId: `demo-${key}`,
+    const sessionId = `demo-${key}`;
+    const existing = demoSessions.get(sessionId);
+    if (existing && !existing.endedAt) return existing;
+    return emptyDemoSession({
+      sessionId,
       assignmentId: key,
       game: params.assignment.game,
       date: params.assignment.date,
@@ -187,13 +234,7 @@ export async function createOrResumeFromAssignment(params: {
       gmName: params.gmName,
       parcoursId: params.assignment.parcoursId || DEFAULT_PARCOURS_ID,
       notes: params.assignment.notes || '',
-      incidentType: null,
-      incidentDetails: '',
-      completedSteps: [],
-      sales: [],
-      salesComment: '',
-      endedAt: null,
-    };
+    });
   }
 
   const existing = await supabase
@@ -242,7 +283,7 @@ export async function createManualSession(params: {
   parcoursId: string;
 }): Promise<PersistedSession> {
   if (isMockMode || !supabase) {
-    return {
+    return emptyDemoSession({
       sessionId: `demo-${Date.now()}`,
       assignmentId: null,
       game: params.game,
@@ -252,14 +293,7 @@ export async function createManualSession(params: {
       playerCount: params.playerCount,
       gmName: params.gmName,
       parcoursId: params.parcoursId,
-      notes: '',
-      incidentType: null,
-      incidentDetails: '',
-      completedSteps: [],
-      sales: [],
-      salesComment: '',
-      endedAt: null,
-    };
+    });
   }
   return insertSession({ ...params, notes: '', assignmentId: null });
 }
@@ -276,7 +310,8 @@ async function insertSession(params: {
   notes: string;
   assignmentId: string | null;
 }): Promise<PersistedSession> {
-  const startedAt = new Date(`${params.date}T${params.time}:00`).toISOString();
+  // Real clock time = GM arrival. Planned slot stays in session_time.
+  const startedAt = new Date().toISOString();
   const { data, error } = await supabase!
     .from('vr_sessions')
     .insert({
@@ -331,7 +366,20 @@ export async function updateSessionFields(
 }
 
 export async function setStepCompleted(sessionId: string, step: SessionStep, completed: boolean) {
-  if (isMockMode || !supabase) return;
+  if (isMockMode || !supabase) {
+    const session = demoSessions.get(sessionId);
+    if (!session) return;
+    if (completed) {
+      if (!session.completedSteps.includes(step)) session.completedSteps = [...session.completedSteps, step];
+      session.stepTimes = { ...session.stepTimes, [step]: new Date().toISOString() };
+    } else {
+      session.completedSteps = session.completedSteps.filter((item) => item !== step);
+      const next = { ...session.stepTimes };
+      delete next[step];
+      session.stepTimes = next;
+    }
+    return;
+  }
   if (completed) {
     const { error } = await supabase.from('session_steps').upsert(
       { session_id: sessionId, step, completed_at: new Date().toISOString() },
@@ -390,6 +438,12 @@ export async function replaceSales(
 }
 
 export async function endSession(sessionId: string) {
+  if (isMockMode || !supabase) {
+    const session = demoSessions.get(sessionId);
+    if (session) session.endedAt = new Date().toISOString();
+    rememberActiveSession(null);
+    return;
+  }
   await updateSessionFields(sessionId, { endedAt: new Date().toISOString() });
   rememberActiveSession(null);
 }

@@ -85,9 +85,34 @@ function planningDate(preferredIso: string, fallbackOffsetDays: number): string 
   return preferredIso > todayIso() ? preferredIso : isoDateOffset(fallbackOffsetDays);
 }
 
+function hhmm(date: Date): string {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+/** Slot close to now (start rounded down to 5 min, ~1h55 like a Saga). */
+function nearbySlot(durationMinutes = 115): { startTime: string; endTime: string } {
+  const start = new Date();
+  start.setSeconds(0, 0);
+  start.setMinutes(Math.floor(start.getMinutes() / 5) * 5);
+  const end = new Date(start.getTime() + durationMinutes * 60 * 1000);
+  return { startTime: hhmm(start), endTime: hhmm(end) };
+}
+
 export function getMockAssignedSessions(gmId: string = DEMO_GM_ID): AssignedSession[] {
-  // Mirrors the GMassignee GM dashboard sample (today empty, upcoming rows).
+  const todaySlot = nearbySlot();
   const rows: AssignedSession[] = [
+    {
+      id: 'asgn-today-saga',
+      gmId,
+      gmName: DEMO_GM_NAME,
+      game: 'Saga le Serviteur de la Rédemption',
+      playerCount: 6,
+      date: todayIso(),
+      startTime: todaySlot.startTime,
+      endTime: todaySlot.endTime,
+      status: 'assigned',
+      parcoursId: DEFAULT_PARCOURS_ID,
+    },
     {
       id: 'asgn-saga-2026-11-06-1430',
       gmId,
@@ -159,7 +184,7 @@ function sortAssignedSessions(sessions: AssignedSession[]): AssignedSession[] {
 
 /**
  * Fetch sessions assigned to the logged-in GM.
- * Split into today / upcoming in the UI.
+ * Split into today / upcoming in the UI. Demo always includes a today slot.
  */
 export async function getAssignedSessions(gmId: string): Promise<AssignedSession[]> {
   // Planning still lives in the other GMassignee app. Always mock until wired.
