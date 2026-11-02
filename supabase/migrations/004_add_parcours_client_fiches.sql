@@ -1,8 +1,8 @@
 -- Add dedicated Parcours Client fiches (one per session step)
 -- Real content extracted from docs where available
 
--- First, add 'parcours_client' to the fiche_category enum
-ALTER TYPE fiche_category ADD VALUE IF NOT EXISTS 'parcours_client';
+-- 'parcours_client' enum value is added in 003b_add_fiche_category_enum_values.sql
+-- (ALTER TYPE ... ADD VALUE cannot be used in the same transaction as the INSERTs below)
 
 -- Create 14 fiches for the client journey (parcours client)
 

@@ -1,6 +1,7 @@
--- Restructure formation into 2 top-level categories
--- 1. Formation technique: hardware and troubleshooting
+-- Restructure formation into top-level categories
+-- 1. Formation technique: hardware / setup
 -- 2. Procédure et déroulement: client flow and operations
+-- (Troubleshooting moves to depannage_bugs in 010.)
 
 -- First, we need to add new category values and remove old ones
 -- Since we can't modify enum values directly in PostgreSQL, we'll:
@@ -8,11 +9,9 @@
 -- 2. Update existing fiches
 -- 3. Create a new enum and swap it (or just use the current one with new values)
 
--- For simplicity, we'll add the new values and update fiches
--- The old values will remain in the enum but won't be used
-
-ALTER TYPE fiche_category ADD VALUE IF NOT EXISTS 'formation_technique';
-ALTER TYPE fiche_category ADD VALUE IF NOT EXISTS 'procedure_deroulement';
+-- Enum values 'formation_technique' and 'procedure_deroulement' are added in
+-- 003b_add_fiche_category_enum_values.sql (must commit before this transaction).
+-- The old values remain in the enum but are no longer used for new fiches.
 
 -- Update all existing fiches to use the new 2-category structure
 

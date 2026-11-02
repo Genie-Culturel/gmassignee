@@ -297,7 +297,7 @@ export const mockFiches: ProcedureFiche[] = [
   },
   {
     id: '3',
-    category: 'formation_technique',
+    category: 'depannage_bugs',
     title: 'Dépannage : Malaise client',
     summary: 'Que faire si un client se sent mal (nausée, vertige, malaise)',
     content_steps: [
@@ -316,7 +316,7 @@ export const mockFiches: ProcedureFiche[] = [
   },
   {
     id: '4',
-    category: 'formation_technique',
+    category: 'depannage_bugs',
     title: '🚧 Dépannage : Bug ou freeze en jeu',
     summary: 'Que faire quand le jeu bug, freeze ou ne répond plus (à compléter)',
     content_steps: [
@@ -326,6 +326,39 @@ export const mockFiches: ProcedureFiche[] = [
     ],
     is_placeholder: true,
     tags: ['bug', 'dépannage', 'incident'],
+    is_active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: '5',
+    category: 'depannage_bugs',
+    title: '🚧 Dépannage : Tracking perdu',
+    summary: 'Que faire quand le tracking des casques ou manettes est perdu (à compléter)',
+    content_steps: [
+      { order: 1, text: '🚧 Vérification de l\'éclairage de la halle (à documenter)' },
+      { order: 2, text: '🚧 Recalibrage du guardian (à documenter)' },
+      { order: 3, text: '🚧 Redémarrage des casques si nécessaire (à documenter)' },
+    ],
+    is_placeholder: true,
+    tags: ['tracking', 'dépannage', 'incident'],
+    is_active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: '6',
+    category: 'depannage_bugs',
+    title: '🚧 Dépannage : Manette ou casque cassé',
+    summary: 'Que faire en cas de matériel cassé (à compléter)',
+    content_steps: [
+      { order: 1, text: 'Mettre le matériel de côté avec une étiquette' },
+      { order: 2, text: 'Noter précisément ce qui est cassé' },
+      { order: 3, text: '🚧 Contacter l\'admin immédiatement (procédure à documenter)' },
+      { order: 4, text: '🚧 Utiliser le matériel de secours si disponible (à documenter)' },
+    ],
+    is_placeholder: true,
+    tags: ['casse', 'matériel', 'incident'],
     is_active: true,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -356,7 +389,7 @@ export const mockStepFichesMapping: Record<SessionStep, string[]> = {
   reception_checkin: ['pc-4'],
   salon_briefing: ['pc-5'],
   salon_lockers: ['pc-6'],
-  game_playing: ['pc-7', '1', '8'], // Primary + Quest 3 setup + game launch
+  game_playing: ['pc-7', '1', '8', '4'], // Animation + Quest 3 + lancement + bug/freeze
   game_filming: ['pc-8'],
   salon_return: ['pc-9'],
   reception_debrief: ['pc-10'],

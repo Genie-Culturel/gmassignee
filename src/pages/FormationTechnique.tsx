@@ -14,17 +14,14 @@ import { Search, FileText } from 'lucide-react';
 import { useProcedureFiches } from '@/hooks/useProcedureFiches';
 import { FicheViewer } from '@/components/FicheViewer';
 import { ProcedureFiche, FicheCategory } from '@/lib/database.types';
-import { FICHE_CATEGORY_LABELS, FICHE_CATEGORY_ICONS } from '@/lib/constants';
+import { FICHE_CATEGORY_LABELS, FICHE_CATEGORY_ICONS, FORMATION_PAGE_CATEGORIES } from '@/lib/constants';
 
 export function FormationTechnique() {
   const { fiches, isLoading } = useProcedureFiches();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFiche, setSelectedFiche] = useState<ProcedureFiche | null>(null);
 
-  const categories: FicheCategory[] = [
-    'formation_technique',
-    'procedure_deroulement',
-  ];
+  const categories: FicheCategory[] = FORMATION_PAGE_CATEGORIES;
 
   const filteredFiches = fiches.filter((fiche) => {
     const searchLower = searchTerm.toLowerCase();
@@ -50,7 +47,7 @@ export function FormationTechnique() {
   return (
     <div className="space-y-6 pb-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Formation technique</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Formations & Procédures</h1>
         <p className="text-muted-foreground mt-2">
           Bibliothèque de fiches procédurales pour le VR Center
         </p>
@@ -68,10 +65,10 @@ export function FormationTechnique() {
       </div>
 
       <Tabs defaultValue={categories[0]} className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3 h-auto">
           {categories.map((cat) => (
-            <TabsTrigger key={cat} value={cat}>
-              <span className="mr-2">{FICHE_CATEGORY_ICONS[cat]}</span>
+            <TabsTrigger key={cat} value={cat} className="text-xs sm:text-sm whitespace-normal py-2">
+              <span className="mr-1 sm:mr-2">{FICHE_CATEGORY_ICONS[cat]}</span>
               <span>{FICHE_CATEGORY_LABELS[cat]}</span>
             </TabsTrigger>
           ))}

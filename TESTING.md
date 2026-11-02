@@ -25,10 +25,10 @@ Ouvre http://localhost:8080 dans ton navigateur (ou téléphone).
 
 **Attendu** : tout s'affiche correctement, aucune erreur console.
 
-## ✅ Scénario de test 2 : Formation technique
+## ✅ Scénario de test 2 : Formations & Procédures
 
-1. **Clique sur l'onglet "Formation"** (icône livre)
-2. **Browse les catégories** : Configuration matériel, Lancement jeux, Dépannage, etc.
+1. **Clique sur l'onglet "Formations"** (icône livre)
+2. **Vérifie le titre** « Formations & Procédures » et les 3 onglets : Formation technique, Procédure et déroulement, Dépannage & bugs
 3. **Vérifie les badges** : certaines fiches ont un badge jaune « 🚧 À compléter »
 4. **Clique sur une fiche** (ex: "Dépannage : Malaise client")
 5. **Le drawer s'ouvre à droite** avec le détail de la fiche (étapes numérotées)
@@ -45,7 +45,9 @@ Ouvre http://localhost:8080 dans ton navigateur (ou téléphone).
 ## ✅ Scénario de test 3 : Suivi des parties (le plus important)
 
 1. **Clique sur l'onglet "Suivi parties"** (icône play)
-2. **Clique "Démarrer la session"** → la card bleue « Session en cours » apparaît
+2. **Vérifie « Mes sessions »** : parties du jour puis à venir (jeu, date/heure, groupe, joueurs)
+3. **Clique une session** → elle démarre pré-remplie (en-tête, ventes, bug reporter)
+4. **Ou** fallback : parcours « Parcours client VR au centre » + **Démarrer la session**
 3. **Coche quelques étapes** :
    - "Installation au lobby"
    - "Check-in QR" → **clique sur « Comment faire ? »** → le drawer s'ouvre avec la fiche Check-in

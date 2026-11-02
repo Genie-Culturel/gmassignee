@@ -35,7 +35,7 @@ export function Layout() {
             <TabsTrigger value="formation" asChild>
               <Link to="/formation" className="flex items-center gap-2">
                 <BookOpen className="h-4 w-4" />
-                <span className="hidden sm:inline">Formation</span>
+                <span className="hidden sm:inline">Formations</span>
               </Link>
             </TabsTrigger>
           </TabsList>

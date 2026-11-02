@@ -20,6 +20,7 @@ export const SESSION_STEP_LABELS: Record<SessionStep, string> = {
 export const FICHE_CATEGORY_LABELS: Record<FicheCategory, string> = {
   formation_technique: 'Formation technique',
   procedure_deroulement: 'Procédure et déroulement',
+  depannage_bugs: 'Dépannage & bugs',
   equipment_setup: 'Configuration matériel',
   game_launch: 'Lancement des jeux',
   troubleshooting: 'Dépannage',
@@ -33,6 +34,7 @@ export const FICHE_CATEGORY_LABELS: Record<FicheCategory, string> = {
 export const FICHE_CATEGORY_ICONS: Record<FicheCategory, string> = {
   formation_technique: '🔧',
   procedure_deroulement: '📋',
+  depannage_bugs: '🐛',
   equipment_setup: '⚙️',
   game_launch: '🎮',
   troubleshooting: '🔧',
@@ -42,6 +44,13 @@ export const FICHE_CATEGORY_ICONS: Record<FicheCategory, string> = {
   parcours_client: '👣',
   other: '📄',
 };
+
+/** Top-level tabs on the Formations & Procédures page. */
+export const FORMATION_PAGE_CATEGORIES: FicheCategory[] = [
+  'formation_technique',
+  'procedure_deroulement',
+  'depannage_bugs',
+];
 
 export const CHECKLIST_TYPE_LABELS: Record<ChecklistType, string> = {
   opening: 'Ouverture',

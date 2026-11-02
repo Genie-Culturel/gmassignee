@@ -3,7 +3,8 @@
 -- DO NOT RUN AGAINST PRODUCTION - Create a test/local Supabase project first
 
 -- Enable RLS
-ALTER DATABASE postgres SET "app.jwt_secret" TO 'your-jwt-secret';
+-- Note: do not ALTER DATABASE SET "app.jwt_secret" here — hosted Supabase
+-- does not allow that, and JWT secrets are managed by the platform.
 
 -- Create enum types
 CREATE TYPE checklist_type AS ENUM ('opening', 'closing', 'weekly_cleaning');

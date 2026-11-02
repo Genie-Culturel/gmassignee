@@ -18,10 +18,13 @@ interface SaleItem {
 
 interface SessionSalesProps {
   products: SalesProduct[];
+  groupName?: string;
+  playerCount?: number;
+  game?: string;
   onSalesChange?: (items: SaleItem[], comment: string) => void;
 }
 
-export function SessionSales({ products, onSalesChange }: SessionSalesProps) {
+export function SessionSales({ products, groupName, playerCount, game, onSalesChange }: SessionSalesProps) {
   const [salesItems, setSalesItems] = useState<SaleItem[]>([]);
   const [salesComment, setSalesComment] = useState('');
 
@@ -99,6 +102,13 @@ export function SessionSales({ products, onSalesChange }: SessionSalesProps) {
             </CardTitle>
             <CardDescription>
               Enregistre les ventes et paiements pour ce groupe
+              {(groupName || playerCount || game) && (
+                <span className="block mt-1">
+                  {[game, groupName, playerCount != null ? `${playerCount} joueur${playerCount > 1 ? 's' : ''}` : null]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+              )}
             </CardDescription>
           </div>
           <Button onClick={addSaleItem} size="sm" variant="outline">

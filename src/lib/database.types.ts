@@ -7,7 +7,18 @@ export type Json =
   | Json[]
 
 export type ChecklistType = 'opening' | 'closing' | 'weekly_cleaning';
-export type FicheCategory = 'formation_technique' | 'procedure_deroulement' | 'equipment_setup' | 'game_launch' | 'troubleshooting' | 'cleaning' | 'client_experience' | 'safety' | 'parcours_client' | 'other';
+export type FicheCategory =
+  | 'formation_technique'
+  | 'procedure_deroulement'
+  | 'depannage_bugs'
+  | 'equipment_setup'
+  | 'game_launch'
+  | 'troubleshooting'
+  | 'cleaning'
+  | 'client_experience'
+  | 'safety'
+  | 'parcours_client'
+  | 'other';
 export type IncidentType = 'bug' | 'malaise' | 'casse' | 'autre';
 export type PaymentMethod = 'twint' | 'especes' | 'carte' | 'facture';
 
@@ -65,6 +76,33 @@ export interface SessionSale {
   payment_method: PaymentMethod;
   is_invoiced: boolean;
   notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BugSession {
+  id: string;
+  ref: string | null;
+  vr_session_id: string | null;
+  game: string;
+  session_date: string;
+  session_time: string | null;
+  panel: string | null;
+  gm: string | null;
+  remarks: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BugEntry {
+  id: string;
+  bug_session_id: string;
+  description: string;
+  criticality: string | null;
+  category: string | null;
+  position: number | null;
+  status: string | null;
+  extra: Json;
   created_at: string;
   updated_at: string;
 }
@@ -305,6 +343,24 @@ export interface Database {
           fiche_id?: string;
           created_at?: string;
         };
+      };
+      bug_sessions: {
+        Row: BugSession;
+        Insert: Omit<BugSession, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<BugSession, 'id' | 'created_at' | 'updated_at'>>;
+      };
+      bug_entries: {
+        Row: BugEntry;
+        Insert: Omit<BugEntry, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<BugEntry, 'id' | 'created_at' | 'updated_at'>>;
       };
     };
     Views: Record<string, never>;

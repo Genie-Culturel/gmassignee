@@ -92,9 +92,9 @@ export function Dashboard() {
             </p>
           </div>
           <div>
-            <h3 className="font-semibold mb-2">📚 Formation technique</h3>
+            <h3 className="font-semibold mb-2">📚 Formations & Procédures</h3>
             <p className="text-sm text-muted-foreground">
-              Bibliothèque de fiches procédurales (Quest 3, lancement des jeux, dépannage, nettoyage, sécurité).
+              Bibliothèque de fiches : formation technique, procédure et déroulement, dépannage & bugs.
               Les fiches marquées 🚧 sont à compléter par Julien.
             </p>
           </div>

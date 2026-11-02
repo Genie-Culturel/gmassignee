@@ -19,7 +19,9 @@ Crée un projet Supabase de test/staging pour valider le module d'abord.
 
 ### 2. Appliquer les migrations
 
-Dans le dashboard Supabase, va dans **SQL Editor** et exécute les fichiers dans l'ordre :
+Dans le dashboard Supabase, va dans **SQL Editor** et exécute les fichiers **un par un** (chaque fichier = une transaction). L'ordre compte, surtout pour les `ALTER TYPE ... ADD VALUE` qui doivent commiter **avant** d'être utilisés.
+
+Sur un projet où 001–007 sont déjà appliqués : n'exécuter que **008, 009, 010**.
 
 #### Migration 1 : Structure des tables
 
@@ -54,6 +56,30 @@ Cette migration ajoute :
 - Les liens étapes de session → fiches
 
 **Temps estimé** : ~3 secondes
+
+#### 003b : Valeurs d'enum (transaction dédiée)
+
+Fichier : `supabase/migrations/003b_add_fiche_category_enum_values.sql`
+
+Ajoute `parcours_client`, `formation_technique`, `procedure_deroulement`. **Ne pas fusionner** avec 004/006.
+
+#### 004–007
+
+- `004_add_parcours_client_fiches.sql` — 14 fiches parcours client
+- `005_add_sales_and_payment.sql` — ventes / encaissement
+- `006_restructure_formation_categories.sql` — recatégorisation
+- `007_bug_reporter.sql` — `bug_sessions` / `bug_entries` (déjà appliqué sur l'instance hébergée)
+
+#### 008 : RLS admin
+
+Fichier : `supabase/migrations/008_fix_admin_rls.sql`
+
+Remplace `auth.jwt() ->> 'role' = 'admin'` (ne matche jamais sur Supabase hébergé) par `public.is_admin()` = `(auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'`.
+
+#### 009–010 : Dépannage & bugs
+
+- `009_add_depannage_bugs_enum.sql` — `ALTER TYPE` seul
+- `010_move_troubleshooting_to_depannage.sql` — déplace les fiches « Dépannage » hors de Formation technique
 
 ### 3. Vérifier les données
 
