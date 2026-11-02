@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,16 +17,14 @@ import {
   Users,
 } from 'lucide-react';
 import { SESSION_STEP_LABELS, INCIDENT_TYPE_LABELS, buildBugReporterUrl } from '@/lib/constants';
-import { SessionStep, IncidentType } from '@/lib/database.types';
+import { IncidentType, SalesProduct, SessionStep } from '@/lib/database.types';
 import { FicheButton } from '@/components/FicheButton';
 import { useFichesByStep, useFichesByIncidentType } from '@/hooks/useProcedureFiches';
 import { formatDate, formatTime } from '@/lib/utils';
 import { SessionSales } from '@/components/SessionSales';
-import { mockSalesProducts } from '@/lib/mockData';
 import {
   AssignedSession,
   DEMO_GM_ID,
-  DEMO_GM_NAME,
   getAssignedSessions,
 } from '@/lib/assignedSessions';
 import {
@@ -34,9 +32,30 @@ import {
   PARCOURS,
   getParcoursOrDefault,
 } from '@/lib/parcours';
+import { isMockMode } from '@/lib/supabase';
+import { useAuth } from '@/hooks/useAuth';
+import {
+  PersistedSession,
+  SaleItem,
+  SessionBug,
+  assignmentKey,
+  createManualSession,
+  createOrResumeFromAssignment,
+  endSession as persistEndSession,
+  fetchSalesProducts,
+  listBugsForSession,
+  listOpenSessions,
+  loadSession,
+  readRememberedSessionId,
+  rememberActiveSession,
+  replaceSales,
+  setStepCompleted,
+  updateSessionFields,
+} from '@/lib/sessionRepository';
 
 interface ActiveSession {
   sessionId: string;
+  assignmentId: string | null;
   game: string;
   date: string;
   time: string;
@@ -79,6 +98,21 @@ function dayLabel(date: string): string {
   return formatDate(date + 'T12:00:00');
 }
 
+function toActive(row: PersistedSession): ActiveSession {
+  return {
+    sessionId: row.sessionId,
+    assignmentId: row.assignmentId,
+    game: row.game,
+    date: row.date,
+    time: row.time,
+    groupName: row.groupName,
+    playerCount: row.playerCount,
+    gmName: row.gmName,
+    parcoursId: row.parcoursId,
+    notes: row.notes,
+  };
+}
+
 function openBugReporter(session: ActiveSession, remarks?: string) {
   const url = buildBugReporterUrl({
     game: session.game,
@@ -88,31 +122,90 @@ function openBugReporter(session: ActiveSession, remarks?: string) {
     gm: session.gmName,
     remarks: remarks || undefined,
     ref: session.sessionId,
+    sessionId: session.sessionId,
   });
   window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 export function SuiviParties() {
+  const { user, displayName } = useAuth();
+  const gmId = user?.id || DEMO_GM_ID;
+
   const [assigned, setAssigned] = useState<AssignedSession[]>([]);
+  const [openSessions, setOpenSessions] = useState<PersistedSession[]>([]);
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
   const [completedSteps, setCompletedSteps] = useState<Set<SessionStep>>(new Set());
   const [incidentType, setIncidentType] = useState<IncidentType | null>(null);
   const [incidentDetails, setIncidentDetails] = useState('');
+  const [salesItems, setSalesItems] = useState<SaleItem[]>([]);
+  const [salesComment, setSalesComment] = useState('');
+  const [products, setProducts] = useState<SalesProduct[]>([]);
+  const [bugs, setBugs] = useState<SessionBug[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const [manualGroupName, setManualGroupName] = useState('');
   const [manualGame, setManualGame] = useState('');
   const [manualPlayers, setManualPlayers] = useState('8');
   const [manualParcoursId, setManualParcoursId] = useState(DEFAULT_PARCOURS_ID);
 
+  const notesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const applyLoaded = useCallback((row: PersistedSession) => {
+    setActiveSession(toActive(row));
+    setCompletedSteps(new Set(row.completedSteps));
+    setIncidentType(row.incidentType);
+    setIncidentDetails(row.incidentDetails);
+    setSalesItems(row.sales);
+    setSalesComment(row.salesComment);
+    rememberActiveSession(row.sessionId);
+  }, []);
+
+  const refreshBugs = useCallback(async (sessionId: string) => {
+    try {
+      setBugs(await listBugsForSession(sessionId));
+    } catch {
+      /* listing bugs is best-effort */
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
-    getAssignedSessions(DEMO_GM_ID).then((rows) => {
+    getAssignedSessions(gmId).then((rows) => {
       if (!cancelled) setAssigned(rows);
     });
+    fetchSalesProducts().then((rows) => {
+      if (!cancelled) setProducts(rows);
+    });
+    if (!isMockMode && user) {
+      listOpenSessions(user.id).then((rows) => {
+        if (!cancelled) setOpenSessions(rows);
+      });
+      const remembered = readRememberedSessionId();
+      if (remembered) {
+        loadSession(remembered)
+          .then((row) => {
+            if (!cancelled && row && !row.endedAt) applyLoaded(row);
+          })
+          .catch(() => rememberActiveSession(null));
+      }
+    }
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [gmId, user, applyLoaded]);
+
+  useEffect(() => {
+    if (!activeSession) return;
+    refreshBugs(activeSession.sessionId);
+    const onFocus = () => refreshBugs(activeSession.sessionId);
+    window.addEventListener('focus', onFocus);
+    const tick = window.setInterval(() => refreshBugs(activeSession.sessionId), 15000);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      window.clearInterval(tick);
+    };
+  }, [activeSession?.sessionId, refreshBugs]);
 
   const groupedAssignments = useMemo(() => {
     const groups: { label: string; date: string; sessions: AssignedSession[] }[] = [];
@@ -131,60 +224,148 @@ export function SuiviParties() {
     return groups;
   }, [assigned]);
 
+  const openByAssignment = useMemo(() => {
+    const map = new Map<string, PersistedSession>();
+    for (const row of openSessions) {
+      if (row.assignmentId) map.set(row.assignmentId, row);
+    }
+    return map;
+  }, [openSessions]);
+
   const parcours = getParcoursOrDefault(activeSession?.parcoursId);
   const sessionSteps = parcours.steps;
 
-  const startFromAssignment = (assignment: AssignedSession) => {
-    setActiveSession({
-      sessionId: assignment.id,
-      game: assignment.game,
-      date: assignment.date,
-      time: assignment.time,
-      groupName: assignment.groupName,
-      playerCount: assignment.playerCount,
-      gmName: assignment.gmName,
-      parcoursId: assignment.parcoursId || DEFAULT_PARCOURS_ID,
-      notes: assignment.notes || '',
-    });
-    setCompletedSteps(new Set());
-    setIncidentType(null);
-    setIncidentDetails('');
+  const startFromAssignment = async (assignment: AssignedSession) => {
+    setError(null);
+    setBusy(true);
+    try {
+      const row = await createOrResumeFromAssignment({
+        assignment,
+        gmId,
+        gmName: displayName,
+      });
+      applyLoaded(row);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible de démarrer la session');
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const startManualSession = () => {
+  const resumeOpen = (row: PersistedSession) => {
+    applyLoaded(row);
+  };
+
+  const startManualSession = async () => {
     const players = parseInt(manualPlayers, 10);
-    setActiveSession({
-      sessionId: `session-${Date.now()}`,
-      game: manualGame.trim() || 'VR Session',
-      date: nowDate(),
-      time: nowTime(),
-      groupName: manualGroupName.trim(),
-      playerCount: Number.isFinite(players) && players > 0 ? players : 8,
-      gmName: DEMO_GM_NAME,
-      parcoursId: manualParcoursId,
-      notes: '',
-    });
-    setCompletedSteps(new Set());
-    setIncidentType(null);
-    setIncidentDetails('');
+    setError(null);
+    setBusy(true);
+    try {
+      const row = await createManualSession({
+        gmId,
+        gmName: displayName,
+        game: manualGame.trim() || 'VR Session',
+        date: nowDate(),
+        time: nowTime(),
+        groupName: manualGroupName.trim(),
+        playerCount: Number.isFinite(players) && players > 0 ? players : 8,
+        parcoursId: manualParcoursId,
+      });
+      applyLoaded(row);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible de démarrer la session');
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const endSession = () => {
-    setActiveSession(null);
-    alert('Session terminée et enregistrée (mode démo)');
+  const handleEndSession = async () => {
+    if (!activeSession) return;
+    setBusy(true);
+    try {
+      await persistEndSession(activeSession.sessionId);
+      setActiveSession(null);
+      setCompletedSteps(new Set());
+      setIncidentType(null);
+      setIncidentDetails('');
+      setSalesItems([]);
+      setSalesComment('');
+      setBugs([]);
+      if (user && !isMockMode) {
+        setOpenSessions(await listOpenSessions(user.id));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible de terminer la session');
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const toggleStep = (step: SessionStep) => {
+  const toggleStep = async (step: SessionStep) => {
+    if (!activeSession) return;
     const next = new Set(completedSteps);
-    if (next.has(step)) next.delete(step);
-    else next.add(step);
+    const completing = !next.has(step);
+    if (completing) next.add(step);
+    else next.delete(step);
     setCompletedSteps(next);
+    try {
+      await setStepCompleted(activeSession.sessionId, step, completing);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Étape non enregistrée');
+    }
   };
 
-  const reportIncident = (type: IncidentType) => {
+  const reportIncident = async (type: IncidentType) => {
     setIncidentType(type);
     if (type === 'bug' && activeSession) {
       openBugReporter(activeSession, incidentDetails);
+    }
+    if (activeSession) {
+      try {
+        await updateSessionFields(activeSession.sessionId, {
+          incidentType: type,
+          incidentDetails,
+        });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Incident non enregistré');
+      }
+    }
+  };
+
+  const onNotesChange = (notes: string) => {
+    if (!activeSession) return;
+    setActiveSession({ ...activeSession, notes });
+    if (notesTimer.current) clearTimeout(notesTimer.current);
+    notesTimer.current = setTimeout(() => {
+      updateSessionFields(activeSession.sessionId, { notes }).catch((err) =>
+        setError(err instanceof Error ? err.message : 'Notes non enregistrées')
+      );
+    }, 600);
+  };
+
+  const onIncidentDetailsChange = (details: string) => {
+    setIncidentDetails(details);
+    if (!activeSession) return;
+    if (notesTimer.current) clearTimeout(notesTimer.current);
+    notesTimer.current = setTimeout(() => {
+      updateSessionFields(activeSession.sessionId, { incidentDetails: details }).catch((err) =>
+        setError(err instanceof Error ? err.message : 'Incident non enregistré')
+      );
+    }, 600);
+  };
+
+  const clearIncident = async () => {
+    setIncidentType(null);
+    setIncidentDetails('');
+    if (activeSession) {
+      try {
+        await updateSessionFields(activeSession.sessionId, {
+          incidentType: null,
+          incidentDetails: '',
+        });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Incident non enregistré');
+      }
     }
   };
 
@@ -197,6 +378,39 @@ export function SuiviParties() {
             Mode Session : accompagner les clients étape par étape
           </p>
         </div>
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {!isMockMode && openSessions.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Sessions en cours</CardTitle>
+              <CardDescription>Reprendre exactement là où tu t&apos;étais arrêté</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {openSessions.map((row) => (
+                <button
+                  key={row.sessionId}
+                  type="button"
+                  onClick={() => resumeOpen(row)}
+                  className="w-full text-left rounded-lg border bg-background p-3 hover:border-primary transition-colors"
+                >
+                  <p className="font-medium">{row.game}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {row.date} · {row.time}
+                    {row.groupName ? ` · ${row.groupName}` : ''}
+                    {` · ${row.completedSteps.length} étape${row.completedSteps.length > 1 ? 's' : ''}`}
+                  </p>
+                </button>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
@@ -216,40 +430,44 @@ export function SuiviParties() {
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     {group.label}
                   </p>
-                  {group.sessions.map((session) => (
-                    <button
-                      key={session.id}
-                      type="button"
-                      onClick={() => startFromAssignment(session)}
-                      className="w-full text-left rounded-lg border bg-background p-3 hover:border-primary transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="font-medium leading-snug">{session.game}</p>
-                          <p className="text-sm text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-                            <span className="inline-flex items-center gap-1">
-                              <Clock className="h-3.5 w-3.5" />
-                              {session.time}
-                            </span>
-                            <span className="inline-flex items-center gap-1">
-                              <Calendar className="h-3.5 w-3.5" />
-                              {formatDate(session.date + 'T12:00:00')}
-                            </span>
-                            <span className="inline-flex items-center gap-1">
-                              <Users className="h-3.5 w-3.5" />
-                              {session.playerCount} joueur{session.playerCount > 1 ? 's' : ''}
-                            </span>
-                          </p>
-                          {session.groupName && (
-                            <p className="text-sm mt-1">{session.groupName}</p>
-                          )}
+                  {group.sessions.map((session) => {
+                    const existing = openByAssignment.get(assignmentKey(session));
+                    return (
+                      <button
+                        key={session.id}
+                        type="button"
+                        disabled={busy}
+                        onClick={() => startFromAssignment(session)}
+                        className="w-full text-left rounded-lg border bg-background p-3 hover:border-primary transition-colors disabled:opacity-50"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-medium leading-snug">{session.game}</p>
+                            <p className="text-sm text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                              <span className="inline-flex items-center gap-1">
+                                <Clock className="h-3.5 w-3.5" />
+                                {session.time}
+                              </span>
+                              <span className="inline-flex items-center gap-1">
+                                <Calendar className="h-3.5 w-3.5" />
+                                {formatDate(session.date + 'T12:00:00')}
+                              </span>
+                              <span className="inline-flex items-center gap-1">
+                                <Users className="h-3.5 w-3.5" />
+                                {session.playerCount} joueur{session.playerCount > 1 ? 's' : ''}
+                              </span>
+                            </p>
+                            {session.groupName && (
+                              <p className="text-sm mt-1">{session.groupName}</p>
+                            )}
+                          </div>
+                          <Badge variant={existing ? 'success' : isToday(session.date) ? 'success' : 'secondary'}>
+                            {existing ? 'Reprendre' : isToday(session.date) ? "Aujourd'hui" : group.label}
+                          </Badge>
                         </div>
-                        <Badge variant={isToday(session.date) ? 'success' : 'secondary'}>
-                          {isToday(session.date) ? 'Aujourd\'hui' : group.label}
-                        </Badge>
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    );
+                  })}
                 </div>
               ))
             )}
@@ -314,7 +532,7 @@ export function SuiviParties() {
                   onChange={(e) => setManualPlayers(e.target.value)}
                 />
               </div>
-              <Button onClick={startManualSession} className="w-full" size="lg">
+              <Button onClick={startManualSession} className="w-full" size="lg" disabled={busy}>
                 <PlayCircle className="mr-2 h-5 w-5" />
                 Démarrer la session
               </Button>
@@ -333,6 +551,13 @@ export function SuiviParties() {
           Mode Session : accompagner les clients étape par étape
         </p>
       </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <div className="space-y-6">
         <Card className="border-primary">
@@ -364,11 +589,8 @@ export function SuiviParties() {
           <IncidentAlert
             incidentType={incidentType}
             details={incidentDetails}
-            onDetailsChange={setIncidentDetails}
-            onClear={() => {
-              setIncidentType(null);
-              setIncidentDetails('');
-            }}
+            onDetailsChange={onIncidentDetailsChange}
+            onClear={clearIncident}
             session={activeSession}
           />
         )}
@@ -394,7 +616,12 @@ export function SuiviParties() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Incident ?</CardTitle>
+            <CardTitle className="flex items-center justify-between gap-2">
+              <span>Incident ?</span>
+              {bugs.length > 0 && (
+                <Badge variant="destructive">{bugs.length} bug{bugs.length > 1 ? 's' : ''}</Badge>
+              )}
+            </CardTitle>
             <CardDescription>
               Signale un incident si quelque chose ne va pas
             </CardDescription>
@@ -422,16 +649,58 @@ export function SuiviParties() {
               <ExternalLink className="h-4 w-4 mr-2" />
               Ouvrir le Bug reporter
             </Button>
+
+            {bugs.length > 0 && (
+              <div className="space-y-2 pt-2 border-t">
+                <p className="text-sm font-medium">Bugs de cette session</p>
+                <ul className="space-y-2">
+                  {bugs.map((bug) => (
+                    <li
+                      key={`${bug.bugSessionId}-${bug.position}-${bug.description}`}
+                      className="text-sm rounded-md border p-2"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium leading-snug">{bug.description}</span>
+                        {bug.criticality && (
+                          <Badge variant="secondary" className="shrink-0 text-xs">
+                            {bug.criticality}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {[bug.category, bug.status].filter(Boolean).join(' · ')}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => openBugReporter(activeSession, incidentDetails)}
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Rouvrir le Bug reporter
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         <SessionSales
-          products={mockSalesProducts}
+          key={activeSession.sessionId}
+          products={products}
           groupName={activeSession.groupName}
           playerCount={activeSession.playerCount}
           game={activeSession.game}
+          initialItems={salesItems}
+          initialComment={salesComment}
           onSalesChange={(items, comment) => {
-            console.log('Sales updated:', items, comment);
+            setSalesItems(items);
+            setSalesComment(comment);
+            replaceSales(activeSession.sessionId, items, comment, products).catch((err) =>
+              setError(err instanceof Error ? err.message : 'Ventes non enregistrées')
+            );
           }}
         />
 
@@ -443,16 +712,14 @@ export function SuiviParties() {
             <Textarea
               placeholder="Notes libres sur cette session..."
               value={activeSession.notes}
-              onChange={(e) =>
-                setActiveSession({ ...activeSession, notes: e.target.value })
-              }
+              onChange={(e) => onNotesChange(e.target.value)}
               rows={3}
             />
           </CardContent>
         </Card>
 
         <div className="flex gap-3">
-          <Button onClick={endSession} size="lg" className="flex-1">
+          <Button onClick={handleEndSession} size="lg" className="flex-1" disabled={busy}>
             <CheckCircle2 className="mr-2 h-5 w-5" />
             Terminer la session
           </Button>

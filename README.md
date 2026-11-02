@@ -27,20 +27,46 @@ Les fiches marquées **🚧** sont des placeholders « à compléter ».
 
 Le bouton **« Comment faire ? »** dans une session ouvre la fiche associée sans quitter le flux.
 
-## Mode démo
-
-Sans `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`, l'app tourne en **mode démo** (données locales, pas de secrets). C'est le mode du build GitHub Pages.
+## Lancer l'app
 
 ```bash
+git pull origin main
 npm install
 npm run dev
 ```
 
 Ouvre [http://localhost:8080](http://localhost:8080).
 
-- **Dashboard** : vue d'ensemble
-- **Suivi parties** : Mes sessions → clic pour démarrer, ou formulaire manuel
-- **Formations** : 3 onglets de fiches
+À l'entrée : écran PIN (même principe que le Bug reporter). Code **1950**, mémorisé dans `localStorage`. Ensuite seulement : login Supabase ou mode démo.
+
+Par défaut l'app se connecte au projet Supabase **gm-vrcenter** (URL + clé publishable dans `src/lib/config.ts`, surcharge possible via `.env.local`).
+
+### Mode démo (fallback)
+
+Les données restent locales (rien n'est écrit en base) si :
+
+- `?demo=1` dans l'URL (ou `#/dashboard?demo=1`)
+- toggle « Passer en mode démo » dans le pied de page (`localStorage`)
+- `VITE_FORCE_DEMO=true`
+
+Le login n'est pas demandé en mode démo.
+
+### Login GM
+
+Écran e-mail / mot de passe (connexion ou création de compte).
+
+**Créer le premier compte :**
+
+1. Ouvre l'app (pas en mode démo) → **Créer un compte GM**
+2. Ou dans Supabase → Authentication → Users → Add user (e-mail + mot de passe)
+3. Si la confirmation e-mail est activée : confirme le mail, ou désactive « Confirm email » (Authentication → Providers → Email) le temps du rollout
+4. Pour un **admin** : Authentication → user → `app_metadata` :
+
+```json
+{ "role": "admin" }
+```
+
+`is_admin()` (migration 008) lit ce champ. Le claim JWT `role` reste `authenticated`.
 
 ## Sessions assignées (planning GMassignee)
 
@@ -69,15 +95,20 @@ D'autres (EscapeLife Sion, EscapeLife Sierre, Chandoline…) s'ajoutent comme no
 
 Constante `BUG_REPORTER_BASE_URL` dans `src/lib/constants.ts`.
 
-URL : `https://genie-culturel.github.io/Bug_report_VR/?game=...&date=YYYY-MM-DD&time=HH:MM&panel=N&gm=...&remarks=...&ref=...&autostart=1`
+URL : `https://genie-culturel.github.io/Bug_report_VR/?game=...&date=YYYY-MM-DD&time=HH:MM&panel=N&gm=...&remarks=...&ref=<vr_sessions.id>&session_id=<vr_sessions.id>&autostart=1`
 
-## Configuration Supabase (optionnel)
+`session_id` est l'UUID `vr_sessions.id` (le bug reporter le pose dans `bug_sessions.vr_session_id`). `ref` reste le même id. La vue Session liste les `bug_entries` de cette session (via `vr_session_id` ou `ref`).
 
-Crée `.env.local` :
+## Configuration Supabase
+
+Défaut (commité, clé publishable publique) : projet `gm-vrcenter`.
+
+Surcharge optionnelle dans `.env.local` :
 
 ```env
-VITE_SUPABASE_URL=https://ton-projet.supabase.co
-VITE_SUPABASE_ANON_KEY=ta-cle-anon-publique
+VITE_SUPABASE_URL=https://vxeprhyswkqugyewpwfm.supabase.co
+VITE_SUPABASE_ANON_KEY=sb_publishable_…
+VITE_FORCE_DEMO=true
 ```
 
 ### Migrations
@@ -97,8 +128,9 @@ VITE_SUPABASE_ANON_KEY=ta-cle-anon-publique
 | `008_fix_admin_rls.sql` | Admin = `(auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'` |
 | `009_add_depannage_bugs_enum.sql` | `ALTER TYPE` : `depannage_bugs` (fichier séparé) |
 | `010_move_troubleshooting_to_depannage.sql` | Déplace les fiches Dépannage vers `depannage_bugs` |
+| `011_session_persistence.sql` | Colonnes de reprise (`game`, `session_date`, `session_time`, `player_count`, `parcours_id`, `assignment_id`, `gm_name`), `event_id` nullable, unique étape |
 
-Sur le projet déjà migré (001–007 + enum values déjà appliqués), n'exécuter que **008, 009, 010**.
+Sur **gm-vrcenter**, 001–011 sont déjà appliqués. Toute nouvelle schema = **012+**.
 
 Pour qu'un compte soit admin, dans Authentication → user → `app_metadata` :
 

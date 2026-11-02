@@ -1,4 +1,3 @@
-import { isMockMode, supabase } from './supabase';
 import { DEFAULT_PARCOURS_ID } from './parcours';
 
 /**
@@ -111,11 +110,8 @@ function sortAssignedSessions(sessions: AssignedSession[]): AssignedSession[] {
  * Today first, then upcoming. Past days are omitted.
  */
 export async function getAssignedSessions(gmId: string): Promise<AssignedSession[]> {
-  if (isMockMode || !supabase) {
-    return getMockAssignedSessions(gmId);
-  }
-
-  return fetchFromGmassigneePlanning(gmId);
+  // Planning still lives in the other GMassignee app. Always mock until wired.
+  return getMockAssignedSessions(gmId);
 }
 
 /**
@@ -131,7 +127,7 @@ export async function getAssignedSessions(gmId: string): Promise<AssignedSession
  *     .gte('start_at', startOfToday)
  *     .order('start_at');
  */
-async function fetchFromGmassigneePlanning(gmId: string): Promise<AssignedSession[]> {
+export async function fetchFromGmassigneePlanning(gmId: string): Promise<AssignedSession[]> {
   console.warn(
     'getAssignedSessions: GMassignee planning tables are not wired yet; using mock assignments.'
   );

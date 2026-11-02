@@ -7,26 +7,31 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Trash2, Banknote } from 'lucide-react';
 import { PaymentMethod, SalesProduct } from '@/lib/database.types';
 import { PAYMENT_METHOD_LABELS } from '@/lib/constants';
+import { SaleItem } from '@/lib/sessionRepository';
 
-interface SaleItem {
-  id: string;
-  productName: string;
-  quantity: number;
-  unitPrice: number;
-  paymentMethod: PaymentMethod;
-}
+export type { SaleItem };
 
 interface SessionSalesProps {
   products: SalesProduct[];
   groupName?: string;
   playerCount?: number;
   game?: string;
+  initialItems?: SaleItem[];
+  initialComment?: string;
   onSalesChange?: (items: SaleItem[], comment: string) => void;
 }
 
-export function SessionSales({ products, groupName, playerCount, game, onSalesChange }: SessionSalesProps) {
-  const [salesItems, setSalesItems] = useState<SaleItem[]>([]);
-  const [salesComment, setSalesComment] = useState('');
+export function SessionSales({
+  products,
+  groupName,
+  playerCount,
+  game,
+  initialItems = [],
+  initialComment = '',
+  onSalesChange,
+}: SessionSalesProps) {
+  const [salesItems, setSalesItems] = useState<SaleItem[]>(initialItems);
+  const [salesComment, setSalesComment] = useState(initialComment);
 
   const addSaleItem = () => {
     const defaultProduct = products.find(p => p.name === 'Autre') || products[0];

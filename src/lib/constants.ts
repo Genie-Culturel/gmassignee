@@ -90,7 +90,8 @@ export function buildBugReporterUrl(params: {
   panel: number; // number of players
   gm: string;
   remarks?: string;
-  ref: string; // session id
+  ref: string;
+  sessionId?: string; // vr_sessions.id
 }): string {
   const searchParams = new URLSearchParams({
     game: params.game,
@@ -101,10 +102,13 @@ export function buildBugReporterUrl(params: {
     ref: params.ref,
     autostart: '1',
   });
-  
+
+  if (params.sessionId) {
+    searchParams.set('session_id', params.sessionId);
+  }
   if (params.remarks) {
     searchParams.set('remarks', params.remarks);
   }
-  
+
   return `${BUG_REPORTER_BASE_URL}?${searchParams.toString()}`;
 }

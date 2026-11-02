@@ -1,15 +1,48 @@
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, Clock, FileText } from 'lucide-react';
 import { isMockMode } from '@/lib/supabase';
+import { useAuth } from '@/hooks/useAuth';
+import { useProcedureFiches } from '@/hooks/useProcedureFiches';
+import { ensureCheckin, listCheckinsThisMonth, listSessionsThisMonth } from '@/lib/sessionRepository';
 
 export function Dashboard() {
+  const { user, displayName } = useAuth();
+  const { fiches } = useProcedureFiches();
+  const [sessions, setSessions] = useState(0);
+  const [checkins, setCheckins] = useState(0);
+  const [checkinBusy, setCheckinBusy] = useState(false);
+  const [checkinMsg, setCheckinMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isMockMode || !user) return;
+    listSessionsThisMonth(user.id).then(setSessions);
+    listCheckinsThisMonth(user.id).then(setCheckins);
+  }, [user]);
+
+  const pointerArrivee = async () => {
+    if (!user) return;
+    setCheckinBusy(true);
+    setCheckinMsg(null);
+    try {
+      await ensureCheckin(user.id);
+      setCheckins(await listCheckinsThisMonth(user.id));
+      setCheckinMsg('Arrivée enregistrée');
+    } catch (err) {
+      setCheckinMsg(err instanceof Error ? err.message : 'Check-in impossible');
+    } finally {
+      setCheckinBusy(false);
+    }
+  };
+
   return (
     <div className="space-y-6 pb-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground mt-2">
-          Vue d'ensemble de tes activités
+          Vue d'ensemble de tes activités{!isMockMode ? ` · ${displayName}` : ''}
         </p>
       </div>
 
@@ -17,8 +50,8 @@ export function Dashboard() {
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Mode démo actif - Les données affichées sont des exemples.
-            Configure Supabase pour utiliser une vraie base de données.
+            Mode démo actif — les données ne sont pas enregistrées.
+            Désactive le mode démo (pied de page) pour te connecter à gm-vrcenter.
           </AlertDescription>
         </Alert>
       )}
@@ -30,9 +63,9 @@ export function Dashboard() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">0</div>
+            <div className="text-2xl font-bold">{isMockMode ? 0 : sessions}</div>
             <p className="text-xs text-muted-foreground">
-              Aucune session enregistrée
+              {sessions === 0 ? 'Aucune session enregistrée' : 'Enregistrées dans Supabase'}
             </p>
           </CardContent>
         </Card>
@@ -43,10 +76,22 @@ export function Dashboard() {
             <CheckCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">0</div>
-            <p className="text-xs text-muted-foreground">
-              Arrivées enregistrées
-            </p>
+            <div className="text-2xl font-bold">{isMockMode ? 0 : checkins}</div>
+            <p className="text-xs text-muted-foreground">Arrivées ce mois</p>
+            {!isMockMode && (
+              <Button
+                className="mt-3 w-full"
+                size="sm"
+                variant="outline"
+                disabled={checkinBusy}
+                onClick={pointerArrivee}
+              >
+                Pointer mon arrivée
+              </Button>
+            )}
+            {checkinMsg && (
+              <p className="text-xs text-muted-foreground mt-2">{checkinMsg}</p>
+            )}
           </CardContent>
         </Card>
 
@@ -69,7 +114,7 @@ export function Dashboard() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">8</div>
+            <div className="text-2xl font-bold">{fiches.length || 8}</div>
             <p className="text-xs text-muted-foreground">
               Disponibles en formation
             </p>

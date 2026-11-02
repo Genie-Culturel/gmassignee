@@ -251,7 +251,7 @@ export interface Database {
       vr_sessions: {
         Row: {
           id: string;
-          event_id: string;
+          event_id: string | null;
           gm_id: string;
           started_at: string;
           ended_at: string | null;
@@ -263,11 +263,18 @@ export interface Database {
           total_collected: number | null;
           total_to_invoice: number | null;
           sales_comment: string | null;
+          game: string | null;
+          session_date: string | null;
+          session_time: string | null;
+          player_count: number | null;
+          parcours_id: string | null;
+          assignment_id: string | null;
+          gm_name: string | null;
           created_at: string;
         };
         Insert: {
           id?: string;
-          event_id: string;
+          event_id?: string | null;
           gm_id: string;
           started_at?: string;
           ended_at?: string | null;
@@ -279,11 +286,18 @@ export interface Database {
           total_collected?: number | null;
           total_to_invoice?: number | null;
           sales_comment?: string | null;
+          game?: string | null;
+          session_date?: string | null;
+          session_time?: string | null;
+          player_count?: number | null;
+          parcours_id?: string | null;
+          assignment_id?: string | null;
+          gm_name?: string | null;
           created_at?: string;
         };
         Update: {
           id?: string;
-          event_id?: string;
+          event_id?: string | null;
           gm_id?: string;
           started_at?: string;
           ended_at?: string | null;
@@ -295,6 +309,13 @@ export interface Database {
           total_collected?: number | null;
           total_to_invoice?: number | null;
           sales_comment?: string | null;
+          game?: string | null;
+          session_date?: string | null;
+          session_time?: string | null;
+          player_count?: number | null;
+          parcours_id?: string | null;
+          assignment_id?: string | null;
+          gm_name?: string | null;
           created_at?: string;
         };
       };

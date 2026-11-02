@@ -1,22 +1,32 @@
 import { createClient } from '@supabase/supabase-js';
-import { Database } from './database.types';
+import {
+  DEFAULT_SUPABASE_ANON_KEY,
+  DEFAULT_SUPABASE_URL,
+  readDemoFlag,
+} from './config';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabaseUrl =
+  import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+const supabaseAnonKey =
+  import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
 
-// For local/mock mode when no Supabase credentials
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
-export const supabase = isSupabaseConfigured
-  ? createClient<Database>(supabaseUrl, supabaseAnonKey)
-  : null;
+/** Snapshot at module load. Toggle demo via localStorage/`?demo=1` then reload. */
+export const isMockMode = readDemoFlag() || !isSupabaseConfigured;
 
-// Mock mode flag - when true, the app uses local state instead of Supabase
-export const isMockMode = !isSupabaseConfigured;
+export const supabase = isSupabaseConfigured
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    })
+  : null;
 
 if (isMockMode) {
   console.warn(
-    '⚠️ Running in MOCK MODE - no Supabase connection. ' +
-    'Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to connect to a real database.'
+    '⚠️ Mode démo — données locales. Enlève ?demo=1 / le toggle, ou configure VITE_SUPABASE_* pour la vraie base.'
   );
 }
