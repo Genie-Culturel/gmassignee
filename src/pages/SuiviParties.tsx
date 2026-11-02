@@ -7,8 +7,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle2, Clock, PlayCircle } from 'lucide-react';
-import { SESSION_STEP_LABELS, INCIDENT_TYPE_LABELS } from '@/lib/constants';
+import { AlertCircle, CheckCircle2, Clock, PlayCircle, ExternalLink } from 'lucide-react';
+import { SESSION_STEP_LABELS, INCIDENT_TYPE_LABELS, buildBugReporterUrl } from '@/lib/constants';
 import { SessionStep, IncidentType } from '@/lib/database.types';
 import { FicheButton } from '@/components/FicheButton';
 import { useFichesByStep, useFichesByIncidentType } from '@/hooks/useProcedureFiches';
@@ -40,6 +40,8 @@ export function SuiviParties() {
   const [incidentDetails, setIncidentDetails] = useState('');
   const [sessionNotes, setSessionNotes] = useState('');
   const [groupName, setGroupName] = useState('');
+  const [sessionId] = useState(`session-${Date.now()}`);
+  const [sessionStartTime] = useState(new Date());
 
   const startSession = () => {
     setActiveSession(true);
@@ -67,6 +69,25 @@ export function SuiviParties() {
 
   const reportIncident = (type: IncidentType) => {
     setIncidentType(type);
+    
+    // For bug/freeze, also open the bug reporter
+    if (type === 'bug') {
+      openBugReporter();
+    }
+  };
+
+  const openBugReporter = () => {
+    const bugReporterUrl = buildBugReporterUrl({
+      game: 'VR Session', // In real app: get from event/session data
+      date: sessionStartTime.toISOString().split('T')[0], // YYYY-MM-DD
+      time: sessionStartTime.toTimeString().slice(0, 5), // HH:MM
+      panel: 8, // In real app: actual number of players
+      gm: 'GM Demo', // In real app: current GM name
+      remarks: incidentDetails || undefined,
+      ref: sessionId,
+    });
+    
+    window.open(bugReporterUrl, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -136,6 +157,8 @@ export function SuiviParties() {
                 setIncidentType(null);
                 setIncidentDetails('');
               }}
+              sessionId={sessionId}
+              sessionStartTime={sessionStartTime}
             />
           )}
 
@@ -165,7 +188,7 @@ export function SuiviParties() {
                 Signale un incident si quelque chose ne va pas
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
               <div className="grid grid-cols-2 gap-2">
                 {(['bug', 'malaise', 'casse', 'autre'] as IncidentType[]).map((type) => (
                   <Button
@@ -178,6 +201,16 @@ export function SuiviParties() {
                   </Button>
                 ))}
               </div>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={openBugReporter}
+                className="w-full"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Ouvrir le Bug reporter
+              </Button>
             </CardContent>
           </Card>
 
@@ -263,13 +296,30 @@ function IncidentAlert({
   details,
   onDetailsChange,
   onClear,
+  sessionId,
+  sessionStartTime,
 }: {
   incidentType: IncidentType;
   details: string;
   onDetailsChange: (details: string) => void;
   onClear: () => void;
+  sessionId: string;
+  sessionStartTime: Date;
 }) {
   const relevantFiches = useFichesByIncidentType(incidentType);
+
+  const openBugReporter = () => {
+    const bugReporterUrl = buildBugReporterUrl({
+      game: 'VR Session',
+      date: sessionStartTime.toISOString().split('T')[0],
+      time: sessionStartTime.toTimeString().slice(0, 5),
+      panel: 8,
+      gm: 'GM Demo',
+      remarks: details || undefined,
+      ref: sessionId,
+    });
+    window.open(bugReporterUrl, '_blank', 'noopener,noreferrer');
+  };
 
   return (
     <Alert variant="destructive">
@@ -287,11 +337,17 @@ function IncidentAlert({
           onChange={(e) => onDetailsChange(e.target.value)}
           rows={2}
         />
-        {relevantFiches.length > 0 && (
-          <div>
+        <div className="flex flex-wrap gap-2">
+          {relevantFiches.length > 0 && (
             <FicheButton fiches={relevantFiches} label="Voir la procédure de dépannage" />
-          </div>
-        )}
+          )}
+          {(incidentType === 'bug' || incidentType === 'autre') && (
+            <Button variant="outline" size="sm" onClick={openBugReporter}>
+              <ExternalLink className="h-4 w-4 mr-1" />
+              Bug reporter
+            </Button>
+          )}
+        </div>
       </AlertDescription>
     </Alert>
   );

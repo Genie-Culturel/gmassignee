@@ -70,3 +70,32 @@ export const PAYMENT_METHOD_LABELS: Record<import('./database.types').PaymentMet
   carte: 'Carte',
   facture: 'Facture entreprise',
 };
+
+// Bug reporter configuration
+export const BUG_REPORTER_BASE_URL = 'https://genie-culturel.github.io/Bug_report_VR/';
+
+export function buildBugReporterUrl(params: {
+  game: string;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:MM
+  panel: number; // number of players
+  gm: string;
+  remarks?: string;
+  ref: string; // session id
+}): string {
+  const searchParams = new URLSearchParams({
+    game: params.game,
+    date: params.date,
+    time: params.time,
+    panel: params.panel.toString(),
+    gm: params.gm,
+    ref: params.ref,
+    autostart: '1',
+  });
+  
+  if (params.remarks) {
+    searchParams.set('remarks', params.remarks);
+  }
+  
+  return `${BUG_REPORTER_BASE_URL}?${searchParams.toString()}`;
+}
