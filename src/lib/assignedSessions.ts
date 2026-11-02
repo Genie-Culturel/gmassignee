@@ -1,26 +1,40 @@
 import { DEFAULT_PARCOURS_ID } from './parcours';
 
 /**
- * A session assigned to a GM in the planning calendar.
+ * A session assigned to a GM in the GMassignee planning calendar.
  *
- * Real assignments live in the separate GMassignee Lovable app
- * (its own Supabase project — not this module's database). Until that
- * source is wired, `getAssignedSessions` returns demo data.
+ * Shape mirrors the GM dashboard rows ("Mes Activités Aujourd'hui" /
+ * "Mes Prochaines Activités"): game, player count, date, start/end time,
+ * status. Real assignments live in the separate GMassignee Lovable app
+ * (its own Supabase project). Until that source is wired,
+ * `getAssignedSessions` returns demo data in this same shape.
  *
  * To plug in the real planning tables later, replace the body of
- * `fetchFromGmassigneePlanning` (keep this AssignedSession shape).
+ * `fetchFromGmassigneePlanning` and map rows onto AssignedSession.
  */
+export type AssignmentStatus = 'assigned';
+
+export const ASSIGNMENT_STATUS_LABELS: Record<AssignmentStatus, string> = {
+  assigned: 'Assigné',
+};
+
 export interface AssignedSession {
   id: string;
   gmId: string;
   gmName: string;
+  /** Game title, shown as "Name [players]". */
   game: string;
+  /** Player count, shown in brackets after the game name. */
+  playerCount: number;
   /** YYYY-MM-DD */
   date: string;
-  /** HH:MM (session start) */
-  time: string;
-  groupName: string;
-  playerCount: number;
+  /** HH:MM session start */
+  startTime: string;
+  /** HH:MM session end */
+  endTime: string;
+  /** GMassignee assignment status (badge "Assigné"). */
+  status: AssignmentStatus;
+  groupName?: string;
   notes?: string;
   /** Parcours to run; defaults to VR Center client flow. */
   parcoursId: string;
@@ -28,6 +42,29 @@ export interface AssignedSession {
 
 export const DEMO_GM_ID = 'gm-demo';
 export const DEMO_GM_NAME = 'GM Demo';
+
+export function assignmentTitle(session: Pick<AssignedSession, 'game' | 'playerCount'>): string {
+  return `${session.game} [${session.playerCount}]`;
+}
+
+export function assignmentTimeRange(session: Pick<AssignedSession, 'startTime' | 'endTime'>): string {
+  return `${session.startTime} - ${session.endTime}`;
+}
+
+export function assignmentStatusLabel(status: AssignmentStatus | string): string {
+  return ASSIGNMENT_STATUS_LABELS[status as AssignmentStatus] || status;
+}
+
+export function splitAssignedSessions(sessions: AssignedSession[]): {
+  today: AssignedSession[];
+  upcoming: AssignedSession[];
+} {
+  const today = todayIso();
+  return {
+    today: sessions.filter((s) => s.date === today),
+    upcoming: sessions.filter((s) => s.date > today),
+  };
+}
 
 function isoDateOffset(days: number): string {
   const d = new Date();
@@ -43,51 +80,72 @@ function todayIso(): string {
   return isoDateOffset(0);
 }
 
+/** Prefer the real GMassignee date when it is still upcoming, else a relative fallback. */
+function planningDate(preferredIso: string, fallbackOffsetDays: number): string {
+  return preferredIso > todayIso() ? preferredIso : isoDateOffset(fallbackOffsetDays);
+}
+
 export function getMockAssignedSessions(gmId: string = DEMO_GM_ID): AssignedSession[] {
+  // Mirrors the GMassignee GM dashboard sample (today empty, upcoming rows).
   const rows: AssignedSession[] = [
     {
-      id: 'asgn-today-1400',
+      id: 'asgn-saga-2026-11-06-1430',
       gmId,
       gmName: DEMO_GM_NAME,
-      game: 'Le Serviteur I',
-      date: isoDateOffset(0),
-      time: '14:00',
-      groupName: 'Entreprise ABC',
-      playerCount: 6,
-      notes: 'Facture entreprise demandée.',
+      game: 'Saga le Serviteur de la Rédemption',
+      playerCount: 7,
+      date: planningDate('2026-11-06', 4),
+      startTime: '14:30',
+      endTime: '16:25',
+      status: 'assigned',
       parcoursId: DEFAULT_PARCOURS_ID,
     },
     {
-      id: 'asgn-today-1630',
-      gmId,
-      gmName: DEMO_GM_NAME,
-      game: 'La Bataille de la Planta',
-      date: isoDateOffset(0),
-      time: '16:30',
-      groupName: 'Anniversaire Sophie',
-      playerCount: 8,
-      parcoursId: DEFAULT_PARCOURS_ID,
-    },
-    {
-      id: 'asgn-tomorrow-1000',
-      gmId,
-      gmName: DEMO_GM_NAME,
-      game: 'La Saga',
-      date: isoDateOffset(1),
-      time: '10:00',
-      groupName: 'Team building Horizon',
-      playerCount: 12,
-      parcoursId: DEFAULT_PARCOURS_ID,
-    },
-    {
-      id: 'asgn-plus2-1800',
+      id: 'asgn-schoolcrafter-2026-11-13-1630',
       gmId,
       gmName: DEMO_GM_NAME,
       game: 'SchoolCrafter',
-      date: isoDateOffset(2),
-      time: '18:00',
-      groupName: 'EVJF Camille',
-      playerCount: 7,
+      playerCount: 5,
+      date: planningDate('2026-11-13', 11),
+      startTime: '16:30',
+      endTime: '17:50',
+      status: 'assigned',
+      parcoursId: DEFAULT_PARCOURS_ID,
+    },
+    {
+      id: 'asgn-schoolcrafter-2026-11-16-0900',
+      gmId,
+      gmName: DEMO_GM_NAME,
+      game: 'SchoolCrafter',
+      playerCount: 8,
+      date: planningDate('2026-11-16', 14),
+      startTime: '09:00',
+      endTime: '10:20',
+      status: 'assigned',
+      parcoursId: DEFAULT_PARCOURS_ID,
+    },
+    {
+      id: 'asgn-schoolcrafter-2026-11-16-1000',
+      gmId,
+      gmName: DEMO_GM_NAME,
+      game: 'SchoolCrafter',
+      playerCount: 8,
+      date: planningDate('2026-11-16', 14),
+      startTime: '10:00',
+      endTime: '11:20',
+      status: 'assigned',
+      parcoursId: DEFAULT_PARCOURS_ID,
+    },
+    {
+      id: 'asgn-schoolcrafter-2026-11-16-1100',
+      gmId,
+      gmName: DEMO_GM_NAME,
+      game: 'SchoolCrafter',
+      playerCount: 8,
+      date: planningDate('2026-11-16', 14),
+      startTime: '11:00',
+      endTime: '12:20',
+      status: 'assigned',
       parcoursId: DEFAULT_PARCOURS_ID,
     },
   ];
@@ -96,18 +154,12 @@ export function getMockAssignedSessions(gmId: string = DEMO_GM_ID): AssignedSess
 }
 
 function sortAssignedSessions(sessions: AssignedSession[]): AssignedSession[] {
-  return [...sessions].sort((a, b) => {
-    const today = todayIso();
-    const aToday = a.date === today ? 0 : 1;
-    const bToday = b.date === today ? 0 : 1;
-    if (aToday !== bToday) return aToday - bToday;
-    return `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`);
-  });
+  return [...sessions].sort((a, b) => `${a.date}T${a.startTime}`.localeCompare(`${b.date}T${b.startTime}`));
 }
 
 /**
  * Fetch sessions assigned to the logged-in GM.
- * Today first, then upcoming. Past days are omitted.
+ * Split into today / upcoming in the UI.
  */
 export async function getAssignedSessions(gmId: string): Promise<AssignedSession[]> {
   // Planning still lives in the other GMassignee app. Always mock until wired.
@@ -122,10 +174,15 @@ export async function getAssignedSessions(gmId: string): Promise<AssignedSession
  *
  *   const { data } = await planningClient
  *     .from('events')
- *     .select('id, game_name, start_at, group_name, player_count, gm_id, gm_name')
+ *     .select('id, game_name, start_at, end_at, player_count, status, gm_id, gm_name')
  *     .eq('gm_id', gmId)
  *     .gte('start_at', startOfToday)
  *     .order('start_at');
+ *
+ *   game ← game_name
+ *   playerCount ← player_count
+ *   date / startTime / endTime ← start_at, end_at
+ *   status ← 'assigned' when the GM is assigned
  */
 export async function fetchFromGmassigneePlanning(gmId: string): Promise<AssignedSession[]> {
   console.warn(

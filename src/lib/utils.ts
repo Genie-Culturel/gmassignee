@@ -14,6 +14,16 @@ export function formatDate(date: Date | string): string {
   }).format(d);
 }
 
+/** GMassignee row date, e.g. "vendredi 6 novembre 2026". */
+export function formatLongWeekdayDate(isoDate: string): string {
+  return new Intl.DateTimeFormat('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(`${isoDate}T12:00:00`));
+}
+
 export function formatTime(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
   return new Intl.DateTimeFormat('fr-FR', {
