@@ -81,6 +81,12 @@ Remplace `auth.jwt() ->> 'role' = 'admin'` (ne matche jamais sur Supabase héber
 - `009_add_depannage_bugs_enum.sql` — `ALTER TYPE` seul
 - `010_move_troubleshooting_to_depannage.sql` — déplace les fiches « Dépannage » hors de Formation technique
 
+#### 011 : Persistance / reprise de session
+
+Fichier : `supabase/migrations/011_session_persistence.sql`
+
+Colonnes `game`, `session_date`, `session_time`, `player_count`, `parcours_id`, `assignment_id`, `gm_name` ; `event_id` nullable ; unique `(session_id, step)`. Déjà appliqué sur **gm-vrcenter**.
+
 ### 3. Vérifier les données
 
 Dans **Table Editor**, vérifie que tu as :
