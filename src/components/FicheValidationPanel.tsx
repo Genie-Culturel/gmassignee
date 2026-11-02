@@ -124,7 +124,6 @@ export function FicheValidationPanel({
         <div className="space-y-4">
           <h3 className="text-sm font-semibold">Questions de validation</h3>
           {questions.map((question) => {
-            const multi = question.choices.length > 2 && question.prompt.toLowerCase().includes('plusieurs');
             const isWrong = wrong.includes(question.id);
             return (
               <div
@@ -139,6 +138,7 @@ export function FicheValidationPanel({
                     </Badge>
                   )}
                 </p>
+                <p className="text-xs text-muted-foreground">Coche la ou les bonnes réponses.</p>
                 <div className="space-y-1">
                   {question.choices.map((choice) => {
                     const selected = (answers[question.id] || []).includes(choice.id);
@@ -148,10 +148,10 @@ export function FicheValidationPanel({
                         className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60"
                       >
                         <input
-                          type={multi ? 'checkbox' : 'radio'}
-                          name={`q-${question.id}`}
+                          type="checkbox"
+                          name={`q-${question.id}-${choice.id}`}
                           checked={selected}
-                          onChange={() => toggleChoice(question.id, choice.id, multi)}
+                          onChange={() => toggleChoice(question.id, choice.id, true)}
                           className="h-4 w-4"
                         />
                         {choice.text}

@@ -242,7 +242,14 @@ export async function saveFiche(params: {
     if (params.fiche.id) {
       const idx = list.findIndex((row) => row.id === params.fiche.id);
       const prev = idx >= 0 ? list[idx] : hydrateTrainingFiche(params.fiche as ProcedureFiche);
-      const version = params.minorCorrection ? (prev.version ?? 1) : (prev.version ?? 1) + 1;
+      const contentChanged =
+        params.fiche.title !== prev.title ||
+        (params.fiche.summary ?? null) !== (prev.summary ?? null) ||
+        JSON.stringify(params.fiche.content_steps ?? []) !== JSON.stringify(prev.content_steps ?? []) ||
+        params.fiche.category !== prev.category ||
+        (params.fiche.is_required !== false) !== (prev.is_required !== false);
+      const version =
+        params.minorCorrection || !contentChanged ? (prev.version ?? 1) : (prev.version ?? 1) + 1;
       const next: ProcedureFiche = {
         ...prev,
         ...params.fiche,

@@ -181,6 +181,7 @@ function AdminFicheEditor({
   const [stepsText, setStepsText] = useState('');
   const [required, setRequired] = useState(true);
   const [active, setActive] = useState(true);
+  const [placeholder, setPlaceholder] = useState(false);
   const [minor, setMinor] = useState(false);
   const [questions, setQuestions] = useState<QuizQuestionAdmin[]>([]);
   const [busy, setBusy] = useState(false);
@@ -195,6 +196,7 @@ function AdminFicheEditor({
     setStepsText(selected.content_steps.map((step) => step.text).join('\n'));
     setRequired(selected.is_required !== false);
     setActive(selected.is_active);
+    setPlaceholder(Boolean(selected.is_placeholder));
     setMinor(false);
     listQuizQuestionsAdmin(selected.id).then(setQuestions).catch(() => setQuestions([]));
   }, [selected]);
@@ -210,6 +212,20 @@ function AdminFicheEditor({
         .map((text) => text.trim())
         .filter(Boolean)
         .map((text, index) => ({ order: index + 1, text }));
+      const cleanedQuestions = questions.map((question) => {
+        const choices = question.choices.filter((choice) => choice.text.trim());
+        return {
+          ...question,
+          prompt: question.prompt.trim(),
+          choices,
+          correct_choice_ids: question.correct_choice_ids.filter((id) =>
+            choices.some((choice) => choice.id === id)
+          ),
+        };
+      });
+      if (cleanedQuestions.some((q) => !q.prompt || q.choices.length < 2 || q.correct_choice_ids.length < 1)) {
+        throw new Error('Chaque question doit avoir un intitulé, au moins 2 réponses et une bonne réponse.');
+      }
       await saveFiche({
         fiche: {
           ...selected,
@@ -219,10 +235,11 @@ function AdminFicheEditor({
           content_steps: steps,
           is_required: required,
           is_active: active,
+          is_placeholder: placeholder,
         },
         minorCorrection: minor,
       });
-      for (const question of questions) {
+      for (const question of cleanedQuestions) {
         await saveQuizQuestion({ ...question, fiche_id: selected.id }, { skipBump: minor });
       }
       if (minor) await clearSkipVersionBump(selected.id);
@@ -280,7 +297,7 @@ function AdminFicheEditor({
                 content_steps: [{ order: 1, text: 'À compléter' }],
                 is_required: true,
                 is_active: true,
-                is_placeholder: true,
+                is_placeholder: false,
                 tags: [],
               },
               minorCorrection: true,
@@ -339,6 +356,10 @@ function AdminFicheEditor({
               Active
             </label>
             <label className="flex items-center gap-2 text-sm">
+              <Checkbox checked={placeholder} onCheckedChange={(v) => setPlaceholder(v === true)} />
+              Fiche à compléter (affiche un avertissement aux GM)
+            </label>
+            <label className="flex items-center gap-2 text-sm">
               <Checkbox checked={minor} onCheckedChange={(v) => setMinor(v === true)} />
               Correction mineure (ne pas demander de revalidation)
             </label>
@@ -361,6 +382,9 @@ function AdminFicheEditor({
                       setQuestions(next);
                     }}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Coche une ou plusieurs bonnes réponses (2 à 8 choix).
+                  </p>
                   {question.choices.map((choice, cidx) => (
                     <div key={choice.id} className="flex items-center gap-2">
                       <Checkbox
@@ -376,7 +400,7 @@ function AdminFicheEditor({
                       />
                       <Input
                         value={choice.text}
-                        placeholder={`Choix ${choice.id}`}
+                        placeholder={`Réponse ${cidx + 1}`}
                         onChange={(e) => {
                           const next = [...questions];
                           const choices = question.choices.map((item, i) =>
@@ -386,8 +410,47 @@ function AdminFicheEditor({
                           setQuestions(next);
                         }}
                       />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="shrink-0"
+                        disabled={question.choices.length <= 2}
+                        aria-label="Supprimer la réponse"
+                        onClick={() => {
+                          const next = [...questions];
+                          const choices = question.choices.filter((_, i) => i !== cidx);
+                          next[index] = {
+                            ...question,
+                            choices,
+                            correct_choice_ids: question.correct_choice_ids.filter((id) => id !== choice.id),
+                          };
+                          setQuestions(next);
+                        }}
+                      >
+                        ×
+                      </Button>
                     </div>
                   ))}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={question.choices.length >= 8}
+                    onClick={() => {
+                      const next = [...questions];
+                      const used = new Set(question.choices.map((item) => item.id));
+                      const alphabet = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+                      const id = alphabet.find((letter) => !used.has(letter)) || `r${Date.now()}`;
+                      next[index] = {
+                        ...question,
+                        choices: [...question.choices, { id, text: '' }],
+                      };
+                      setQuestions(next);
+                    }}
+                  >
+                    + Ajouter une réponse
+                  </Button>
                   <Button
                     type="button"
                     size="sm"
