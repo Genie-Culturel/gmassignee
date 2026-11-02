@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type ChecklistType = 'opening' | 'closing' | 'weekly_cleaning';
-export type FicheCategory = 'equipment_setup' | 'game_launch' | 'troubleshooting' | 'cleaning' | 'client_experience' | 'safety' | 'parcours_client' | 'other';
+export type FicheCategory = 'formation_technique' | 'procedure_deroulement' | 'equipment_setup' | 'game_launch' | 'troubleshooting' | 'cleaning' | 'client_experience' | 'safety' | 'parcours_client' | 'other';
 export type IncidentType = 'bug' | 'malaise' | 'casse' | 'autre';
 export type PaymentMethod = 'twint' | 'especes' | 'carte' | 'facture';
 

@@ -2,10 +2,10 @@ import { ProcedureFiche, SessionStep, SalesProduct } from './database.types';
 
 // Mock data for testing without Supabase
 export const mockFiches: ProcedureFiche[] = [
-  // Parcours client fiches (14 - one per session step)
+  // Parcours client fiches (14 - one per session step) - now in 'procedure_deroulement'
   {
     id: 'pc-1',
-    category: 'parcours_client',
+    category: 'procedure_deroulement',
     title: 'Installation au lobby',
     summary: 'Comment installer les clients dans la salle d\'accueil au début de leur visite',
     content_steps: [
@@ -23,7 +23,7 @@ export const mockFiches: ProcedureFiche[] = [
   },
   {
     id: 'pc-2',
-    category: 'parcours_client',
+    category: 'procedure_deroulement',
     title: 'Proposition de boissons',
     summary: 'Comment proposer et servir les boissons aux clients',
     content_steps: [
@@ -41,7 +41,7 @@ export const mockFiches: ProcedureFiche[] = [
   },
   {
     id: 'pc-3',
-    category: 'parcours_client',
+    category: 'procedure_deroulement',
     title: 'Service du pop-corn',
     summary: 'Comment servir le pop-corn offert aux clients',
     content_steps: [
@@ -58,7 +58,7 @@ export const mockFiches: ProcedureFiche[] = [
   },
   {
     id: 'pc-4',
-    category: 'parcours_client',
+    category: 'procedure_deroulement',
     title: 'Check-in QR et consentement',
     summary: 'Comment faire scanner le QR code de check-in et expliquer le consentement aux CG',
     content_steps: [
@@ -76,7 +76,7 @@ export const mockFiches: ProcedureFiche[] = [
   },
   {
     id: 'pc-5',
-    category: 'parcours_client',
+    category: 'procedure_deroulement',
     title: 'Briefing de sécurité',
     summary: 'Les points de sécurité et le pitch à présenter avant le jeu',
     content_steps: [
@@ -97,7 +97,7 @@ export const mockFiches: ProcedureFiche[] = [
   },
   {
     id: 'pc-6',
-    category: 'parcours_client',
+    category: 'procedure_deroulement',
     title: 'Vestiaire et casiers',
     summary: 'Comment gérer le vestiaire avant d\'équiper les clients',
     content_steps: [
@@ -114,7 +114,7 @@ export const mockFiches: ProcedureFiche[] = [
   },
   {
     id: 'pc-7',
-    category: 'parcours_client',
+    category: 'procedure_deroulement',
     title: 'Animation pendant le jeu',
     summary: 'Comment animer et accompagner les clients pendant qu\'ils jouent',
     content_steps: [
@@ -133,7 +133,7 @@ export const mockFiches: ProcedureFiche[] = [
   },
   {
     id: 'pc-8',
-    category: 'parcours_client',
+    category: 'procedure_deroulement',
     title: 'Filmer les moments clés',
     summary: 'Comment capturer les meilleurs moments du jeu',
     content_steps: [
@@ -151,7 +151,7 @@ export const mockFiches: ProcedureFiche[] = [
   },
   {
     id: 'pc-9',
-    category: 'parcours_client',
+    category: 'procedure_deroulement',
     title: 'Retour au salon',
     summary: 'Comment gérer le retour des clients après le jeu',
     content_steps: [
@@ -169,7 +169,7 @@ export const mockFiches: ProcedureFiche[] = [
   },
   {
     id: 'pc-10',
-    category: 'parcours_client',
+    category: 'procedure_deroulement',
     title: 'Débriefing avec les clients',
     summary: 'Comment mener la discussion après le jeu',
     content_steps: [
@@ -189,7 +189,7 @@ export const mockFiches: ProcedureFiche[] = [
   },
   {
     id: 'pc-11',
-    category: 'parcours_client',
+    category: 'procedure_deroulement',
     title: 'Envoi des vidéos souvenirs',
     summary: 'Comment partager les vidéos du jeu avec les clients',
     content_steps: [
@@ -206,7 +206,7 @@ export const mockFiches: ProcedureFiche[] = [
   },
   {
     id: 'pc-12',
-    category: 'parcours_client',
+    category: 'procedure_deroulement',
     title: 'Encourager les avis Google',
     summary: 'Comment demander un avis Google aux clients satisfaits',
     content_steps: [
@@ -224,7 +224,7 @@ export const mockFiches: ProcedureFiche[] = [
   },
   {
     id: 'pc-13',
-    category: 'parcours_client',
+    category: 'procedure_deroulement',
     title: 'Partage sur les réseaux sociaux',
     summary: 'Comment encourager le partage sur les réseaux sociaux',
     content_steps: [
@@ -242,7 +242,7 @@ export const mockFiches: ProcedureFiche[] = [
   },
   {
     id: 'pc-14',
-    category: 'parcours_client',
+    category: 'procedure_deroulement',
     title: 'Nettoyage entre deux groupes',
     summary: 'Nettoyage rapide et obligatoire entre chaque groupe',
     content_steps: [
@@ -264,7 +264,7 @@ export const mockFiches: ProcedureFiche[] = [
   // Original technical fiches (kept for reference and secondary links)
   {
     id: '1',
-    category: 'equipment_setup',
+    category: 'formation_technique',
     title: '🚧 Configuration casques Quest 3',
     summary: 'Procédure complète de mise en route des casques Meta Quest 3 (à compléter par Julien)',
     content_steps: [
@@ -281,7 +281,7 @@ export const mockFiches: ProcedureFiche[] = [
   },
   {
     id: '2',
-    category: 'equipment_setup',
+    category: 'formation_technique',
     title: '🚧 Recharge des casques et manettes',
     summary: 'Comment recharger les casques Quest 3 et les manettes entre deux groupes (à compléter)',
     content_steps: [
@@ -297,7 +297,7 @@ export const mockFiches: ProcedureFiche[] = [
   },
   {
     id: '3',
-    category: 'troubleshooting',
+    category: 'formation_technique',
     title: 'Dépannage : Malaise client',
     summary: 'Que faire si un client se sent mal (nausée, vertige, malaise)',
     content_steps: [
@@ -316,7 +316,7 @@ export const mockFiches: ProcedureFiche[] = [
   },
   {
     id: '4',
-    category: 'troubleshooting',
+    category: 'formation_technique',
     title: '🚧 Dépannage : Bug ou freeze en jeu',
     summary: 'Que faire quand le jeu bug, freeze ou ne répond plus (à compléter)',
     content_steps: [
@@ -332,7 +332,7 @@ export const mockFiches: ProcedureFiche[] = [
   },
   {
     id: '8',
-    category: 'game_launch',
+    category: 'formation_technique',
     title: '🚧 Lancement du Serviteur I',
     summary: 'Comment lancer le jeu Le Serviteur de la Rédemption - Chapitre I (à compléter)',
     content_steps: [

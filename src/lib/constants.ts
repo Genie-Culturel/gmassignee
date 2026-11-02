@@ -18,6 +18,8 @@ export const SESSION_STEP_LABELS: Record<SessionStep, string> = {
 };
 
 export const FICHE_CATEGORY_LABELS: Record<FicheCategory, string> = {
+  formation_technique: 'Formation technique',
+  procedure_deroulement: 'Procédure et déroulement',
   equipment_setup: 'Configuration matériel',
   game_launch: 'Lancement des jeux',
   troubleshooting: 'Dépannage',
@@ -29,6 +31,8 @@ export const FICHE_CATEGORY_LABELS: Record<FicheCategory, string> = {
 };
 
 export const FICHE_CATEGORY_ICONS: Record<FicheCategory, string> = {
+  formation_technique: '🔧',
+  procedure_deroulement: '📋',
   equipment_setup: '⚙️',
   game_launch: '🎮',
   troubleshooting: '🔧',

@@ -22,13 +22,8 @@ export function FormationTechnique() {
   const [selectedFiche, setSelectedFiche] = useState<ProcedureFiche | null>(null);
 
   const categories: FicheCategory[] = [
-    'parcours_client',
-    'equipment_setup',
-    'game_launch',
-    'troubleshooting',
-    'cleaning',
-    'client_experience',
-    'safety',
+    'formation_technique',
+    'procedure_deroulement',
   ];
 
   const filteredFiches = fiches.filter((fiche) => {
@@ -73,13 +68,11 @@ export function FormationTechnique() {
       </div>
 
       <Tabs defaultValue={categories[0]} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-7">
+        <TabsList className="grid w-full grid-cols-2">
           {categories.map((cat) => (
-            <TabsTrigger key={cat} value={cat} className="text-xs">
-              <span className="mr-1">{FICHE_CATEGORY_ICONS[cat]}</span>
-              <span className="hidden sm:inline">
-                {FICHE_CATEGORY_LABELS[cat]}
-              </span>
+            <TabsTrigger key={cat} value={cat}>
+              <span className="mr-2">{FICHE_CATEGORY_ICONS[cat]}</span>
+              <span>{FICHE_CATEGORY_LABELS[cat]}</span>
             </TabsTrigger>
           ))}
         </TabsList>
