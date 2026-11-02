@@ -9,12 +9,10 @@ import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   AlertCircle,
-  Calendar,
   CheckCircle2,
   Clock,
   PlayCircle,
   ExternalLink,
-  Users,
 } from 'lucide-react';
 import { SESSION_STEP_LABELS, INCIDENT_TYPE_LABELS, buildBugReporterUrl } from '@/lib/constants';
 import { IncidentType, SalesProduct, SessionStep } from '@/lib/database.types';
@@ -22,6 +20,7 @@ import { FicheButton } from '@/components/FicheButton';
 import { useFichesByStep, useFichesByIncidentType } from '@/hooks/useProcedureFiches';
 import { formatDate, formatTime } from '@/lib/utils';
 import { SessionSales } from '@/components/SessionSales';
+import { AssignedActivities } from '@/components/AssignedActivities';
 import {
   AssignedSession,
   DEMO_GM_ID,
@@ -59,6 +58,7 @@ interface ActiveSession {
   game: string;
   date: string;
   time: string;
+  endTime?: string;
   groupName: string;
   playerCount: number;
   gmName: string;
@@ -78,33 +78,14 @@ function nowTime(): string {
   return new Date().toTimeString().slice(0, 5);
 }
 
-function isToday(date: string): boolean {
-  return date === nowDate();
-}
-
-function isTomorrow(date: string): boolean {
-  const d = new Date();
-  d.setHours(12, 0, 0, 0);
-  d.setDate(d.getDate() + 1);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return date === `${y}-${m}-${day}`;
-}
-
-function dayLabel(date: string): string {
-  if (isToday(date)) return "Aujourd'hui";
-  if (isTomorrow(date)) return 'Demain';
-  return formatDate(date + 'T12:00:00');
-}
-
-function toActive(row: PersistedSession): ActiveSession {
+function toActive(row: PersistedSession, endTime?: string): ActiveSession {
   return {
     sessionId: row.sessionId,
     assignmentId: row.assignmentId,
     game: row.game,
     date: row.date,
     time: row.time,
+    endTime,
     groupName: row.groupName,
     playerCount: row.playerCount,
     gmName: row.gmName,
@@ -151,8 +132,8 @@ export function SuiviParties() {
 
   const notesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const applyLoaded = useCallback((row: PersistedSession) => {
-    setActiveSession(toActive(row));
+  const applyLoaded = useCallback((row: PersistedSession, endTime?: string) => {
+    setActiveSession(toActive(row, endTime));
     setCompletedSteps(new Set(row.completedSteps));
     setIncidentType(row.incidentType);
     setIncidentDetails(row.incidentDetails);
@@ -207,23 +188,6 @@ export function SuiviParties() {
     };
   }, [activeSession?.sessionId, refreshBugs]);
 
-  const groupedAssignments = useMemo(() => {
-    const groups: { label: string; date: string; sessions: AssignedSession[] }[] = [];
-    for (const session of assigned) {
-      const last = groups[groups.length - 1];
-      if (last && last.date === session.date) {
-        last.sessions.push(session);
-      } else {
-        groups.push({
-          label: dayLabel(session.date),
-          date: session.date,
-          sessions: [session],
-        });
-      }
-    }
-    return groups;
-  }, [assigned]);
-
   const openByAssignment = useMemo(() => {
     const map = new Map<string, PersistedSession>();
     for (const row of openSessions) {
@@ -244,7 +208,7 @@ export function SuiviParties() {
         gmId,
         gmName: displayName,
       });
-      applyLoaded(row);
+      applyLoaded(row, assignment.endTime);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Impossible de démarrer la session');
     } finally {
@@ -253,7 +217,8 @@ export function SuiviParties() {
   };
 
   const resumeOpen = (row: PersistedSession) => {
-    applyLoaded(row);
+    const match = assigned.find((session) => assignmentKey(session) === row.assignmentId);
+    applyLoaded(row, match?.endTime);
   };
 
   const startManualSession = async () => {
@@ -412,67 +377,20 @@ export function SuiviParties() {
           </Card>
         )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Mes sessions</CardTitle>
-            <CardDescription>
-              Tes parties du jour, puis les prochaines. Clique pour démarrer sans retaper les infos.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            {assigned.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Aucune session assignée pour le moment.
-              </p>
-            ) : (
-              groupedAssignments.map((group) => (
-                <div key={group.date} className="space-y-2">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {group.label}
-                  </p>
-                  {group.sessions.map((session) => {
-                    const existing = openByAssignment.get(assignmentKey(session));
-                    return (
-                      <button
-                        key={session.id}
-                        type="button"
-                        disabled={busy}
-                        onClick={() => startFromAssignment(session)}
-                        className="w-full text-left rounded-lg border bg-background p-3 hover:border-primary transition-colors disabled:opacity-50"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="font-medium leading-snug">{session.game}</p>
-                            <p className="text-sm text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-                              <span className="inline-flex items-center gap-1">
-                                <Clock className="h-3.5 w-3.5" />
-                                {session.time}
-                              </span>
-                              <span className="inline-flex items-center gap-1">
-                                <Calendar className="h-3.5 w-3.5" />
-                                {formatDate(session.date + 'T12:00:00')}
-                              </span>
-                              <span className="inline-flex items-center gap-1">
-                                <Users className="h-3.5 w-3.5" />
-                                {session.playerCount} joueur{session.playerCount > 1 ? 's' : ''}
-                              </span>
-                            </p>
-                            {session.groupName && (
-                              <p className="text-sm mt-1">{session.groupName}</p>
-                            )}
-                          </div>
-                          <Badge variant={existing ? 'success' : isToday(session.date) ? 'success' : 'secondary'}>
-                            {existing ? 'Reprendre' : isToday(session.date) ? "Aujourd'hui" : group.label}
-                          </Badge>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
+        <div className="space-y-3">
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight">Mes sessions</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Tes parties assignées. Clique une ligne pour démarrer, déjà pré-remplie.
+            </p>
+          </div>
+          <AssignedActivities
+            sessions={assigned}
+            openByAssignment={openByAssignment}
+            busy={busy}
+            onStart={startFromAssignment}
+          />
+        </div>
 
         <Card>
           <CardHeader>
@@ -534,7 +452,7 @@ export function SuiviParties() {
               </div>
               <Button onClick={startManualSession} className="w-full" size="lg" disabled={busy}>
                 <PlayCircle className="mr-2 h-5 w-5" />
-                Démarrer la session
+                Démarrer une session manuelle
               </Button>
             </div>
           </CardContent>
@@ -572,6 +490,7 @@ export function SuiviParties() {
                   <span className="block font-medium text-foreground">{activeSession.game}</span>
                   <span className="block">
                     {formatDate(activeSession.date + 'T12:00:00')} · {activeSession.time}
+                    {activeSession.endTime ? ` - ${activeSession.endTime}` : ''}
                     {activeSession.groupName ? ` · ${activeSession.groupName}` : ''}
                     {` · ${activeSession.playerCount} joueur${activeSession.playerCount > 1 ? 's' : ''}`}
                   </span>
