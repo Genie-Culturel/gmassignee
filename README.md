@@ -119,13 +119,22 @@ Pour qu'un compte soit admin, dans Authentication → user → `app_metadata` :
 - Supabase (PostgreSQL + RLS)
 - React Router v6 (**HashRouter** pour le démo GitHub Pages)
 
-## Démo GitHub Pages
+## Démo GitHub Pages (test téléphone)
 
-Workflow `.github/workflows/deploy-pages.yml` : build Vite en mode démo (pas de secrets), `base` = `/gmassignee/`.
+Workflow `.github/workflows/deploy-pages.yml` : build Vite en **mode démo** (pas de secrets), `base` = `/gmassignee/`, HashRouter.
 
-URL attendue : `https://genie-culturel.github.io/gmassignee/`
+URL attendue : [https://genie-culturel.github.io/gmassignee/](https://genie-culturel.github.io/gmassignee/)  
+(routes : `/#/dashboard`, `/#/suivi-parties`, `/#/formation`)
 
-Le repo est **privé** : GitHub Pages sur un repo privé exige un plan Pro / Team / Enterprise. Si Pages refuse, le repo n'est pas rendu public.
+Le premier déploiement a **buildé** mais n'a pas pu publier tant que Pages n'est pas activé.
+
+À faire une fois (owner, dans GitHub) :
+
+1. Repo → **Settings → Pages**
+2. Build and deployment → Source : **GitHub Actions**
+3. Relancer le workflow : **Actions → Deploy demo to GitHub Pages → Run workflow**
+
+Le repo est **privé** et n'a pas été rendu public. Sur un plan GitHub Free, Pages n'est disponible que pour les repos publics ; un repo privé nécessite Pro / Team / Enterprise. Si GitHub refuse l'activation, garder le repo privé et tester en local (`npm run dev`).
 
 ## Contact
 

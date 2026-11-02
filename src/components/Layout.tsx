@@ -21,19 +21,19 @@ export function Layout() {
         <Tabs value={currentPath} className="mb-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="dashboard" asChild>
-              <Link to="/dashboard" className="flex items-center gap-2">
+              <Link to="/dashboard" className="flex items-center gap-2" aria-label="Dashboard">
                 <LayoutDashboard className="h-4 w-4" />
                 <span className="hidden sm:inline">Dashboard</span>
               </Link>
             </TabsTrigger>
             <TabsTrigger value="suivi-parties" asChild>
-              <Link to="/suivi-parties" className="flex items-center gap-2">
+              <Link to="/suivi-parties" className="flex items-center gap-2" aria-label="Suivi parties">
                 <PlayCircle className="h-4 w-4" />
                 <span className="hidden sm:inline">Suivi parties</span>
               </Link>
             </TabsTrigger>
             <TabsTrigger value="formation" asChild>
-              <Link to="/formation" className="flex items-center gap-2">
+              <Link to="/formation" className="flex items-center gap-2" aria-label="Formations">
                 <BookOpen className="h-4 w-4" />
                 <span className="hidden sm:inline">Formations</span>
               </Link>
