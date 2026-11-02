@@ -24,6 +24,7 @@ export const FICHE_CATEGORY_LABELS: Record<FicheCategory, string> = {
   cleaning: 'Nettoyage',
   client_experience: 'Expérience client',
   safety: 'Sécurité',
+  parcours_client: 'Parcours client',
   other: 'Autre',
 };
 
@@ -34,6 +35,7 @@ export const FICHE_CATEGORY_ICONS: Record<FicheCategory, string> = {
   cleaning: '🧹',
   client_experience: '👥',
   safety: '⚠️',
+  parcours_client: '👣',
   other: '📄',
 };
 
@@ -56,4 +58,11 @@ export const INCIDENT_FICHE_MAPPING: Record<IncidentType, string[]> = {
   malaise: ['Dépannage : Malaise client'],
   casse: ['🚧 Dépannage : Manette ou casque cassé'],
   autre: [],
+};
+
+export const PAYMENT_METHOD_LABELS: Record<import('./database.types').PaymentMethod, string> = {
+  twint: 'Twint',
+  especes: 'Espèces',
+  carte: 'Carte',
+  facture: 'Facture entreprise',
 };

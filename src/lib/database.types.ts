@@ -7,8 +7,9 @@ export type Json =
   | Json[]
 
 export type ChecklistType = 'opening' | 'closing' | 'weekly_cleaning';
-export type FicheCategory = 'equipment_setup' | 'game_launch' | 'troubleshooting' | 'cleaning' | 'client_experience' | 'safety' | 'other';
+export type FicheCategory = 'equipment_setup' | 'game_launch' | 'troubleshooting' | 'cleaning' | 'client_experience' | 'safety' | 'parcours_client' | 'other';
 export type IncidentType = 'bug' | 'malaise' | 'casse' | 'autre';
+export type PaymentMethod = 'twint' | 'especes' | 'carte' | 'facture';
 
 export type SessionStep =
   | 'reception_seating'
@@ -39,6 +40,35 @@ export interface ProcedureFiche {
   updated_at: string;
 }
 
+export interface SalesProduct {
+  id: string;
+  name: string;
+  unit_price: number;
+  category: string | null;
+  description: string | null;
+  min_quantity: number | null;
+  max_quantity: number | null;
+  is_active: boolean;
+  order_index: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SessionSale {
+  id: string;
+  session_id: string;
+  product_id: string | null;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+  payment_method: PaymentMethod;
+  is_invoiced: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -50,6 +80,24 @@ export interface Database {
           updated_at?: string;
         };
         Update: Partial<Omit<ProcedureFiche, 'id' | 'created_at' | 'updated_at'>>;
+      };
+      sales_products: {
+        Row: SalesProduct;
+        Insert: Omit<SalesProduct, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<SalesProduct, 'id' | 'created_at' | 'updated_at'>>;
+      };
+      session_sales: {
+        Row: SessionSale;
+        Insert: Omit<SessionSale, 'id' | 'line_total' | 'created_at' | 'updated_at'> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<SessionSale, 'id' | 'line_total' | 'created_at' | 'updated_at'>>;
       };
       gm_checkins: {
         Row: {
@@ -174,6 +222,9 @@ export interface Database {
           has_incident: boolean;
           incident_type: IncidentType | null;
           incident_details: string | null;
+          total_collected: number | null;
+          total_to_invoice: number | null;
+          sales_comment: string | null;
           created_at: string;
         };
         Insert: {
@@ -187,6 +238,9 @@ export interface Database {
           has_incident?: boolean;
           incident_type?: IncidentType | null;
           incident_details?: string | null;
+          total_collected?: number | null;
+          total_to_invoice?: number | null;
+          sales_comment?: string | null;
           created_at?: string;
         };
         Update: {
@@ -200,6 +254,9 @@ export interface Database {
           has_incident?: boolean;
           incident_type?: IncidentType | null;
           incident_details?: string | null;
+          total_collected?: number | null;
+          total_to_invoice?: number | null;
+          sales_comment?: string | null;
           created_at?: string;
         };
       };
@@ -257,6 +314,7 @@ export interface Database {
       fiche_category: FicheCategory;
       session_step: SessionStep;
       incident_type: IncidentType;
+      payment_method: PaymentMethod;
     };
   };
 }

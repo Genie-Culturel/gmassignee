@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase, isMockMode } from '@/lib/supabase';
-import { ProcedureFiche } from '@/lib/database.types';
-import { mockFiches } from '@/lib/mockData';
+import { ProcedureFiche, SessionStep } from '@/lib/database.types';
+import { mockFiches, mockStepFichesMapping } from '@/lib/mockData';
 
 export function useProcedureFiches() {
   const [fiches, setFiches] = useState<ProcedureFiche[]>([]);
@@ -42,18 +42,18 @@ export function useProcedureFiches() {
   return { fiches, isLoading, error };
 }
 
-export function useFichesByStep(step: string) {
+export function useFichesByStep(step: SessionStep) {
   const [fiches, setFiches] = useState<ProcedureFiche[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function fetchStepFiches() {
       if (isMockMode) {
-        // Mock mode: filter mock data
+        // Mock mode: use mapping
         setTimeout(() => {
-          // For now, return empty in mock mode
-          // In a real implementation, we'd store step-fiche links in mock data too
-          setFiches([]);
+          const ficheIds = mockStepFichesMapping[step] || [];
+          const matchedFiches = mockFiches.filter(f => ficheIds.includes(f.id));
+          setFiches(matchedFiches);
           setIsLoading(false);
         }, 200);
         return;

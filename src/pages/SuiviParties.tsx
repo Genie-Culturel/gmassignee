@@ -13,6 +13,8 @@ import { SessionStep, IncidentType } from '@/lib/database.types';
 import { FicheButton } from '@/components/FicheButton';
 import { useFichesByStep, useFichesByIncidentType } from '@/hooks/useProcedureFiches';
 import { formatTime } from '@/lib/utils';
+import { SessionSales } from '@/components/SessionSales';
+import { mockSalesProducts } from '@/lib/mockData';
 
 const SESSION_STEPS: SessionStep[] = [
   'reception_seating',
@@ -178,6 +180,14 @@ export function SuiviParties() {
               </div>
             </CardContent>
           </Card>
+
+          <SessionSales
+            products={mockSalesProducts}
+            onSalesChange={(items, comment) => {
+              // In real app: update session state
+              console.log('Sales updated:', items, comment);
+            }}
+          />
 
           <Card>
             <CardHeader>

@@ -22,6 +22,7 @@ export function FormationTechnique() {
   const [selectedFiche, setSelectedFiche] = useState<ProcedureFiche | null>(null);
 
   const categories: FicheCategory[] = [
+    'parcours_client',
     'equipment_setup',
     'game_launch',
     'troubleshooting',
@@ -72,7 +73,7 @@ export function FormationTechnique() {
       </div>
 
       <Tabs defaultValue={categories[0]} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6">
+        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-7">
           {categories.map((cat) => (
             <TabsTrigger key={cat} value={cat} className="text-xs">
               <span className="mr-1">{FICHE_CATEGORY_ICONS[cat]}</span>
