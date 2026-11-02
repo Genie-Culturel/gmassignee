@@ -1,0 +1,59 @@
+import { SessionStep, FicheCategory, ChecklistType, IncidentType } from './database.types';
+
+export const SESSION_STEP_LABELS: Record<SessionStep, string> = {
+  reception_seating: 'Installation au lobby',
+  reception_drinks: 'Boissons',
+  reception_popcorn: 'Pop-corn',
+  reception_checkin: 'Check-in QR',
+  salon_briefing: 'Briefing sécurité',
+  salon_lockers: 'Casiers',
+  game_playing: 'Jeu en cours',
+  game_filming: 'Filmer moments clés',
+  salon_return: 'Retour salon',
+  reception_debrief: 'Débriefing',
+  videos_sent: 'Envoi vidéos',
+  google_review: 'Avis Google',
+  socials_shared: 'Réseaux sociaux',
+  cleaning: 'Nettoyage',
+};
+
+export const FICHE_CATEGORY_LABELS: Record<FicheCategory, string> = {
+  equipment_setup: 'Configuration matériel',
+  game_launch: 'Lancement des jeux',
+  troubleshooting: 'Dépannage',
+  cleaning: 'Nettoyage',
+  client_experience: 'Expérience client',
+  safety: 'Sécurité',
+  other: 'Autre',
+};
+
+export const FICHE_CATEGORY_ICONS: Record<FicheCategory, string> = {
+  equipment_setup: '⚙️',
+  game_launch: '🎮',
+  troubleshooting: '🔧',
+  cleaning: '🧹',
+  client_experience: '👥',
+  safety: '⚠️',
+  other: '📄',
+};
+
+export const CHECKLIST_TYPE_LABELS: Record<ChecklistType, string> = {
+  opening: 'Ouverture',
+  closing: 'Fermeture',
+  weekly_cleaning: 'Ménage hebdomadaire',
+};
+
+export const INCIDENT_TYPE_LABELS: Record<IncidentType, string> = {
+  bug: 'Bug / Freeze',
+  malaise: 'Malaise client',
+  casse: 'Matériel cassé',
+  autre: 'Autre incident',
+};
+
+// Map incident types to relevant fiche titles for auto-opening
+export const INCIDENT_FICHE_MAPPING: Record<IncidentType, string[]> = {
+  bug: ['🚧 Dépannage : Bug ou freeze en jeu'],
+  malaise: ['Dépannage : Malaise client'],
+  casse: ['🚧 Dépannage : Manette ou casque cassé'],
+  autre: [],
+};
