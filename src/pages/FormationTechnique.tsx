@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -10,18 +10,29 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { Search, FileText } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { useProcedureFiches } from '@/hooks/useProcedureFiches';
 import { FicheViewer } from '@/components/FicheViewer';
-import { MaFormation } from '@/components/MaFormation';
 import { FicheValidationPanel } from '@/components/FicheValidationPanel';
 import { TrainingAdmin } from '@/components/TrainingAdmin';
 import { FicheValidation, ProcedureFiche, FicheCategory } from '@/lib/database.types';
 import { FICHE_CATEGORY_LABELS, FICHE_CATEGORY_ICONS, FORMATION_PAGE_CATEGORIES } from '@/lib/constants';
 import { listMyValidations } from '@/lib/trainingRepository';
-import { ficheStatus, TRAINING_STATUS_LABELS } from '@/lib/training';
+import { ficheStatus, progressFor, TRAINING_STATUS_LABELS } from '@/lib/training';
 import { useAuth } from '@/hooks/useAuth';
 import { DEMO_GM_ID } from '@/lib/assignedSessions';
+import { cn } from '@/lib/utils';
+
+const SHORT_CATEGORY_LABELS: Partial<Record<FicheCategory, string>> = {
+  procedure_deroulement: 'Procédure',
+  depannage_bugs: 'Dépannage',
+};
+
+function statusVariant(status: 'todo' | 'done' | 'revalidate') {
+  if (status === 'done') return 'success' as const;
+  if (status === 'revalidate') return 'warning' as const;
+  return 'secondary' as const;
+}
 
 export function FormationTechnique() {
   const { user, isAdmin } = useAuth();
@@ -40,19 +51,18 @@ export function FormationTechnique() {
   }, [loadValidations]);
 
   const categories: FicheCategory[] = FORMATION_PAGE_CATEGORIES;
+  const global = progressFor(fiches, validations);
 
   const filteredFiches = fiches.filter((fiche) => {
+    if (!fiche.is_active) return false;
     const searchLower = searchTerm.toLowerCase();
+    if (!searchLower) return true;
     return (
       fiche.title.toLowerCase().includes(searchLower) ||
       fiche.summary?.toLowerCase().includes(searchLower) ||
       fiche.tags?.some((tag) => tag.toLowerCase().includes(searchLower))
     );
   });
-
-  const getFichesByCategory = (category: FicheCategory) => {
-    return filteredFiches.filter((f) => f.category === category);
-  };
 
   if (isLoading) {
     return (
@@ -66,143 +76,148 @@ export function FormationTechnique() {
   const validationFor = (fiche: ProcedureFiche) => validations.find((row) => row.fiche_id === fiche.id);
 
   return (
-    <div className="space-y-6 pb-8">
+    <div className="space-y-5 pb-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Formations & Procédures</h1>
-        <p className="text-muted-foreground mt-2">
-          Valide tes modules, puis consulte la bibliothèque des fiches.
+        <p className="mt-2 text-sm text-muted-foreground">
+          Progression globale{' '}
+          <span
+            className={cn(
+              'font-semibold',
+              global.total > 0 && global.done === global.total ? 'text-emerald-700' : 'text-red-600'
+            )}
+          >
+            {global.done}/{global.total}
+          </span>
+          {global.revalidate > 0 ? ` · ${global.revalidate} à revalider` : ''}
         </p>
       </div>
 
-      <Tabs defaultValue="ma-formation" className="w-full">
-        <TabsList className={`grid w-full h-auto ${isAdmin ? 'grid-cols-3' : 'grid-cols-2'}`}>
-          <TabsTrigger value="ma-formation" className="text-xs sm:text-sm whitespace-normal py-2">
-            Ma formation
-          </TabsTrigger>
-          <TabsTrigger value="bibliotheque" className="text-xs sm:text-sm whitespace-normal py-2">
-            Bibliothèque
-          </TabsTrigger>
+      <Tabs defaultValue={categories[0]} className="w-full">
+        <TabsList className="flex h-auto w-full flex-wrap gap-1">
+          {categories.map((cat) => {
+            const stats = progressFor(fiches, validations, cat);
+            const complete = stats.total > 0 && stats.done === stats.total;
+            const short = SHORT_CATEGORY_LABELS[cat];
+            return (
+              <TabsTrigger
+                key={cat}
+                value={cat}
+                aria-label={
+                  stats.total > 0
+                    ? `${FICHE_CATEGORY_LABELS[cat]} ${stats.done} sur ${stats.total}`
+                    : FICHE_CATEGORY_LABELS[cat]
+                }
+                className="h-auto min-h-11 min-w-[calc(50%-0.25rem)] flex-1 flex-col gap-1 whitespace-normal px-1.5 py-2 text-[11px] leading-snug sm:min-w-0 sm:flex-row sm:text-sm"
+              >
+                <span>
+                  <span className="mr-1">{FICHE_CATEGORY_ICONS[cat]}</span>
+                  {short ? (
+                    <>
+                      <span className="sm:hidden">{short}</span>
+                      <span className="hidden sm:inline">{FICHE_CATEGORY_LABELS[cat]}</span>
+                    </>
+                  ) : (
+                    FICHE_CATEGORY_LABELS[cat]
+                  )}
+                </span>
+                {stats.total > 0 && (
+                  <span
+                    className={cn(
+                      'rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums sm:text-xs',
+                      complete ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
+                    )}
+                  >
+                    {stats.done}/{stats.total}
+                  </span>
+                )}
+              </TabsTrigger>
+            );
+          })}
           {isAdmin && (
-            <TabsTrigger value="admin" className="text-xs sm:text-sm whitespace-normal py-2">
+            <TabsTrigger
+              value="admin"
+              className="h-auto min-h-11 min-w-[calc(50%-0.25rem)] flex-1 whitespace-normal px-1.5 py-2 text-[11px] sm:min-w-0 sm:text-sm"
+            >
               Admin
             </TabsTrigger>
           )}
         </TabsList>
 
-        <TabsContent value="ma-formation" className="mt-6">
-          <MaFormation fiches={fiches} validations={validations} onOpenFiche={openFiche} />
-        </TabsContent>
+        {categories.map((category) => {
+          const categoryFiches = filteredFiches.filter((fiche) => fiche.category === category);
+          return (
+            <TabsContent key={category} value={category} className="mt-4 space-y-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Rechercher une fiche..."
+                  className="pl-10"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
 
-        <TabsContent value="bibliotheque" className="mt-6 space-y-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Rechercher une fiche..."
-              className="pl-10"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-
-          <Tabs defaultValue={categories[0]} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 h-auto">
-              {categories.map((cat) => (
-                <TabsTrigger key={cat} value={cat} className="text-xs sm:text-sm whitespace-normal py-2">
-                  <span className="mr-1 sm:mr-2">{FICHE_CATEGORY_ICONS[cat]}</span>
-                  <span>{FICHE_CATEGORY_LABELS[cat]}</span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
-
-            {categories.map((category) => {
-              const categoryFiches = getFichesByCategory(category);
-              return (
-                <TabsContent key={category} value={category} className="mt-6">
-                  <div className="mb-4">
-                    <h2 className="text-xl font-semibold flex items-center gap-2">
-                      <span>{FICHE_CATEGORY_ICONS[category]}</span>
-                      {FICHE_CATEGORY_LABELS[category]}
-                    </h2>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {categoryFiches.length} fiche{categoryFiches.length > 1 ? 's' : ''}
-                    </p>
-                  </div>
-
-                  {categoryFiches.length === 0 ? (
-                    <Card>
-                      <CardContent className="py-8 text-center text-muted-foreground">
-                        {searchTerm
-                          ? 'Aucune fiche ne correspond à votre recherche.'
-                          : 'Aucune fiche dans cette catégorie.'}
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <div className="grid gap-4 md:grid-cols-2">
-                      {categoryFiches.map((fiche) => {
-                        const status = ficheStatus(fiche, validationFor(fiche));
-                        return (
-                          <Card
-                            key={fiche.id}
-                            className="cursor-pointer hover:border-primary transition-colors"
-                            onClick={() => openFiche(fiche)}
-                          >
-                            <CardHeader>
-                              <div className="flex items-start justify-between gap-2">
-                                <CardTitle className="text-base leading-snug">
-                                  {fiche.title}
-                                </CardTitle>
-                                <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                              </div>
-                              {fiche.summary && (
-                                <CardDescription className="text-xs">
-                                  {fiche.summary}
-                                </CardDescription>
-                              )}
-                            </CardHeader>
-                            <CardContent>
-                              <div className="flex flex-wrap gap-1">
-                                <Badge
-                                  variant={
-                                    status === 'done'
-                                      ? 'success'
-                                      : status === 'revalidate'
-                                        ? 'warning'
-                                        : 'secondary'
-                                  }
-                                  className="text-xs"
-                                >
-                                  {TRAINING_STATUS_LABELS[status]}
-                                </Badge>
-                                {fiche.is_placeholder && (
-                                  <Badge variant="warning" className="text-xs">
-                                    🚧 À compléter
-                                  </Badge>
-                                )}
-                                {fiche.tags?.slice(0, 3).map((tag) => (
-                                  <Badge key={tag} variant="secondary" className="text-xs">
-                                    {tag}
-                                  </Badge>
-                                ))}
-                              </div>
-                              <p className="text-xs text-muted-foreground mt-2">
-                                {fiche.content_steps.length} étape
-                                {fiche.content_steps.length > 1 ? 's' : ''}
-                              </p>
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
-                    </div>
-                  )}
-                </TabsContent>
-              );
-            })}
-          </Tabs>
-        </TabsContent>
+              {categoryFiches.length === 0 ? (
+                <Card>
+                  <CardContent className="py-8 text-center text-muted-foreground">
+                    {searchTerm
+                      ? 'Aucune fiche ne correspond à votre recherche.'
+                      : 'Aucune fiche dans cette catégorie.'}
+                  </CardContent>
+                </Card>
+              ) : (
+                <ul className="divide-y rounded-lg border bg-card">
+                  {categoryFiches.map((fiche) => {
+                    const required = fiche.is_required !== false;
+                    const status = ficheStatus(fiche, validationFor(fiche));
+                    return (
+                      <li key={fiche.id}>
+                        <button
+                          type="button"
+                          onClick={() => openFiche(fiche)}
+                          className="flex w-full items-start justify-between gap-3 px-3 py-3 text-left hover:bg-muted/50"
+                        >
+                          <span className="min-w-0">
+                            <span className="block font-medium leading-snug">{fiche.title}</span>
+                            {fiche.summary && (
+                              <span className="mt-0.5 block text-xs text-muted-foreground line-clamp-2">
+                                {fiche.summary}
+                              </span>
+                            )}
+                            {required && status === 'revalidate' && (
+                              <span className="mt-0.5 block text-xs text-amber-700">
+                                Procédure mise à jour — à relire
+                              </span>
+                            )}
+                          </span>
+                          <span className="flex shrink-0 flex-col items-end gap-1">
+                            {required ? (
+                              <Badge variant={statusVariant(status)}>
+                                {TRAINING_STATUS_LABELS[status]}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline">Facultative</Badge>
+                            )}
+                            {fiche.is_placeholder && (
+                              <Badge variant="warning" className="text-[10px]">
+                                À compléter
+                              </Badge>
+                            )}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </TabsContent>
+          );
+        })}
 
         {isAdmin && (
-          <TabsContent value="admin" className="mt-6">
+          <TabsContent value="admin" className="mt-4">
             <TrainingAdmin
               fiches={fiches}
               gmId={gmId}

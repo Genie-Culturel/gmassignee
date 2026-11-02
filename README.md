@@ -25,7 +25,7 @@ Bibliothèque de fiches en **3 catégories** :
 
 Les fiches marquées **🚧** sont des placeholders « à compléter ».
 
-**Ma formation** (dans le même onglet) : le GM valide chaque fiche requise (« J’ai lu et compris » + QCM s’il y en a). Progression par module, statut à faire / validée / à revalider. Une modification de procédure incrémente `version` (trigger SQL) et force une revalidation, sauf « Correction mineure ».
+Onglets : les 3 catégories (+ **Admin** si `is_admin`). Badge `3/31` rouge tant qu’il reste des fiches à valider, vert si tout est ok. Chaque fiche a un statut à faire / validée / à revalider ; le GM valide (« J’ai lu et compris » + QCM). Une modification incrémente `version` (sauf correction mineure).
 
 Le bouton **« Comment faire ? »** dans une session ouvre la fiche associée sans quitter le flux.
 
