@@ -575,16 +575,6 @@ export function SuiviParties() {
           </CardHeader>
         </Card>
 
-        {incidentType && (
-          <IncidentAlert
-            incidentType={incidentType}
-            details={incidentDetails}
-            onDetailsChange={onIncidentDetailsChange}
-            onClear={clearIncident}
-            session={activeSession}
-          />
-        )}
-
         <Card>
           <CardHeader>
             <CardTitle>Parcours client</CardTitle>
@@ -631,6 +621,16 @@ export function SuiviParties() {
                 </Button>
               ))}
             </div>
+
+            {incidentType && (
+              <IncidentAlert
+                incidentType={incidentType}
+                details={incidentDetails}
+                onDetailsChange={onIncidentDetailsChange}
+                onClear={clearIncident}
+                session={activeSession}
+              />
+            )}
 
             <Button
               variant="outline"
@@ -827,12 +827,21 @@ function IncidentAlert({
         </Button>
       </AlertTitle>
       <AlertDescription className="space-y-3 mt-2">
+        <label className="block text-sm font-medium text-foreground">
+          Veuillez préciser le problème
+        </label>
         <Textarea
-          placeholder="Décris l'incident..."
+          key={incidentType}
+          autoFocus
+          placeholder="Que s'est-il passé ? Quel matériel, quel client, quelle salle…"
           value={details}
           onChange={(e) => onDetailsChange(e.target.value)}
-          rows={2}
+          rows={3}
+          className={details.trim() ? '' : 'border-destructive'}
         />
+        {!details.trim() && (
+          <p className="text-xs text-destructive">Note à remplir par le GM.</p>
+        )}
         <div className="flex flex-wrap gap-2">
           {relevantFiches.length > 0 && (
             <FicheButton fiches={relevantFiches} label="Voir la procédure de dépannage" />
