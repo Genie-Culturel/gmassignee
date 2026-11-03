@@ -62,7 +62,7 @@ export const CHECKLIST_TYPE_LABELS: Record<ChecklistType, string> = {
 export const INCIDENT_TYPE_LABELS: Record<IncidentType, string> = {
   bug: 'Problème avec le jeu',
   malaise: 'Incident avec un client',
-  casse: 'Matériel manquant ou cassé',
+  casse: 'Problème matériel',
   autre: 'Autre incident',
 };
 
