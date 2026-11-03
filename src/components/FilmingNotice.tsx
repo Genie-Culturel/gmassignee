@@ -17,13 +17,20 @@ export function FilmingNotice({
       <AlertDescription className="space-y-3 text-sm leading-snug">
         <p>{FILMING_NOTICE}</p>
         {requireCheck && onAcknowledged && (
-          <label className="flex items-start gap-2">
+          <label className="flex items-start gap-2 cursor-pointer">
             <Checkbox
               checked={acknowledged}
               onCheckedChange={(v) => onAcknowledged(v === true)}
               className="mt-0.5"
             />
-            <span>J’ai informé le groupe de cet enregistrement.</span>
+            <span
+              onClick={(event) => {
+                event.preventDefault();
+                onAcknowledged(!acknowledged);
+              }}
+            >
+              J’ai informé le groupe de cet enregistrement.
+            </span>
           </label>
         )}
       </AlertDescription>
