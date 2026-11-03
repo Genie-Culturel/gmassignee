@@ -190,7 +190,7 @@ export function SessionVideos({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Vidéos souvenirs</CardTitle>
+        <CardTitle>Vidéos &amp; photos souvenirs</CardTitle>
         <CardDescription>
           Filme avec ton téléphone, téléverse les vidéos ici, puis transmets le lien au client. Limite
           actuelle : {SESSION_MEDIA_MAX_LABEL} par fichier (plan gratuit). Photos acceptées pour les tests.
