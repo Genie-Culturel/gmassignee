@@ -48,8 +48,8 @@ export const FICHE_CATEGORY_ICONS: Record<FicheCategory, string> = {
 
 /** Top-level tabs on the Formations & Procédures page. */
 export const FORMATION_PAGE_CATEGORIES: FicheCategory[] = [
-  'formation_technique',
   'procedure_deroulement',
+  'formation_technique',
   'depannage_bugs',
 ];
 
