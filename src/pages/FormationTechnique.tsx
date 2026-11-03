@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -12,9 +12,11 @@ import {
 } from '@/components/ui/sheet';
 import { Search } from 'lucide-react';
 import { useProcedureFiches } from '@/hooks/useProcedureFiches';
+import { useVenueCatalog } from '@/hooks/useVenueCatalog';
 import { FicheViewer } from '@/components/FicheViewer';
 import { FicheValidationPanel } from '@/components/FicheValidationPanel';
 import { TrainingAdmin } from '@/components/TrainingAdmin';
+import { GameScopeSelect } from '@/components/GameScopeSelect';
 import { FicheValidation, ProcedureFiche, FicheCategory } from '@/lib/database.types';
 import { FICHE_CATEGORY_LABELS, FICHE_CATEGORY_ICONS, FORMATION_PAGE_CATEGORIES } from '@/lib/constants';
 import { listMyValidations } from '@/lib/trainingRepository';
@@ -22,6 +24,13 @@ import { ficheStatus, progressFor, TRAINING_STATUS_LABELS } from '@/lib/training
 import { useAuth } from '@/hooks/useAuth';
 import { DEMO_GM_ID } from '@/lib/assignedSessions';
 import { cn } from '@/lib/utils';
+import {
+  ALL_GAMES_VALUE,
+  ficheScopeBadgeLabel,
+  filterFichesForGame,
+  readStoredGameId,
+  writeStoredGameId,
+} from '@/lib/venues';
 
 const SHORT_CATEGORY_LABELS: Partial<Record<FicheCategory, string>> = {
   procedure_deroulement: 'Procédure',
@@ -37,10 +46,19 @@ function statusVariant(status: 'todo' | 'done' | 'revalidate') {
 export function FormationTechnique() {
   const { user, isAdmin } = useAuth();
   const { fiches, isLoading, reload } = useProcedureFiches({ includeInactive: isAdmin });
+  const { catalog } = useVenueCatalog();
   const gmId = user?.id || DEMO_GM_ID;
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFiche, setSelectedFiche] = useState<ProcedureFiche | null>(null);
   const [validations, setValidations] = useState<FicheValidation[]>([]);
+  const [gameId, setGameId] = useState(ALL_GAMES_VALUE);
+
+  useEffect(() => {
+    const stored = readStoredGameId();
+    if (stored === ALL_GAMES_VALUE || catalog.games.some((game) => game.id === stored)) {
+      setGameId(stored);
+    }
+  }, [catalog]);
 
   const loadValidations = useCallback(() => {
     listMyValidations(gmId).then(setValidations).catch(() => setValidations([]));
@@ -51,9 +69,18 @@ export function FormationTechnique() {
   }, [loadValidations]);
 
   const categories: FicheCategory[] = FORMATION_PAGE_CATEGORIES;
-  const global = progressFor(fiches, validations);
+  const scopedFiches = useMemo(
+    () => filterFichesForGame(fiches, catalog, gameId),
+    [fiches, catalog, gameId]
+  );
+  const global = progressFor(scopedFiches, validations);
 
-  const filteredFiches = fiches.filter((fiche) => {
+  const onGameChange = (next: string) => {
+    setGameId(next);
+    writeStoredGameId(next);
+  };
+
+  const filteredFiches = scopedFiches.filter((fiche) => {
     if (!fiche.is_active || fiche.deleted_at) return false;
     const searchLower = searchTerm.toLowerCase();
     if (!searchLower) return true;
@@ -93,10 +120,12 @@ export function FormationTechnique() {
         </p>
       </div>
 
+      <GameScopeSelect catalog={catalog} value={gameId} onChange={onGameChange} />
+
       <Tabs defaultValue={categories[0]} className="w-full">
         <TabsList className="flex h-auto w-full flex-wrap gap-1">
           {categories.map((cat) => {
-            const stats = progressFor(fiches, validations, cat);
+            const stats = progressFor(scopedFiches, validations, cat);
             const complete = stats.total > 0 && stats.done === stats.total;
             const short = SHORT_CATEGORY_LABELS[cat];
             return (
@@ -181,6 +210,11 @@ export function FormationTechnique() {
                         >
                           <span className="min-w-0">
                             <span className="block font-medium leading-snug">{fiche.title}</span>
+                            <span className="mt-1 inline-flex">
+                              <Badge variant="outline" className="text-[10px] font-normal">
+                                {ficheScopeBadgeLabel(fiche, catalog)}
+                              </Badge>
+                            </span>
                             {fiche.summary && (
                               <span className="mt-0.5 block text-xs text-muted-foreground line-clamp-2">
                                 {fiche.summary}
@@ -220,6 +254,7 @@ export function FormationTechnique() {
           <TabsContent value="admin" className="mt-4">
             <TrainingAdmin
               fiches={fiches}
+              catalog={catalog}
               gmId={gmId}
               myValidations={validations}
               onFichesChanged={reload}

@@ -15,6 +15,16 @@ import {
   GmTrainingRow,
 } from '@/lib/trainingRepository';
 import { isMockMode } from '@/lib/supabase';
+import { GameScopeSelect } from '@/components/GameScopeSelect';
+import {
+  ALL_GAMES_VALUE,
+  FicheScopeKind,
+  VenueCatalog,
+  defaultScopeForNewFiche,
+  ficheScopeBadgeLabel,
+  filterFichesForGame,
+  gamesGroupedByLocation,
+} from '@/lib/venues';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,25 +44,42 @@ import {
 
 interface TrainingAdminProps {
   fiches: ProcedureFiche[];
+  catalog: VenueCatalog;
   gmId: string;
   myValidations: FicheValidation[];
   onFichesChanged: () => void;
 }
 
-export function TrainingAdmin({ fiches, gmId, myValidations, onFichesChanged }: TrainingAdminProps) {
+export function TrainingAdmin({ fiches, catalog, gmId, myValidations, onFichesChanged }: TrainingAdminProps) {
+  const [filterGameId, setFilterGameId] = useState(ALL_GAMES_VALUE);
+  const visible = filterFichesForGame(fiches, catalog, filterGameId);
   return (
-    <Tabs defaultValue="suivi" className="w-full">
-      <TabsList className="grid w-full grid-cols-2">
-        <TabsTrigger value="suivi">Suivi des GM</TabsTrigger>
-        <TabsTrigger value="fiches">Éditer les fiches</TabsTrigger>
-      </TabsList>
-      <TabsContent value="suivi" className="mt-4">
-        <AdminTracking fiches={fiches} gmId={gmId} myValidations={myValidations} />
-      </TabsContent>
-      <TabsContent value="fiches" className="mt-4">
-        <AdminFicheEditor fiches={fiches} onFichesChanged={onFichesChanged} />
-      </TabsContent>
-    </Tabs>
+    <div className="space-y-4">
+      <GameScopeSelect
+        id="admin-game-filter"
+        label="Filtrer par jeu"
+        catalog={catalog}
+        value={filterGameId}
+        onChange={setFilterGameId}
+      />
+      <Tabs defaultValue="suivi" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="suivi">Suivi des GM</TabsTrigger>
+          <TabsTrigger value="fiches">Éditer les fiches</TabsTrigger>
+        </TabsList>
+        <TabsContent value="suivi" className="mt-4">
+          <AdminTracking fiches={visible} gmId={gmId} myValidations={myValidations} />
+        </TabsContent>
+        <TabsContent value="fiches" className="mt-4">
+          <AdminFicheEditor
+            fiches={visible}
+            catalog={catalog}
+            filterGameId={filterGameId}
+            onFichesChanged={onFichesChanged}
+          />
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }
 
@@ -177,9 +204,13 @@ function AdminTracking({
 
 function AdminFicheEditor({
   fiches,
+  catalog,
+  filterGameId,
   onFichesChanged,
 }: {
   fiches: ProcedureFiche[];
+  catalog: VenueCatalog;
+  filterGameId: string;
   onFichesChanged: () => void;
 }) {
   const [selectedId, setSelectedId] = useState<string>(fiches[0]?.id || '');
@@ -197,6 +228,15 @@ function AdminFicheEditor({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [scopeKind, setScopeKind] = useState<FicheScopeKind>('locations');
+  const [scopeLocationIds, setScopeLocationIds] = useState<string[]>([]);
+  const [scopeGameIds, setScopeGameIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    setSelectedId(fiches[0]?.id || '');
+    // Reset only when the admin game filter changes; keep the current fiche after save/create.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterGameId]);
 
   useEffect(() => {
     if (!selected) return;
@@ -211,6 +251,9 @@ function AdminFicheEditor({
     setMessage(null);
     setError(null);
     setConfirmDelete(false);
+    setScopeKind(selected.scope_kind || 'all');
+    setScopeLocationIds(selected.scope_location_ids || []);
+    setScopeGameIds(selected.scope_game_ids || []);
     listQuizQuestionsAdmin(selected.id).then(setQuestions).catch(() => setQuestions([]));
   }, [selected]);
 
@@ -239,6 +282,12 @@ function AdminFicheEditor({
       if (cleanedQuestions.some((q) => !q.prompt || q.choices.length < 2 || q.correct_choice_ids.length < 1)) {
         throw new Error('Chaque question doit avoir un intitulé, au moins 2 réponses et une bonne réponse.');
       }
+      if (scopeKind === 'locations' && scopeLocationIds.length === 0) {
+        throw new Error('Choisis au moins un lieu, ou passe la portée à « Tous les lieux ».');
+      }
+      if (scopeKind === 'games' && scopeGameIds.length === 0) {
+        throw new Error('Choisis au moins un jeu, ou passe la portée à « Tous les lieux ».');
+      }
       await saveFiche({
         fiche: {
           ...selected,
@@ -251,6 +300,7 @@ function AdminFicheEditor({
           is_placeholder: placeholder,
         },
         minorCorrection: minor,
+        scope: { kind: scopeKind, locationIds: scopeLocationIds, gameIds: scopeGameIds },
       });
       for (const question of cleanedQuestions) {
         await saveQuizQuestion({ ...question, fiche_id: selected.id }, { skipBump: minor });
@@ -312,7 +362,7 @@ function AdminFicheEditor({
         >
           {fiches.map((fiche) => (
             <option key={fiche.id} value={fiche.id}>
-              {fiche.title} (v{fiche.version ?? 1})
+              {fiche.title} (v{fiche.version ?? 1}) · {ficheScopeBadgeLabel(fiche, catalog)}
             </option>
           ))}
         </select>
@@ -332,6 +382,14 @@ function AdminFicheEditor({
                 tags: [],
               },
               minorCorrection: true,
+              scope: (() => {
+                const next = defaultScopeForNewFiche(catalog, filterGameId);
+                return {
+                  kind: next.scope_kind,
+                  locationIds: next.scope_location_ids,
+                  gameIds: next.scope_game_ids,
+                };
+              })(),
             });
             await clearSkipVersionBump(created.id);
             onFichesChanged();
@@ -378,6 +436,57 @@ function AdminFicheEditor({
             <div className="space-y-2">
               <Label htmlFor="fiche-steps">Étapes (une par ligne)</Label>
               <Textarea id="fiche-steps" rows={6} value={stepsText} onChange={(e) => setStepsText(e.target.value)} />
+            </div>
+            <div className="space-y-2 rounded-md border p-3">
+              <p className="text-sm font-medium">Portée</p>
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={scopeKind}
+                onChange={(e) => setScopeKind(e.target.value as FicheScopeKind)}
+              >
+                <option value="all">Tous les lieux</option>
+                <option value="locations">Un ou plusieurs lieux</option>
+                <option value="games">Un ou plusieurs jeux</option>
+              </select>
+              {scopeKind === 'locations' && (
+                <div className="space-y-2">
+                  {catalog.locations.map((location) => (
+                    <label key={location.id} className="flex items-center gap-2 text-sm">
+                      <Checkbox
+                        checked={scopeLocationIds.includes(location.id)}
+                        onCheckedChange={(v) => {
+                          setScopeLocationIds((ids) =>
+                            v === true ? [...ids, location.id] : ids.filter((id) => id !== location.id)
+                          );
+                        }}
+                      />
+                      {location.name}
+                    </label>
+                  ))}
+                </div>
+              )}
+              {scopeKind === 'games' && (
+                <div className="space-y-3">
+                  {gamesGroupedByLocation(catalog).map((group) => (
+                    <div key={group.location.id} className="space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground">{group.location.name}</p>
+                      {group.games.map((game) => (
+                        <label key={game.id} className="flex items-center gap-2 text-sm">
+                          <Checkbox
+                            checked={scopeGameIds.includes(game.id)}
+                            onCheckedChange={(v) => {
+                              setScopeGameIds((ids) =>
+                                v === true ? [...ids, game.id] : ids.filter((id) => id !== game.id)
+                              );
+                            }}
+                          />
+                          {game.name}
+                        </label>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <label className="flex items-center gap-2 text-sm">
               <Checkbox checked={required} onCheckedChange={(v) => setRequired(v === true)} />

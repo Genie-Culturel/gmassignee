@@ -105,6 +105,14 @@ Fichier : `supabase/migrations/014_soft_delete_fiches.sql`
 
 Colonne `deleted_at` sur `procedure_fiches`. Distinct de `is_active` (masquage temporaire). Pas de `DELETE` SQL : `fiche_validations` reste. RLS : les GM ne voient que `is_active AND deleted_at IS NULL` ; seul `is_admin()` peut poser `deleted_at`.
 
+#### 015 : Lieux, jeux et portée des fiches
+
+Fichier : `supabase/migrations/015_fiche_locations_games.sql`
+
+Tables `locations` et `games` (un jeu appartient à un lieu). Colonne `procedure_fiches.scope_kind` (`all` / `locations` / `games`) + tables de jointure `fiche_scope_locations` et `fiche_scope_games`. RLS : lecture `authenticated`, écriture `is_admin()`.
+
+Règle métier : en choisissant un jeu, le GM voit les fiches « tous les lieux » + les fiches du lieu du jeu + les fiches de ce jeu. Les fiches déjà en base sont rattachées au Virtual Reality Center, sauf les lancements Planta / Saga / Serviteur (portée jeu).
+
 ### 3. Vérifier les données
 
 Dans **Table Editor**, vérifie que tu as :

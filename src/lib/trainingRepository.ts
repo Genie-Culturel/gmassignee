@@ -11,6 +11,7 @@ import { mockFiches } from './mockData';
 import { DEMO_GM_ID } from './assignedSessions';
 import { FORMATION_PAGE_CATEGORIES } from './constants';
 import { isFicheDeleted } from './training';
+import { DEMO_EXTRA_FICHES, FicheScopeKind } from './venues';
 
 export const TRAINING_STORAGE_KEY = 'gmassignee_fiche_validations';
 
@@ -93,12 +94,41 @@ function writeLocalValidations(gmId: string, rows: FicheValidation[]) {
   }
 }
 
+function defaultDemoScope(fiche: ProcedureFiche): {
+  scope_kind: FicheScopeKind;
+  scope_location_ids: string[];
+  scope_game_ids: string[];
+} {
+  if (fiche.scope_kind) {
+    return {
+      scope_kind: fiche.scope_kind,
+      scope_location_ids: fiche.scope_location_ids || [],
+      scope_game_ids: fiche.scope_game_ids || [],
+    };
+  }
+  const title = fiche.title || '';
+  if (/Lancement du Serviteur/i.test(title)) {
+    return { scope_kind: 'games', scope_location_ids: [], scope_game_ids: ['game-serviteur'] };
+  }
+  if (/Lancement de la Planta/i.test(title)) {
+    return { scope_kind: 'games', scope_location_ids: [], scope_game_ids: ['game-planta'] };
+  }
+  if (/Lancement de la Saga/i.test(title)) {
+    return { scope_kind: 'games', scope_location_ids: [], scope_game_ids: ['game-saga'] };
+  }
+  return { scope_kind: 'locations', scope_location_ids: ['loc-vr_center'], scope_game_ids: [] };
+}
+
 export function hydrateTrainingFiche(fiche: ProcedureFiche): ProcedureFiche {
+  const scope = defaultDemoScope(fiche);
   return {
     ...fiche,
     version: fiche.id === 'pc-1' ? fiche.version ?? 2 : fiche.version ?? 1,
     is_required: fiche.is_required ?? true,
     deleted_at: fiche.deleted_at ?? null,
+    scope_kind: scope.scope_kind,
+    scope_location_ids: scope.scope_location_ids,
+    scope_game_ids: scope.scope_game_ids,
   };
 }
 
@@ -213,7 +243,9 @@ let demoFichesStore: ProcedureFiche[] | null = null;
 let demoQuizStore: QuizQuestionAdmin[] | null = null;
 
 export function loadDemoFiches(): ProcedureFiche[] {
-  if (!demoFichesStore) demoFichesStore = mockFiches.map(hydrateTrainingFiche);
+  if (!demoFichesStore) {
+    demoFichesStore = [...mockFiches, ...DEMO_EXTRA_FICHES].map(hydrateTrainingFiche);
+  }
   return demoFichesStore;
 }
 
@@ -222,9 +254,44 @@ function loadDemoQuiz(): QuizQuestionAdmin[] {
   return demoQuizStore;
 }
 
+async function replaceFicheScope(
+  ficheId: string,
+  scope: { kind: FicheScopeKind; locationIds: string[]; gameIds: string[] }
+) {
+  if (!supabase) return;
+  await supabase.from('fiche_scope_locations').delete().eq('fiche_id', ficheId);
+  await supabase.from('fiche_scope_games').delete().eq('fiche_id', ficheId);
+  if (scope.kind === 'locations' && scope.locationIds.length) {
+    const { error } = await supabase
+      .from('fiche_scope_locations')
+      .insert(scope.locationIds.map((location_id) => ({ fiche_id: ficheId, location_id })));
+    if (error) throw new Error(error.message);
+  }
+  if (scope.kind === 'games' && scope.gameIds.length) {
+    const { error } = await supabase
+      .from('fiche_scope_games')
+      .insert(scope.gameIds.map((game_id) => ({ fiche_id: ficheId, game_id })));
+    if (error) throw new Error(error.message);
+  }
+}
+
+function attachScopeFields(
+  fiche: ProcedureFiche,
+  scope?: { kind: FicheScopeKind; locationIds: string[]; gameIds: string[] }
+): ProcedureFiche {
+  if (!scope) return fiche;
+  return {
+    ...fiche,
+    scope_kind: scope.kind,
+    scope_location_ids: scope.kind === 'locations' ? scope.locationIds : [],
+    scope_game_ids: scope.kind === 'games' ? scope.gameIds : [],
+  };
+}
+
 export async function saveFiche(params: {
   fiche: Partial<ProcedureFiche> & { title: string; category: FicheCategory };
   minorCorrection: boolean;
+  scope?: { kind: FicheScopeKind; locationIds: string[]; gameIds: string[] };
 }): Promise<ProcedureFiche> {
   const body: Record<string, unknown> = {
     title: params.fiche.title,
@@ -236,6 +303,7 @@ export async function saveFiche(params: {
     is_active: params.fiche.is_active ?? true,
     is_required: params.fiche.is_required ?? true,
   };
+  if (params.scope) body.scope_kind = params.scope.kind;
   // Always explicit so a stale flag from an earlier minor save never blocks a real version bump.
   body.skip_version_bump = params.minorCorrection;
 
@@ -253,33 +321,39 @@ export async function saveFiche(params: {
         (params.fiche.is_required !== false) !== (prev.is_required !== false);
       const version =
         params.minorCorrection || !contentChanged ? (prev.version ?? 1) : (prev.version ?? 1) + 1;
-      const next: ProcedureFiche = {
-        ...prev,
-        ...params.fiche,
-        id: prev.id,
-        version,
-        updated_at: now,
-        deleted_at: prev.deleted_at ?? null,
-      };
+      const next: ProcedureFiche = attachScopeFields(
+        {
+          ...prev,
+          ...params.fiche,
+          id: prev.id,
+          version,
+          updated_at: now,
+          deleted_at: prev.deleted_at ?? null,
+        },
+        params.scope
+      );
       if (idx >= 0) list[idx] = next;
       else list.push(next);
       return next;
     }
-    const created: ProcedureFiche = {
-      id: `demo-fiche-${Date.now()}`,
-      category: params.fiche.category,
-      title: params.fiche.title,
-      summary: params.fiche.summary ?? null,
-      content_steps: params.fiche.content_steps ?? [],
-      is_placeholder: params.fiche.is_placeholder ?? false,
-      tags: params.fiche.tags ?? [],
-      is_active: params.fiche.is_active ?? true,
-      is_required: params.fiche.is_required ?? true,
-      version: 1,
-      deleted_at: null,
-      created_at: now,
-      updated_at: now,
-    };
+    const created: ProcedureFiche = attachScopeFields(
+      {
+        id: `demo-fiche-${Date.now()}`,
+        category: params.fiche.category,
+        title: params.fiche.title,
+        summary: params.fiche.summary ?? null,
+        content_steps: params.fiche.content_steps ?? [],
+        is_placeholder: params.fiche.is_placeholder ?? false,
+        tags: params.fiche.tags ?? [],
+        is_active: params.fiche.is_active ?? true,
+        is_required: params.fiche.is_required ?? true,
+        version: 1,
+        deleted_at: null,
+        created_at: now,
+        updated_at: now,
+      },
+      params.scope
+    );
     list.push(created);
     return created;
   }
@@ -292,11 +366,13 @@ export async function saveFiche(params: {
       .select('*')
       .single();
     if (error) throw new Error(error.message);
-    return data as ProcedureFiche;
+    if (params.scope) await replaceFicheScope(params.fiche.id, params.scope);
+    return attachScopeFields(data as ProcedureFiche, params.scope);
   }
   const { data, error } = await supabase.from('procedure_fiches').insert(body).select('*').single();
   if (error) throw new Error(error.message);
-  return data as ProcedureFiche;
+  if (params.scope) await replaceFicheScope(data.id, params.scope);
+  return attachScopeFields(data as ProcedureFiche, params.scope);
 }
 
 export async function saveQuizQuestion(

@@ -28,7 +28,7 @@ export function useProcedureFiches(opts?: { includeInactive?: boolean }) {
       try {
         let query = supabase!
           .from('procedure_fiches')
-          .select('*')
+          .select('*, fiche_scope_locations(location_id), fiche_scope_games(game_id)')
           .is('deleted_at', null)
           .order('category', { ascending: true })
           .order('title', { ascending: true });
@@ -36,7 +36,20 @@ export function useProcedureFiches(opts?: { includeInactive?: boolean }) {
         const { data, error: fetchError } = await query;
 
         if (fetchError) throw fetchError;
-        setFiches((data || []).map(hydrateTrainingFiche));
+        setFiches(
+          (data || []).map((row) => {
+            const record = row as ProcedureFiche & {
+              fiche_scope_locations?: { location_id: string }[];
+              fiche_scope_games?: { game_id: string }[];
+            };
+            return hydrateTrainingFiche({
+              ...record,
+              scope_kind: record.scope_kind || 'all',
+              scope_location_ids: (record.fiche_scope_locations || []).map((item) => item.location_id),
+              scope_game_ids: (record.fiche_scope_games || []).map((item) => item.game_id),
+            });
+          })
+        );
       } catch (err) {
         setError(err as Error);
       } finally {

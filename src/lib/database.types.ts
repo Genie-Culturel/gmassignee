@@ -21,6 +21,7 @@ export type FicheCategory =
   | 'other';
 export type IncidentType = 'bug' | 'malaise' | 'casse' | 'autre';
 export type PaymentMethod = 'twint' | 'especes' | 'carte' | 'facture';
+export type FicheScopeKind = 'all' | 'locations' | 'games';
 
 export type SessionStep =
   | 'reception_seating'
@@ -51,6 +52,9 @@ export interface ProcedureFiche {
   is_required?: boolean;
   skip_version_bump?: boolean;
   deleted_at?: string | null;
+  scope_kind?: FicheScopeKind;
+  scope_location_ids?: string[];
+  scope_game_ids?: string[];
   created_at: string;
   updated_at: string;
 }
