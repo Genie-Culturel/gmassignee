@@ -138,8 +138,9 @@ VITE_FORCE_DEMO=true
 | `013_session_media.sql` | Vidéos clients : `client_email` / `videos_sent_at` / `videos_download_token` sur `vr_sessions`, table `session_media`, bucket privé `session-media` (50 Mo), RLS, `cleanup_expired_session_media()` |
 | `014_soft_delete_fiches.sql` | Suppression logique des fiches : `procedure_fiches.deleted_at` (distinct de `is_active`). L’historique `fiche_validations` est conservé. |
 | `015_fiche_locations_games.sql` | Lieux (`locations`) et jeux (`games`), portée des fiches (`scope_kind` + `fiche_scope_locations` / `fiche_scope_games`). Seed VR Center / Chandoline / Sion / Sierre. Les fiches existantes sont rattachées au VR Center ; les lancements Planta / Saga / Serviteur sont rattachés au jeu. |
+| `016_fiche_sort_order.sql` | Ordre manuel des fiches : `procedure_fiches.sort_order` par catégorie, initialisé sur l’ordre actuel. Le trigger de version ignore ce champ. |
 
-Sur **gm-vrcenter**, 001–**015** sont appliqués. `pg_cron` n’est pas activé sur le plan gratuit : la purge 14 jours passe par l’edge function `cleanup-session-media` (ou un appel SQL manuel à `cleanup_expired_session_media()`).
+Sur **gm-vrcenter**, 001–**016** sont appliqués. `pg_cron` n’est pas activé sur le plan gratuit : la purge 14 jours passe par l’edge function `cleanup-session-media` (ou un appel SQL manuel à `cleanup_expired_session_media()`).
 
 ### Secrets e-mail / nettoyage (à configurer)
 

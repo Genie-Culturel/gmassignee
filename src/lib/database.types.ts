@@ -52,6 +52,7 @@ export interface ProcedureFiche {
   is_required?: boolean;
   skip_version_bump?: boolean;
   deleted_at?: string | null;
+  sort_order?: number;
   scope_kind?: FicheScopeKind;
   scope_location_ids?: string[];
   scope_game_ids?: string[];

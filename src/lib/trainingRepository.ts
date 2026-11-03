@@ -126,6 +126,7 @@ export function hydrateTrainingFiche(fiche: ProcedureFiche): ProcedureFiche {
     version: fiche.id === 'pc-1' ? fiche.version ?? 2 : fiche.version ?? 1,
     is_required: fiche.is_required ?? true,
     deleted_at: fiche.deleted_at ?? null,
+    sort_order: fiche.sort_order,
     scope_kind: scope.scope_kind,
     scope_location_ids: scope.scope_location_ids,
     scope_game_ids: scope.scope_game_ids,
@@ -242,11 +243,67 @@ export async function submitFicheValidation(params: {
 let demoFichesStore: ProcedureFiche[] | null = null;
 let demoQuizStore: QuizQuestionAdmin[] | null = null;
 
+function ensureDemoSortOrders(fiches: ProcedureFiche[]) {
+  const next: Partial<Record<FicheCategory, number>> = {};
+  for (const fiche of fiches) {
+    if (typeof fiche.sort_order === 'number') {
+      next[fiche.category] = Math.max(next[fiche.category] ?? 0, fiche.sort_order);
+    }
+  }
+  for (const fiche of fiches) {
+    if (typeof fiche.sort_order === 'number') continue;
+    next[fiche.category] = (next[fiche.category] ?? 0) + 10;
+    fiche.sort_order = next[fiche.category];
+  }
+}
+
 export function loadDemoFiches(): ProcedureFiche[] {
   if (!demoFichesStore) {
     demoFichesStore = [...mockFiches, ...DEMO_EXTRA_FICHES].map(hydrateTrainingFiche);
+    ensureDemoSortOrders(demoFichesStore);
   }
   return demoFichesStore;
+}
+
+async function nextSortOrder(category: FicheCategory): Promise<number> {
+  if (isMockMode || !supabase) {
+    const max = loadDemoFiches()
+      .filter((fiche) => fiche.category === category && !isFicheDeleted(fiche))
+      .reduce((current, fiche) => Math.max(current, fiche.sort_order ?? 0), 0);
+    return max + 10;
+  }
+  const { data, error } = await supabase
+    .from('procedure_fiches')
+    .select('sort_order')
+    .eq('category', category)
+    .is('deleted_at', null)
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return ((data as { sort_order?: number } | null)?.sort_order ?? 0) + 10;
+}
+
+export async function reorderFiches(
+  updates: { id: string; sort_order: number }[]
+): Promise<void> {
+  const changed = updates.filter((row) => Number.isFinite(row.sort_order));
+  if (!changed.length) return;
+  if (isMockMode || !supabase) {
+    const list = loadDemoFiches();
+    for (const update of changed) {
+      const row = list.find((fiche) => fiche.id === update.id);
+      if (row) row.sort_order = update.sort_order;
+    }
+    return;
+  }
+  const results = await Promise.all(
+    changed.map((update) =>
+      supabase!.from('procedure_fiches').update({ sort_order: update.sort_order }).eq('id', update.id)
+    )
+  );
+  const failed = results.find((result) => result.error);
+  if (failed?.error) throw new Error(failed.error.message);
 }
 
 function loadDemoQuiz(): QuizQuestionAdmin[] {
@@ -321,12 +378,17 @@ export async function saveFiche(params: {
         (params.fiche.is_required !== false) !== (prev.is_required !== false);
       const version =
         params.minorCorrection || !contentChanged ? (prev.version ?? 1) : (prev.version ?? 1) + 1;
+      const sort_order =
+        params.fiche.category !== prev.category
+          ? await nextSortOrder(params.fiche.category)
+          : prev.sort_order;
       const next: ProcedureFiche = attachScopeFields(
         {
           ...prev,
           ...params.fiche,
           id: prev.id,
           version,
+          sort_order,
           updated_at: now,
           deleted_at: prev.deleted_at ?? null,
         },
@@ -348,6 +410,7 @@ export async function saveFiche(params: {
         is_active: params.fiche.is_active ?? true,
         is_required: params.fiche.is_required ?? true,
         version: 1,
+        sort_order: await nextSortOrder(params.fiche.category),
         deleted_at: null,
         created_at: now,
         updated_at: now,
@@ -359,6 +422,16 @@ export async function saveFiche(params: {
   }
 
   if (params.fiche.id) {
+    if (params.fiche.category) {
+      const { data: current } = await supabase
+        .from('procedure_fiches')
+        .select('category')
+        .eq('id', params.fiche.id)
+        .maybeSingle();
+      if (current && (current as { category: FicheCategory }).category !== params.fiche.category) {
+        body.sort_order = await nextSortOrder(params.fiche.category);
+      }
+    }
     const { data, error } = await supabase
       .from('procedure_fiches')
       .update(body)
@@ -369,6 +442,7 @@ export async function saveFiche(params: {
     if (params.scope) await replaceFicheScope(params.fiche.id, params.scope);
     return attachScopeFields(data as ProcedureFiche, params.scope);
   }
+  body.sort_order = await nextSortOrder(params.fiche.category);
   const { data, error } = await supabase.from('procedure_fiches').insert(body).select('*').single();
   if (error) throw new Error(error.message);
   if (params.scope) await replaceFicheScope(data.id, params.scope);

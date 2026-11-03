@@ -3,7 +3,7 @@ import { supabase, isMockMode } from '@/lib/supabase';
 import { ProcedureFiche, SessionStep } from '@/lib/database.types';
 import { mockStepFichesMapping } from '@/lib/mockData';
 import { hydrateTrainingFiche, loadDemoFiches } from '@/lib/trainingRepository';
-import { isFicheDeleted } from '@/lib/training';
+import { isFicheDeleted, sortFichesByOrder } from '@/lib/training';
 
 export function useProcedureFiches(opts?: { includeInactive?: boolean }) {
   const [fiches, setFiches] = useState<ProcedureFiche[]>([]);
@@ -17,9 +17,11 @@ export function useProcedureFiches(opts?: { includeInactive?: boolean }) {
   useEffect(() => {
     async function fetchFiches() {
       if (isMockMode) {
-        const rows = loadDemoFiches()
-          .map(hydrateTrainingFiche)
-          .filter((fiche) => !isFicheDeleted(fiche));
+        const rows = sortFichesByOrder(
+          loadDemoFiches()
+            .map(hydrateTrainingFiche)
+            .filter((fiche) => !isFicheDeleted(fiche))
+        );
         setFiches(includeInactive ? rows : rows.filter((fiche) => fiche.is_active));
         setIsLoading(false);
         return;
@@ -30,25 +32,27 @@ export function useProcedureFiches(opts?: { includeInactive?: boolean }) {
           .from('procedure_fiches')
           .select('*, fiche_scope_locations(location_id), fiche_scope_games(game_id)')
           .is('deleted_at', null)
-          .order('category', { ascending: true })
+          .order('sort_order', { ascending: true })
           .order('title', { ascending: true });
         if (!includeInactive) query = query.eq('is_active', true);
         const { data, error: fetchError } = await query;
 
         if (fetchError) throw fetchError;
         setFiches(
-          (data || []).map((row) => {
-            const record = row as ProcedureFiche & {
-              fiche_scope_locations?: { location_id: string }[];
-              fiche_scope_games?: { game_id: string }[];
-            };
-            return hydrateTrainingFiche({
-              ...record,
-              scope_kind: record.scope_kind || 'all',
-              scope_location_ids: (record.fiche_scope_locations || []).map((item) => item.location_id),
-              scope_game_ids: (record.fiche_scope_games || []).map((item) => item.game_id),
-            });
-          })
+          sortFichesByOrder(
+            (data || []).map((row) => {
+              const record = row as ProcedureFiche & {
+                fiche_scope_locations?: { location_id: string }[];
+                fiche_scope_games?: { game_id: string }[];
+              };
+              return hydrateTrainingFiche({
+                ...record,
+                scope_kind: record.scope_kind || 'all',
+                scope_location_ids: (record.fiche_scope_locations || []).map((item) => item.location_id),
+                scope_game_ids: (record.fiche_scope_games || []).map((item) => item.game_id),
+              });
+            })
+          )
         );
       } catch (err) {
         setError(err as Error);

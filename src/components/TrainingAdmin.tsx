@@ -16,12 +16,12 @@ import {
 } from '@/lib/trainingRepository';
 import { isMockMode } from '@/lib/supabase';
 import { GameScopeSelect } from '@/components/GameScopeSelect';
+import { FicheOrderList } from '@/components/FicheOrderList';
 import {
   ALL_GAMES_VALUE,
   FicheScopeKind,
   VenueCatalog,
   defaultScopeForNewFiche,
-  ficheScopeBadgeLabel,
   filterFichesForGame,
   gamesGroupedByLocation,
 } from '@/lib/venues';
@@ -354,18 +354,13 @@ function AdminFicheEditor({
 
   return (
     <div className="space-y-4">
+      <FicheOrderList
+        fiches={fiches}
+        selectedId={selectedId}
+        onSelect={setSelectedId}
+        onReordered={onFichesChanged}
+      />
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <select
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-          value={selectedId}
-          onChange={(e) => setSelectedId(e.target.value)}
-        >
-          {fiches.map((fiche) => (
-            <option key={fiche.id} value={fiche.id}>
-              {fiche.title} (v{fiche.version ?? 1}) · {ficheScopeBadgeLabel(fiche, catalog)}
-            </option>
-          ))}
-        </select>
         <Button
           type="button"
           variant="outline"

@@ -21,6 +21,22 @@ export function isFicheDeleted(fiche: Pick<ProcedureFiche, 'deleted_at'>): boole
   return Boolean(fiche.deleted_at);
 }
 
+export function sortFichesByOrder(fiches: ProcedureFiche[]): ProcedureFiche[] {
+  return [...fiches].sort((a, b) => {
+    const order = (a.sort_order ?? 0) - (b.sort_order ?? 0);
+    if (order !== 0) return order;
+    return a.title.localeCompare(b.title, 'fr');
+  });
+}
+
+export function sortOrderUpdatesForVisibleReorder(
+  visible: ProcedureFiche[],
+  orderedIds: string[]
+): { id: string; sort_order: number }[] {
+  const slots = [...visible.map((fiche) => fiche.sort_order ?? 0)].sort((a, b) => a - b);
+  return orderedIds.map((id, index) => ({ id, sort_order: slots[index] ?? (index + 1) * 10 }));
+}
+
 export function requiredTrainingFiches(fiches: ProcedureFiche[]): ProcedureFiche[] {
   return fiches.filter(
     (fiche) =>

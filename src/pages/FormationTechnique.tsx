@@ -20,7 +20,7 @@ import { GameScopeSelect } from '@/components/GameScopeSelect';
 import { FicheValidation, ProcedureFiche, FicheCategory } from '@/lib/database.types';
 import { FICHE_CATEGORY_LABELS, FICHE_CATEGORY_ICONS, FORMATION_PAGE_CATEGORIES } from '@/lib/constants';
 import { listMyValidations } from '@/lib/trainingRepository';
-import { ficheStatus, progressFor, TRAINING_STATUS_LABELS } from '@/lib/training';
+import { ficheStatus, progressFor, sortFichesByOrder, TRAINING_STATUS_LABELS } from '@/lib/training';
 import { useAuth } from '@/hooks/useAuth';
 import { DEMO_GM_ID } from '@/lib/assignedSessions';
 import { cn } from '@/lib/utils';
@@ -174,7 +174,9 @@ export function FormationTechnique() {
         </TabsList>
 
         {categories.map((category) => {
-          const categoryFiches = filteredFiches.filter((fiche) => fiche.category === category);
+          const categoryFiches = sortFichesByOrder(
+            filteredFiches.filter((fiche) => fiche.category === category)
+          );
           return (
             <TabsContent key={category} value={category} className="mt-4 space-y-4">
               <div className="relative">

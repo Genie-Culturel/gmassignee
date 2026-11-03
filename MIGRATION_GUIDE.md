@@ -113,6 +113,12 @@ Tables `locations` et `games` (un jeu appartient à un lieu). Colonne `procedure
 
 Règle métier : en choisissant un jeu, le GM voit les fiches « tous les lieux » + les fiches du lieu du jeu + les fiches de ce jeu. Les fiches déjà en base sont rattachées au Virtual Reality Center, sauf les lancements Planta / Saga / Serviteur (portée jeu).
 
+#### 016 : Ordre manuel des fiches
+
+Fichier : `supabase/migrations/016_fiche_sort_order.sql`
+
+Colonne `sort_order` (par catégorie). Initialisée selon l’ordre actuel (`category`, `title`). Les listes GM et admin trient dessus. Changer l’ordre n’incrémente pas `version` (le trigger ne surveille que titre / résumé / étapes / catégorie / `is_required`). RLS : seul `is_admin()` peut `UPDATE` les fiches, donc l’ordre.
+
 ### 3. Vérifier les données
 
 Dans **Table Editor**, vérifie que tu as :
