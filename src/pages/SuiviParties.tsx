@@ -14,7 +14,7 @@ import {
   PlayCircle,
   ExternalLink,
 } from 'lucide-react';
-import { SESSION_STEP_LABELS, INCIDENT_TYPE_LABELS, buildBugReporterUrl } from '@/lib/constants';
+import { SESSION_STEP_LABELS, SESSION_STEP_HINTS, INCIDENT_TYPE_LABELS, buildBugReporterUrl } from '@/lib/constants';
 import { IncidentType, SalesProduct, SessionStep } from '@/lib/database.types';
 import { FicheButton } from '@/components/FicheButton';
 import { useFichesByStep, useFichesByIncidentType } from '@/hooks/useProcedureFiches';
@@ -23,7 +23,6 @@ import { SessionSales } from '@/components/SessionSales';
 import { AssignedActivities } from '@/components/AssignedActivities';
 import { SessionStartNotice } from '@/components/SessionStartNotice';
 import { SessionVideos } from '@/components/SessionVideos';
-import { FilmingNotice } from '@/components/FilmingNotice';
 import {
   AssignedSession,
   DEMO_GM_ID,
@@ -398,7 +397,6 @@ export function SuiviParties() {
             </p>
           </div>
           <SessionStartNotice />
-          <FilmingNotice />
           <AssignedActivities
             sessions={assigned}
             openByAssignment={openByAssignment}
@@ -417,7 +415,6 @@ export function SuiviParties() {
           <CardContent>
             <div className="space-y-4">
               <SessionStartNotice compact />
-              <FilmingNotice />
               <div>
                 <Label htmlFor="parcours">Parcours</Label>
                 <select
@@ -731,6 +728,11 @@ function SessionStepItem({
             </span>
           )}
         </div>
+        {SESSION_STEP_HINTS[step] && (
+          <p className="mt-1 text-xs leading-snug text-muted-foreground">
+            {SESSION_STEP_HINTS[step]}
+          </p>
+        )}
       </div>
       {!isLoading && fiches.length > 0 && (
         <FicheButton fiches={fiches} />

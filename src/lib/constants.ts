@@ -11,10 +11,16 @@ export const SESSION_STEP_LABELS: Record<SessionStep, string> = {
   game_filming: 'Filmer moments clés',
   salon_return: 'Retour salon',
   reception_debrief: 'Débriefing',
-  videos_sent: 'Envoi vidéos',
+  videos_sent: 'Prise et envoi vidéos',
   google_review: 'Avis Google',
   socials_shared: 'Réseaux sociaux',
   cleaning: 'Nettoyage',
+};
+
+/** Short reminder shown under a step in the session checklist. */
+export const SESSION_STEP_HINTS: Partial<Record<SessionStep, string>> = {
+  videos_sent:
+    'Filmer 2 courtes vidéos du groupe en jeu, puis les envoyer au client par e-mail (supprimées après 14 jours). Le groupe en est informé au check-in.',
 };
 
 export const FICHE_CATEGORY_LABELS: Record<FicheCategory, string> = {

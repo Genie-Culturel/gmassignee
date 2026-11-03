@@ -7,7 +7,6 @@ import { isMockMode } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useProcedureFiches } from '@/hooks/useProcedureFiches';
 import { ensureCheckin, listCheckinsThisMonth, listSessionsThisMonth } from '@/lib/sessionRepository';
-import { FilmingNotice } from '@/components/FilmingNotice';
 import { SessionMediaAdmin } from '@/components/SessionMediaAdmin';
 
 export function Dashboard() {
@@ -17,7 +16,6 @@ export function Dashboard() {
   const [checkins, setCheckins] = useState(0);
   const [checkinBusy, setCheckinBusy] = useState(false);
   const [checkinMsg, setCheckinMsg] = useState<string | null>(null);
-  const [filmingAck, setFilmingAck] = useState(false);
 
   useEffect(() => {
     if (isMockMode || !user) return;
@@ -59,12 +57,6 @@ export function Dashboard() {
         </Alert>
       )}
 
-      <FilmingNotice
-        requireCheck
-        acknowledged={filmingAck}
-        onAcknowledged={setFilmingAck}
-      />
-
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -92,7 +84,7 @@ export function Dashboard() {
                 className="mt-3 w-full"
                 size="sm"
                 variant="outline"
-                disabled={checkinBusy || !filmingAck}
+                disabled={checkinBusy}
                 onClick={pointerArrivee}
               >
                 Pointer mon arrivée
