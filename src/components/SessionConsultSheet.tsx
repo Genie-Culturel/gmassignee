@@ -11,7 +11,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { ManualSessionBadge, SessionFlagBadge } from '@/components/SessionFlagBadge';
+import { ManualSessionBadge, SessionFlagBadges } from '@/components/SessionFlagBadge';
+import { SessionMediaSection } from '@/components/SessionMediaSection';
 import { useParcoursList } from '@/hooks/useParcoursList';
 import { INCIDENT_TYPE_LABELS, PAYMENT_METHOD_LABELS } from '@/lib/constants';
 import { getParcoursById, getParcoursOrDefault } from '@/lib/parcours';
@@ -45,6 +46,8 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 const chf = (value: number) => `CHF ${value.toFixed(2)}`;
+
+const FLAG_TEXT = { incident: 'text-red-700', remark: 'text-amber-800', cash: 'text-emerald-700' } as const;
 
 export function SessionConsultSheet({ row, onClose, onReviewedChange, reviewBusy }: SessionConsultSheetProps) {
   const [session, setSession] = useState<PersistedSession | null>(null);
@@ -113,18 +116,14 @@ export function SessionConsultSheet({ row, onClose, onReviewedChange, reviewBusy
               </SheetDescription>
             </SheetHeader>
 
-            {row.flag && (
+            {row.flags.length > 0 && (
               <div
                 className={`mt-4 rounded-lg border p-3 text-sm ${
-                  row.flagReviewedAt
-                    ? 'border-slate-200 bg-slate-50'
-                    : row.flag.kind === 'incident'
-                      ? 'border-red-200 bg-red-50'
-                      : 'border-amber-200 bg-amber-50'
+                  row.flagReviewedAt ? 'border-slate-200 bg-slate-50' : 'border-border bg-muted/40'
                 }`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <SessionFlagBadge flag={row.flag} reviewed={!!row.flagReviewedAt} />
+                  <SessionFlagBadges flags={row.flags} reviewed={!!row.flagReviewedAt} />
                   <label className="flex min-h-[44px] cursor-pointer items-center gap-2 text-sm">
                     <Checkbox
                       checked={!!row.flagReviewedAt}
@@ -134,7 +133,18 @@ export function SessionConsultSheet({ row, onClose, onReviewedChange, reviewBusy
                     Relevé
                   </label>
                 </div>
-                {row.flag.excerpt && <p className="mt-2 text-muted-foreground">{row.flag.excerpt}</p>}
+                <ul className="mt-2 space-y-1">
+                  {row.flags
+                    .filter((flag) => flag.excerpt)
+                    .map((flag) => (
+                      <li key={flag.kind} className="text-muted-foreground">
+                        <span className={`font-medium ${row.flagReviewedAt ? '' : FLAG_TEXT[flag.kind]}`}>
+                          {flag.kind === 'cash' ? 'Encaissement' : flag.label} :
+                        </span>{' '}
+                        {flag.excerpt}
+                      </li>
+                    ))}
+                </ul>
                 {row.flagReviewedAt && (
                   <p className="mt-1 text-xs text-muted-foreground">Relevé le {formatDateTime(row.flagReviewedAt)}</p>
                 )}
@@ -222,6 +232,10 @@ export function SessionConsultSheet({ row, onClose, onReviewedChange, reviewBusy
 
                   <Section title="Notes de session">
                     <p className="whitespace-pre-wrap text-sm text-muted-foreground">{session.notes || 'Aucune note.'}</p>
+                  </Section>
+
+                  <Section title="Vidéos & photos">
+                    <SessionMediaSection sessionId={session.sessionId} videosSentAt={session.videosSentAt} />
                   </Section>
 
                   <Section title="Ventes">

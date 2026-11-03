@@ -1,13 +1,34 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Clapperboard } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ManualSessionBadge, SessionFlagBadge } from '@/components/SessionFlagBadge';
+import { ManualSessionBadge, SessionFlagBadges } from '@/components/SessionFlagBadge';
 import { SessionConsultSheet } from '@/components/SessionConsultSheet';
 import { RecordedSessionRow, listRecordedSessions, setSessionFlagReviewed } from '@/lib/sessionView';
 import { formatDate, formatTime } from '@/lib/utils';
+
+function flagText(row: RecordedSessionRow): string {
+  return row.flags
+    .filter((flag) => flag.kind !== 'cash')
+    .map((flag) => flag.excerpt)
+    .filter(Boolean)
+    .join(' · ');
+}
+
+function MediaCount({ count }: { count: number }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-xs text-muted-foreground"
+      title={`${count} vidéo(s) / photo(s)`}
+      aria-label={`${count} vidéo(s) ou photo(s)`}
+    >
+      <Clapperboard className="h-3.5 w-3.5" aria-hidden />
+      {count}
+    </span>
+  );
+}
 
 /** Admin « Sessions enregistrées » (Dashboard): click a session to consult it read-only. */
 export function SessionMediaAdmin() {
@@ -24,9 +45,9 @@ export function SessionMediaAdmin() {
       .catch((err) => setError(err instanceof Error ? err.message : 'Suivi indisponible'));
   }, []);
 
-  const pendingCount = rows.filter((row) => row.flag && !row.flagReviewedAt).length;
+  const pendingCount = rows.filter((row) => row.flags.length > 0 && !row.flagReviewedAt).length;
   const visible = useMemo(
-    () => (onlyFlagged ? rows.filter((row) => row.flag && !row.flagReviewedAt) : rows),
+    () => (onlyFlagged ? rows.filter((row) => row.flags.length > 0 && !row.flagReviewedAt) : rows),
     [rows, onlyFlagged]
   );
   const openRow = rows.find((row) => row.sessionId === openId) || null;
@@ -54,7 +75,7 @@ export function SessionMediaAdmin() {
   };
 
   const reviewBox = (row: RecordedSessionRow) =>
-    row.flag ? (
+    row.flags.length ? (
       <label
         className="inline-flex min-h-[36px] cursor-pointer items-center gap-2 text-xs text-muted-foreground"
         onClick={(event) => event.stopPropagation()}
@@ -127,19 +148,20 @@ export function SessionMediaAdmin() {
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-medium">{row.game}</p>
                     {row.isManual && <ManualSessionBadge />}
-                    <SessionFlagBadge flag={row.flag} reviewed={!!row.flagReviewedAt} />
+                    <SessionFlagBadges flags={row.flags} reviewed={!!row.flagReviewedAt} />
+                    {!!row.mediaCount && <MediaCount count={row.mediaCount} />}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {row.date ? formatDate(row.date + 'T12:00:00') : '—'} · {row.time} · {row.gmName || '—'}
                   </p>
-                  {row.flag?.excerpt && !row.flagReviewedAt && (
-                    <p className="line-clamp-2 text-xs text-muted-foreground">{row.flag.excerpt}</p>
+                  {!row.flagReviewedAt && flagText(row) && (
+                    <p className="line-clamp-2 text-xs text-muted-foreground">{flagText(row)}</p>
                   )}
                   <p className="text-xs">Vidéos : {videos(row)}</p>
                 </div>
                 <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
               </button>
-              {row.flag && <div className="border-t px-3 py-1">{reviewBox(row)}</div>}
+              {row.flags.length > 0 && <div className="border-t px-3 py-1">{reviewBox(row)}</div>}
             </div>
           ))}
         </div>
@@ -169,6 +191,7 @@ export function SessionMediaAdmin() {
                     <p className="flex flex-wrap items-center gap-2 font-medium">
                       {row.game}
                       {row.isManual && <ManualSessionBadge />}
+                      {!!row.mediaCount && <MediaCount count={row.mediaCount} />}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {row.date} {row.time}
@@ -179,9 +202,9 @@ export function SessionMediaAdmin() {
                   <td className="px-3 py-2 text-xs">{row.clientEmail || '—'}</td>
                   <td className="px-3 py-2">{videos(row)}</td>
                   <td className="px-3 py-2">
-                    {row.flag ? (
+                    {row.flags.length ? (
                       <div className="flex flex-col items-start gap-1">
-                        <SessionFlagBadge flag={row.flag} reviewed={!!row.flagReviewedAt} />
+                        <SessionFlagBadges flags={row.flags} reviewed={!!row.flagReviewedAt} className="flex-col items-start" />
                         {reviewBox(row)}
                       </div>
                     ) : (
