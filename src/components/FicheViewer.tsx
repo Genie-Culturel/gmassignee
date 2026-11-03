@@ -2,7 +2,7 @@ import { ProcedureFiche } from '@/lib/database.types';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
-import { FICHE_CATEGORY_LABELS, FICHE_CATEGORY_ICONS } from '@/lib/constants';
+import { FICHE_CATEGORY_LABELS } from '@/lib/constants';
 
 interface FicheViewerProps {
   fiche: ProcedureFiche;
@@ -14,9 +14,6 @@ export function FicheViewer({ fiche, compact = false }: FicheViewerProps) {
     <div className="space-y-4">
       {!compact && (
         <div className="flex items-start gap-3">
-          <div className="text-2xl">
-            {FICHE_CATEGORY_ICONS[fiche.category]}
-          </div>
           <div className="flex-1">
             <h3 className="text-lg font-semibold">{fiche.title}</h3>
             {fiche.summary && (

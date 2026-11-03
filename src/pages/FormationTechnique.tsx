@@ -20,7 +20,7 @@ import { FicheValidationPanel } from '@/components/FicheValidationPanel';
 import { TrainingAdmin } from '@/components/TrainingAdmin';
 import { GameScopeSelect } from '@/components/GameScopeSelect';
 import { FicheValidation, ProcedureFiche, FicheCategory } from '@/lib/database.types';
-import { FICHE_CATEGORY_LABELS, FICHE_CATEGORY_ICONS, FORMATION_PAGE_CATEGORIES } from '@/lib/constants';
+import { FICHE_CATEGORY_LABELS, FORMATION_PAGE_CATEGORIES } from '@/lib/constants';
 import { listMyValidations } from '@/lib/trainingRepository';
 import { ficheStatus, progressFor, sortFichesByOrder, TRAINING_STATUS_LABELS } from '@/lib/training';
 import { useAuth } from '@/hooks/useAuth';
@@ -142,7 +142,6 @@ export function FormationTechnique() {
                 className="h-auto min-h-11 min-w-[calc(50%-0.25rem)] flex-1 flex-col gap-1 whitespace-normal px-1.5 py-2 text-[11px] leading-snug sm:min-w-0 sm:flex-row sm:text-sm"
               >
                 <span>
-                  <span className="mr-1">{FICHE_CATEGORY_ICONS[cat]}</span>
                   {short ? (
                     <>
                       <span className="sm:hidden">{short}</span>
