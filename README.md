@@ -9,7 +9,7 @@ Deux parties liées :
 ### 1. Suivi des parties (opérationnel)
 
 - **Mes sessions** : même structure que le dashboard GM GMassignee — **Mes Activités Aujourd'hui** et **Mes Prochaines Activités**. Chaque ligne : jeu + `[nb joueurs]`, badge Assigné, date, créneau début–fin. Un clic démarre / reprend la session pré-remplie. Un bandeau rappelle de démarrer **à l'arrivée** : `started_at` = heure d'arrivée GM, chaque étape cochée garde `completed_at`.
-- **Démarrage manuel** : fallback si la partie n'est pas dans le planning. Le GM choisit le **parcours** (aujourd'hui un seul : « Parcours client VR au centre », 14 étapes).
+- **Démarrage manuel** : fallback si la partie n'est pas dans le planning. Le GM choisit le **jeu** (noms officiels de la table `games`) ; le parcours du lieu du jeu est pris automatiquement.
 - **Vidéos clients** : depuis le suivi de session, le GM envoie 1–2 vidéos (téléphone perso) vers un bucket privé `session-media` (TUS, 50 Mo/fichier en plan gratuit). Un e-mail chaleureux part au client (Resend) avec une page de téléchargement valable 14 jours ; les fichiers sont ensuite supprimés. En mode démo, upload et envoi sont simulés localement.
 - **Incidents** : Bug / Freeze ouvre le [Bug reporter](https://genie-culturel.github.io/Bug_report_VR/) pré-rempli + la fiche de dépannage. Malaise / Casse / Autre gardent fiche + note ; Autre affiche aussi le lien bug reporter.
 - **Ventes & encaissement** : lignes, CHF, Twint / Espèces / Carte / Facture.
@@ -90,11 +90,21 @@ Les infos de session suivent tout le flux : en-tête, ventes, notes, pré-rempli
 
 ## Parcours
 
-Définis en données dans `src/lib/parcours.ts`. Un seul pour l'instant :
+Un parcours par lieu, stocké en base (`parcours` + `parcours_steps`, migration 018) et modifiable dans **Formations → Admin → Parcours** :
 
-- **Parcours client VR au centre** (14 étapes existantes)
+| Lieu | Jeux | Parcours (`parcours.id`) | Étapes |
+|---|---|---|---|
+| Virtual Reality Center | Bataille de la Planta, Le Serviteur 1 & 2, La Saga, Schoolcrafter | `vr_centre_client` | 17 |
+| Escape Life Sion | Da Vinci Code | `escape_life_sion` | 16 (2 « Option Vinum ») |
+| Escape Life Sierre | Le Feu sacré | `escape_life_sierre` | 14 (version 1 équipe) |
+| Usine de Chandoline | Novasphère | `chandoline` | 11, provisoire |
 
-D'autres (EscapeLife Sion, EscapeLife Sierre, Chandoline…) s'ajoutent comme nouvelles entrées dans `PARCOURS`, sans réécrire l'écran Session.
+- Au démarrage, le jeu donne le lieu, donc le parcours (titre du planning rapproché du nom officiel via `resolveGameByName`).
+- Les étapes actives sont copiées dans `vr_sessions.steps_snapshot` : modifier un parcours ne change pas les parties déjà commencées. Les anciennes sessions (sans snapshot) utilisent le parcours actuel.
+- `session_steps.step` est du texte (ex-enum) : les clés VR historiques sont inchangées ; les autres lieux utilisent `sion_*`, `sierre_*`, `nova_*`.
+- L'encadré d'envoi des vidéos n'apparaît que si le parcours contient l'étape `videos_sent` (VR Center, Chandoline ; pas Sion ni Sierre).
+- Admin : glisser ⋮⋮ pour réordonner (appui long sur mobile), nom, rappel et condition modifiables, case Active, suppression logique (`deleted_at`).
+- Mode démo : mêmes 4 parcours dans `src/lib/parcours.ts` (modifs admin en localStorage).
 
 ## Bug reporter
 
@@ -139,8 +149,11 @@ VITE_FORCE_DEMO=true
 | `014_soft_delete_fiches.sql` | Suppression logique des fiches : `procedure_fiches.deleted_at` (distinct de `is_active`). L’historique `fiche_validations` est conservé. |
 | `015_fiche_locations_games.sql` | Lieux (`locations`) et jeux (`games`), portée des fiches (`scope_kind` + `fiche_scope_locations` / `fiche_scope_games`). Seed VR Center / Chandoline / Sion / Sierre. Les fiches existantes sont rattachées au VR Center ; les lancements Planta / Saga / Serviteur sont rattachés au jeu. |
 | `016_fiche_sort_order.sql` | Ordre manuel des fiches : `procedure_fiches.sort_order` par catégorie, initialisé sur l’ordre actuel. Le trigger de version ignore ce champ. |
+| `017_game_official_names.sql` | Noms officiels des jeux (Bataille de la Planta, Novasphère, Da Vinci Code, Le Feu sacré…). |
+| `018_parcours_per_location.sql` | Parcours par lieu : tables `parcours` / `parcours_steps` (RLS lecture authentifiée, écriture admin), seed des 4 parcours, `session_steps.step` et `session_step_fiches.step` en texte, `vr_sessions.steps_snapshot`. |
+| `019_placeholder_fiches_nova_schoolcrafter.sql` | Fiches 🚧 « Procédure Novasphère » et « Procédure GM Schoolcrafter » (à compléter), rattachées à leur jeu. |
 
-Sur **gm-vrcenter**, 001–**016** sont appliqués. `pg_cron` n’est pas activé sur le plan gratuit : la purge 14 jours passe par l’edge function `cleanup-session-media` (ou un appel SQL manuel à `cleanup_expired_session_media()`).
+Sur **gm-vrcenter**, 001–**019** sont appliqués. `pg_cron` n’est pas activé sur le plan gratuit : la purge 14 jours passe par l’edge function `cleanup-session-media` (ou un appel SQL manuel à `cleanup_expired_session_media()`).
 
 ### Secrets e-mail / nettoyage (à configurer)
 

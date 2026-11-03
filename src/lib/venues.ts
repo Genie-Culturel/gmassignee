@@ -124,6 +124,24 @@ export const DEMO_EXTRA_FICHES: ProcedureFiche[] = [
     ['game-usine_chandoline']
   ),
   extraFiche(
+    'demo-novasphere-procedure',
+    'procedure_deroulement',
+    '🚧 Procédure Novasphère (à compléter)',
+    'Déroulement d’une partie Novasphère (en cours d’élaboration).',
+    'games',
+    [],
+    ['game-usine_chandoline']
+  ),
+  extraFiche(
+    'demo-schoolcrafter-procedure',
+    'procedure_deroulement',
+    '🚧 Procédure GM Schoolcrafter (à compléter)',
+    'Procédure GM Schoolcrafter (pas encore de document).',
+    'games',
+    [],
+    ['game-schoolcrafter']
+  ),
+  extraFiche(
     'demo-davinci',
     'procedure_deroulement',
     'Briefing Davinci',

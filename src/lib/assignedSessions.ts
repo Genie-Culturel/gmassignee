@@ -1,5 +1,3 @@
-import { DEFAULT_PARCOURS_ID } from './parcours';
-
 /**
  * A session assigned to a GM in the GMassignee planning calendar.
  *
@@ -38,8 +36,11 @@ export interface AssignedSession {
   notes?: string;
   /** Client / group email for souvenir videos. */
   clientEmail?: string;
-  /** Parcours to run; defaults to VR Center client flow. */
-  parcoursId: string;
+  /**
+   * Optional explicit parcours. Normally resolved from the game's location
+   * when the session starts (Planta → VR Center, Da Vinci Code → Sion…).
+   */
+  parcoursId?: string;
 }
 
 export const DEMO_GM_ID = 'gm-demo';
@@ -107,74 +108,101 @@ export function getMockAssignedSessions(gmId: string = DEMO_GM_ID): AssignedSess
       id: 'asgn-today-saga',
       gmId,
       gmName: DEMO_GM_NAME,
-      game: 'Saga le Serviteur de la Rédemption',
+      game: 'La Saga',
       playerCount: 6,
       date: todayIso(),
       startTime: todaySlot.startTime,
       endTime: todaySlot.endTime,
       status: 'assigned',
-      parcoursId: DEFAULT_PARCOURS_ID,
       clientEmail: 'client.demo@vrcenter.ch',
     },
     {
       id: 'asgn-saga-2026-11-06-1430',
       gmId,
       gmName: DEMO_GM_NAME,
-      game: 'Saga le Serviteur de la Rédemption',
+      game: 'La Saga',
       playerCount: 7,
       date: planningDate('2026-11-06', 4),
       startTime: '14:30',
       endTime: '16:25',
       status: 'assigned',
-      parcoursId: DEFAULT_PARCOURS_ID,
+    },
+    {
+      id: 'asgn-davinci-2026-11-07-1400',
+      gmId,
+      gmName: DEMO_GM_NAME,
+      game: 'Da Vinci Code',
+      playerCount: 10,
+      date: planningDate('2026-11-07', 4),
+      startTime: '14:00',
+      endTime: '16:45',
+      status: 'assigned',
+    },
+    {
+      id: 'asgn-feu-sacre-2026-11-08-1000',
+      gmId,
+      gmName: DEMO_GM_NAME,
+      game: 'Le Feu sacré',
+      playerCount: 8,
+      date: planningDate('2026-11-08', 5),
+      startTime: '10:00',
+      endTime: '12:45',
+      status: 'assigned',
+    },
+    {
+      id: 'asgn-novasphere-2026-11-10-1500',
+      gmId,
+      gmName: DEMO_GM_NAME,
+      game: 'Novasphère',
+      playerCount: 6,
+      date: planningDate('2026-11-10', 7),
+      startTime: '15:00',
+      endTime: '15:45',
+      status: 'assigned',
     },
     {
       id: 'asgn-schoolcrafter-2026-11-13-1630',
       gmId,
       gmName: DEMO_GM_NAME,
-      game: 'SchoolCrafter',
+      game: 'Schoolcrafter',
       playerCount: 5,
       date: planningDate('2026-11-13', 11),
       startTime: '16:30',
       endTime: '17:50',
       status: 'assigned',
-      parcoursId: DEFAULT_PARCOURS_ID,
     },
     {
       id: 'asgn-schoolcrafter-2026-11-16-0900',
       gmId,
       gmName: DEMO_GM_NAME,
-      game: 'SchoolCrafter',
+      game: 'Schoolcrafter',
       playerCount: 8,
       date: planningDate('2026-11-16', 14),
       startTime: '09:00',
       endTime: '10:20',
       status: 'assigned',
-      parcoursId: DEFAULT_PARCOURS_ID,
     },
     {
       id: 'asgn-schoolcrafter-2026-11-16-1000',
       gmId,
       gmName: DEMO_GM_NAME,
-      game: 'SchoolCrafter',
+      game: 'Schoolcrafter',
       playerCount: 8,
       date: planningDate('2026-11-16', 14),
       startTime: '10:00',
       endTime: '11:20',
       status: 'assigned',
-      parcoursId: DEFAULT_PARCOURS_ID,
     },
     {
       id: 'asgn-schoolcrafter-2026-11-16-1100',
       gmId,
       gmName: DEMO_GM_NAME,
-      game: 'SchoolCrafter',
+      game: 'Schoolcrafter',
       playerCount: 8,
       date: planningDate('2026-11-16', 14),
       startTime: '11:00',
       endTime: '12:20',
       status: 'assigned',
-      parcoursId: DEFAULT_PARCOURS_ID,
     },
   ];
 

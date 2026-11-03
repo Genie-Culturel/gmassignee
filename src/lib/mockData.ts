@@ -382,7 +382,7 @@ export const mockFiches: ProcedureFiche[] = [
 ];
 
 // Step-to-fiche mapping (1:1 primary + optional secondary)
-export const mockStepFichesMapping: Record<SessionStep, string[]> = {
+export const mockStepFichesMapping: Record<SessionStep, string[] | undefined> = {
   reception_seating: ['pc-1'],
   reception_drinks: ['pc-2'],
   reception_popcorn: ['pc-3'],

@@ -17,6 +17,7 @@ import {
 import { isMockMode } from '@/lib/supabase';
 import { GameScopeSelect } from '@/components/GameScopeSelect';
 import { FicheOrderList } from '@/components/FicheOrderList';
+import { ParcoursAdmin } from '@/components/ParcoursAdmin';
 import {
   ALL_GAMES_VALUE,
   FicheScopeKind,
@@ -63,10 +64,14 @@ export function TrainingAdmin({ fiches, catalog, gmId, myValidations, onFichesCh
         onChange={setFilterGameId}
       />
       <Tabs defaultValue="fiches" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="fiches">Éditer les fiches</TabsTrigger>
-          <TabsTrigger value="suivi">Suivi des GM</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="fiches" className="px-1 text-xs sm:text-sm">Éditer les fiches</TabsTrigger>
+          <TabsTrigger value="parcours" className="px-1 text-xs sm:text-sm">Parcours</TabsTrigger>
+          <TabsTrigger value="suivi" className="px-1 text-xs sm:text-sm">Suivi des GM</TabsTrigger>
         </TabsList>
+        <TabsContent value="parcours" className="mt-4">
+          <ParcoursAdmin catalog={catalog} filterGameId={filterGameId} />
+        </TabsContent>
         <TabsContent value="suivi" className="mt-4">
           <AdminTracking fiches={visible} gmId={gmId} myValidations={myValidations} />
         </TabsContent>

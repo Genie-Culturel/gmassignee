@@ -14,8 +14,8 @@ import {
   PlayCircle,
   ExternalLink,
 } from 'lucide-react';
-import { SESSION_STEP_LABELS, SESSION_STEP_HINTS, INCIDENT_TYPE_LABELS, buildBugReporterUrl } from '@/lib/constants';
-import { IncidentType, SalesProduct, SessionStep } from '@/lib/database.types';
+import { SESSION_STEP_LABELS, INCIDENT_TYPE_LABELS, buildBugReporterUrl } from '@/lib/constants';
+import { IncidentType, LegacyVrStep, SalesProduct, SessionStep } from '@/lib/database.types';
 import { FicheButton } from '@/components/FicheButton';
 import { useFichesByStep, useFichesByIncidentType } from '@/hooks/useProcedureFiches';
 import { formatDate, formatTime } from '@/lib/utils';
@@ -29,10 +29,18 @@ import {
   getAssignedSessions,
 } from '@/lib/assignedSessions';
 import {
-  DEFAULT_PARCOURS_ID,
-  PARCOURS,
+  ParcoursDefinition,
+  ParcoursStepDef,
+  activeSteps,
+  getParcoursById,
   getParcoursOrDefault,
+  hasVideoStep,
+  parcoursForGame,
+  resolveGameByName,
 } from '@/lib/parcours';
+import { findGame, gamesGroupedByLocation } from '@/lib/venues';
+import { useVenueCatalog } from '@/hooks/useVenueCatalog';
+import { useParcoursList } from '@/hooks/useParcoursList';
 import { isMockMode } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -66,6 +74,7 @@ interface ActiveSession {
   playerCount: number;
   gmName: string;
   parcoursId: string;
+  stepsSnapshot: ParcoursStepDef[] | null;
   notes: string;
   clientEmail: string;
   videosSentAt: string | null;
@@ -96,10 +105,33 @@ function toActive(row: PersistedSession, endTime?: string): ActiveSession {
     playerCount: row.playerCount,
     gmName: row.gmName,
     parcoursId: row.parcoursId,
+    stepsSnapshot: row.stepsSnapshot,
     notes: row.notes,
     clientEmail: row.clientEmail || '',
     videosSentAt: row.videosSentAt,
   };
+}
+
+/** Steps to show: snapshot taken at start, else current parcours; keep any completed legacy step. */
+function buildSessionSteps(
+  snapshot: ParcoursStepDef[] | null,
+  parcours: ParcoursDefinition,
+  stepTimes: Partial<Record<SessionStep, string>>
+): ParcoursStepDef[] {
+  const base = snapshot && snapshot.length ? snapshot : activeSteps(parcours);
+  const known = new Set(base.map((step) => step.key));
+  const extra = Object.keys(stepTimes)
+    .filter((key) => !known.has(key))
+    .map((key) => {
+      const fromParcours = parcours.steps.find((step) => step.key === key);
+      return {
+        key,
+        label: fromParcours?.label || SESSION_STEP_LABELS[key as LegacyVrStep] || key,
+        hint: null,
+        note: null,
+      };
+    });
+  return [...base, ...extra];
 }
 
 function openBugReporter(session: ActiveSession, remarks?: string) {
@@ -134,9 +166,16 @@ export function SuiviParties() {
   const [busy, setBusy] = useState(false);
 
   const [manualGroupName, setManualGroupName] = useState('');
-  const [manualGame, setManualGame] = useState('');
+  const [manualGameId, setManualGameId] = useState('');
   const [manualPlayers, setManualPlayers] = useState('8');
-  const [manualParcoursId, setManualParcoursId] = useState(DEFAULT_PARCOURS_ID);
+
+  const { catalog, isLoading: catalogLoading } = useVenueCatalog();
+  const { parcoursList, isLoading: parcoursLoading } = useParcoursList();
+  const setupLoading = catalogLoading || parcoursLoading;
+  const gameGroups = useMemo(() => gamesGroupedByLocation(catalog), [catalog]);
+  const effectiveManualGameId = manualGameId || catalog.games[0]?.id || '';
+  const manualGame = findGame(catalog, effectiveManualGameId);
+  const manualParcours = parcoursForGame(parcoursList, catalog, manualGame) || getParcoursOrDefault(parcoursList);
 
   const notesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const emailTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -207,17 +246,30 @@ export function SuiviParties() {
     return map;
   }, [openSessions]);
 
-  const parcours = getParcoursOrDefault(activeSession?.parcoursId);
-  const sessionSteps = parcours.steps;
+  const parcours = getParcoursOrDefault(parcoursList, activeSession?.parcoursId);
+  const sessionSteps = useMemo(
+    () => buildSessionSteps(activeSession?.stepsSnapshot ?? null, parcours, stepTimes),
+    [activeSession?.stepsSnapshot, parcours, stepTimes]
+  );
+  const completedCount = sessionSteps.filter((step) => stepTimes[step.key]).length;
+  const showVideos = hasVideoStep(sessionSteps);
 
   const startFromAssignment = async (assignment: AssignedSession) => {
     setError(null);
     setBusy(true);
     try {
+      const game = resolveGameByName(catalog, assignment.game);
+      const resolved =
+        getParcoursById(parcoursList, assignment.parcoursId) ||
+        parcoursForGame(parcoursList, catalog, game) ||
+        getParcoursOrDefault(parcoursList);
       const row = await createOrResumeFromAssignment({
         assignment,
         gmId,
         gmName: displayName,
+        game: game?.name,
+        parcoursId: resolved.id,
+        stepsSnapshot: activeSteps(resolved),
       });
       applyLoaded(row, assignment.endTime);
     } catch (err) {
@@ -240,12 +292,13 @@ export function SuiviParties() {
       const row = await createManualSession({
         gmId,
         gmName: displayName,
-        game: manualGame.trim() || 'VR Session',
+        game: manualGame?.name || 'Session',
         date: nowDate(),
         time: nowTime(),
         groupName: manualGroupName.trim(),
         playerCount: Number.isFinite(players) && players > 0 ? players : 8,
-        parcoursId: manualParcoursId,
+        parcoursId: manualParcours.id,
+        stepsSnapshot: activeSteps(manualParcours),
       });
       applyLoaded(row);
     } catch (err) {
@@ -400,7 +453,7 @@ export function SuiviParties() {
           <AssignedActivities
             sessions={assigned}
             openByAssignment={openByAssignment}
-            busy={busy}
+            busy={busy || setupLoading}
             onStart={startFromAssignment}
           />
         </div>
@@ -416,21 +469,27 @@ export function SuiviParties() {
             <div className="space-y-4">
               <SessionStartNotice compact />
               <div>
-                <Label htmlFor="parcours">Parcours</Label>
+                <Label htmlFor="manual-game">Jeu</Label>
                 <select
-                  id="parcours"
+                  id="manual-game"
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={manualParcoursId}
-                  onChange={(e) => setManualParcoursId(e.target.value)}
+                  value={effectiveManualGameId}
+                  onChange={(e) => setManualGameId(e.target.value)}
+                  disabled={setupLoading}
                 >
-                  {PARCOURS.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
+                  {gameGroups.map((group) => (
+                    <optgroup key={group.location.id} label={group.location.name}>
+                      {group.games.map((game) => (
+                        <option key={game.id} value={game.id}>
+                          {game.name}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {getParcoursOrDefault(manualParcoursId).description}
+                  {manualParcours.name} · {activeSteps(manualParcours).length} étapes
+                  {manualParcours.isProvisional ? ' · provisoire' : ''}
                 </p>
               </div>
               <div>
@@ -444,16 +503,6 @@ export function SuiviParties() {
                 />
               </div>
               <div>
-                <Label htmlFor="game-name">Jeu (optionnel)</Label>
-                <Input
-                  id="game-name"
-                  type="text"
-                  placeholder="ex: Le Serviteur I, La Planta..."
-                  value={manualGame}
-                  onChange={(e) => setManualGame(e.target.value)}
-                />
-              </div>
-              <div>
                 <Label htmlFor="player-count">Nombre de joueurs</Label>
                 <Input
                   id="player-count"
@@ -464,7 +513,7 @@ export function SuiviParties() {
                   onChange={(e) => setManualPlayers(e.target.value)}
                 />
               </div>
-              <Button onClick={startManualSession} className="w-full" size="lg" disabled={busy}>
+              <Button onClick={startManualSession} className="w-full" size="lg" disabled={busy || setupLoading}>
                 <PlayCircle className="mr-2 h-5 w-5" />
                 Démarrer une session manuelle
               </Button>
@@ -508,14 +557,17 @@ export function SuiviParties() {
                     {activeSession.groupName ? ` · ${activeSession.groupName}` : ''}
                     {` · ${activeSession.playerCount} joueur${activeSession.playerCount > 1 ? 's' : ''}`}
                   </span>
-                  <span className="block">{parcours.name}</span>
+                  <span className="block">
+                    {parcours.name}
+                    {parcours.isProvisional ? ' (provisoire)' : ''}
+                  </span>
                   <span className="mt-2 inline-flex items-center rounded-md bg-primary/10 px-2.5 py-1 text-sm font-semibold text-foreground">
                     Arrivée GM : {formatTime(activeSession.startedAt)}
                   </span>
                 </CardDescription>
               </div>
               <Badge variant="success" className="text-sm shrink-0">
-                {Object.keys(stepTimes).length} / {sessionSteps.length} étapes
+                {completedCount} / {sessionSteps.length} étapes
               </Badge>
             </div>
           </CardHeader>
@@ -541,11 +593,11 @@ export function SuiviParties() {
           <CardContent className="space-y-3">
             {sessionSteps.map((step) => (
               <SessionStepItem
-                key={step}
+                key={step.key}
                 step={step}
-                isCompleted={Boolean(stepTimes[step])}
-                completedAt={stepTimes[step]}
-                onToggle={() => toggleStep(step)}
+                isCompleted={Boolean(stepTimes[step.key])}
+                completedAt={stepTimes[step.key]}
+                onToggle={() => toggleStep(step.key)}
               />
             ))}
           </CardContent>
@@ -624,28 +676,30 @@ export function SuiviParties() {
           </CardContent>
         </Card>
 
-        <SessionVideos
-          key={`${activeSession.sessionId}-videos`}
-          sessionId={activeSession.sessionId}
-          gmId={gmId}
-          clientEmail={activeSession.clientEmail}
-          videosSentAt={activeSession.videosSentAt}
-          onClientEmailChange={(email) => {
-            setActiveSession({ ...activeSession, clientEmail: email });
-            if (emailTimer.current) clearTimeout(emailTimer.current);
-            emailTimer.current = setTimeout(() => {
-              updateSessionFields(activeSession.sessionId, { clientEmail: email }).catch((err) =>
-                setError(err instanceof Error ? err.message : 'E-mail non enregistré')
-              );
-            }, 600);
-          }}
-          onSent={(sentAt) => {
-            setActiveSession({ ...activeSession, videosSentAt: sentAt });
-            setStepTimes((prev) => ({ ...prev, videos_sent: sentAt }));
-            void setStepCompleted(activeSession.sessionId, 'videos_sent', true);
-            void updateSessionFields(activeSession.sessionId, { videosSentAt: sentAt });
-          }}
-        />
+        {showVideos && (
+          <SessionVideos
+            key={`${activeSession.sessionId}-videos`}
+            sessionId={activeSession.sessionId}
+            gmId={gmId}
+            clientEmail={activeSession.clientEmail}
+            videosSentAt={activeSession.videosSentAt}
+            onClientEmailChange={(email) => {
+              setActiveSession({ ...activeSession, clientEmail: email });
+              if (emailTimer.current) clearTimeout(emailTimer.current);
+              emailTimer.current = setTimeout(() => {
+                updateSessionFields(activeSession.sessionId, { clientEmail: email }).catch((err) =>
+                  setError(err instanceof Error ? err.message : 'E-mail non enregistré')
+                );
+              }, 600);
+            }}
+            onSent={(sentAt) => {
+              setActiveSession({ ...activeSession, videosSentAt: sentAt });
+              setStepTimes((prev) => ({ ...prev, videos_sent: sentAt }));
+              void setStepCompleted(activeSession.sessionId, 'videos_sent', true);
+              void updateSessionFields(activeSession.sessionId, { videosSentAt: sentAt });
+            }}
+          />
+        )}
 
         <SessionSales
           key={activeSession.sessionId}
@@ -695,12 +749,12 @@ function SessionStepItem({
   completedAt,
   onToggle,
 }: {
-  step: SessionStep;
+  step: ParcoursStepDef;
   isCompleted: boolean;
   completedAt?: string;
   onToggle: () => void;
 }) {
-  const { fiches, isLoading } = useFichesByStep(step);
+  const { fiches, isLoading } = useFichesByStep(step.key);
 
   return (
     <div
@@ -709,7 +763,7 @@ function SessionStepItem({
       }`}
     >
       <Checkbox
-        id={`step-${step}`}
+        id={`step-${step.key}`}
         checked={isCompleted}
         onCheckedChange={onToggle}
         className="mt-1"
@@ -717,21 +771,24 @@ function SessionStepItem({
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap items-baseline gap-x-2">
           <Label
-            htmlFor={`step-${step}`}
+            htmlFor={`step-${step.key}`}
             className={`cursor-pointer ${isCompleted ? 'line-through text-muted-foreground' : ''}`}
           >
-            {SESSION_STEP_LABELS[step]}
+            {step.label}
           </Label>
+          {step.note && (
+            <Badge variant="secondary" className="text-[10px] font-normal">
+              {step.note}
+            </Badge>
+          )}
           {isCompleted && completedAt && (
             <span className="text-xs tabular-nums text-muted-foreground">
               {formatTime(completedAt)}
             </span>
           )}
         </div>
-        {SESSION_STEP_HINTS[step] && (
-          <p className="mt-1 text-xs leading-snug text-muted-foreground">
-            {SESSION_STEP_HINTS[step]}
-          </p>
+        {step.hint && (
+          <p className="mt-1 text-xs leading-snug text-muted-foreground">{step.hint}</p>
         )}
       </div>
       {!isLoading && fiches.length > 0 && (

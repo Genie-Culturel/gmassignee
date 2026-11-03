@@ -6,7 +6,7 @@ import {
   SessionStep,
 } from './database.types';
 import { AssignedSession } from './assignedSessions';
-import { DEFAULT_PARCOURS_ID } from './parcours';
+import { DEFAULT_PARCOURS_ID, ParcoursStepDef } from './parcours';
 import { mockSalesProducts } from './mockData';
 import { ACTIVE_SESSION_STORAGE_KEY } from './config';
 
@@ -31,6 +31,8 @@ export interface PersistedSession {
   playerCount: number;
   gmName: string;
   parcoursId: string;
+  /** Steps the session was started with (null = legacy session, use current parcours). */
+  stepsSnapshot: ParcoursStepDef[] | null;
   notes: string;
   incidentType: IncidentType | null;
   incidentDetails: string;
@@ -92,6 +94,16 @@ function stepsPayload(steps: LoadedStep[]): {
   return { completedSteps: steps.map((item) => item.step), stepTimes };
 }
 
+function parseSnapshot(value: unknown): ParcoursStepDef[] | null {
+  if (!Array.isArray(value) || !value.length) return null;
+  return value
+    .filter((item) => item && typeof item === 'object' && typeof (item as ParcoursStepDef).key === 'string')
+    .map((item) => {
+      const step = item as ParcoursStepDef;
+      return { key: step.key, label: step.label || step.key, hint: step.hint ?? null, note: step.note ?? null };
+    });
+}
+
 function rowToSession(
   row: Record<string, unknown>,
   steps: LoadedStep[],
@@ -111,6 +123,7 @@ function rowToSession(
     playerCount: Number(row.player_count || 0) || 8,
     gmName: (row.gm_name as string) || 'GM',
     parcoursId: (row.parcours_id as string) || DEFAULT_PARCOURS_ID,
+    stepsSnapshot: parseSnapshot(row.steps_snapshot),
     notes: (row.notes as string) || '',
     incidentType: (row.incident_type as IncidentType) || null,
     incidentDetails: (row.incident_details as string) || '',
@@ -224,6 +237,10 @@ export async function createOrResumeFromAssignment(params: {
   assignment: AssignedSession;
   gmId: string;
   gmName: string;
+  /** Official game name (games table) when the planning title was matched. */
+  game?: string;
+  parcoursId: string;
+  stepsSnapshot: ParcoursStepDef[];
 }): Promise<PersistedSession> {
   const key = assignmentKey(params.assignment);
   if (isMockMode || !supabase) {
@@ -233,13 +250,14 @@ export async function createOrResumeFromAssignment(params: {
     return emptyDemoSession({
       sessionId,
       assignmentId: key,
-      game: params.assignment.game,
+      game: params.game || params.assignment.game,
       date: params.assignment.date,
       time: params.assignment.startTime,
       groupName: params.assignment.groupName || '',
       playerCount: params.assignment.playerCount,
       gmName: params.gmName,
-      parcoursId: params.assignment.parcoursId || DEFAULT_PARCOURS_ID,
+      parcoursId: params.parcoursId,
+      stepsSnapshot: params.stepsSnapshot,
       notes: params.assignment.notes || '',
       clientEmail: params.assignment.clientEmail || '',
     });
@@ -269,12 +287,13 @@ export async function createOrResumeFromAssignment(params: {
   return insertSession({
     gmId: params.gmId,
     gmName: params.gmName,
-    game: params.assignment.game,
+    game: params.game || params.assignment.game,
     date: params.assignment.date,
     time: params.assignment.startTime,
     groupName: params.assignment.groupName || '',
     playerCount: params.assignment.playerCount,
-    parcoursId: params.assignment.parcoursId || DEFAULT_PARCOURS_ID,
+    parcoursId: params.parcoursId,
+    stepsSnapshot: params.stepsSnapshot,
     notes: params.assignment.notes || '',
     assignmentId: key,
     clientEmail: params.assignment.clientEmail || '',
@@ -290,6 +309,7 @@ export async function createManualSession(params: {
   groupName: string;
   playerCount: number;
   parcoursId: string;
+  stepsSnapshot: ParcoursStepDef[];
 }): Promise<PersistedSession> {
   if (isMockMode || !supabase) {
     return emptyDemoSession({
@@ -302,6 +322,7 @@ export async function createManualSession(params: {
       playerCount: params.playerCount,
       gmName: params.gmName,
       parcoursId: params.parcoursId,
+      stepsSnapshot: params.stepsSnapshot,
     });
   }
   return insertSession({ ...params, notes: '', assignmentId: null, clientEmail: '' });
@@ -316,6 +337,7 @@ async function insertSession(params: {
   groupName: string;
   playerCount: number;
   parcoursId: string;
+  stepsSnapshot: ParcoursStepDef[];
   notes: string;
   assignmentId: string | null;
   clientEmail?: string;
@@ -333,6 +355,7 @@ async function insertSession(params: {
       group_name: params.groupName || null,
       player_count: params.playerCount,
       parcours_id: params.parcoursId,
+      steps_snapshot: params.stepsSnapshot,
       notes: params.notes || null,
       assignment_id: params.assignmentId,
       started_at: startedAt,

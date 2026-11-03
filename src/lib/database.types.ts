@@ -23,7 +23,8 @@ export type IncidentType = 'bug' | 'malaise' | 'casse' | 'autre';
 export type PaymentMethod = 'twint' | 'especes' | 'carte' | 'facture';
 export type FicheScopeKind = 'all' | 'locations' | 'games';
 
-export type SessionStep =
+/** Historical VR Center step keys (former Postgres enum session_step). */
+export type LegacyVrStep =
   | 'reception_seating'
   | 'reception_drinks'
   | 'reception_popcorn'
@@ -38,6 +39,9 @@ export type SessionStep =
   | 'google_review'
   | 'socials_shared'
   | 'cleaning';
+
+/** Step key of any parcours (parcours_steps.step_key). VR keys = LegacyVrStep. */
+export type SessionStep = string;
 
 export interface ProcedureFiche {
   id: string;
@@ -468,7 +472,6 @@ export interface Database {
     Enums: {
       checklist_type: ChecklistType;
       fiche_category: FicheCategory;
-      session_step: SessionStep;
       incident_type: IncidentType;
       payment_method: PaymentMethod;
     };
