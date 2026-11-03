@@ -628,7 +628,6 @@ export function SuiviParties() {
                 details={incidentDetails}
                 onDetailsChange={onIncidentDetailsChange}
                 onClear={clearIncident}
-                session={activeSession}
               />
             )}
 
@@ -807,13 +806,11 @@ function IncidentAlert({
   details,
   onDetailsChange,
   onClear,
-  session,
 }: {
   incidentType: IncidentType;
   details: string;
   onDetailsChange: (details: string) => void;
   onClear: () => void;
-  session: ActiveSession;
 }) {
   const relevantFiches = useFichesByIncidentType(incidentType);
 
@@ -845,12 +842,6 @@ function IncidentAlert({
         <div className="flex flex-wrap gap-2">
           {relevantFiches.length > 0 && (
             <FicheButton fiches={relevantFiches} label="Voir la procédure de dépannage" />
-          )}
-          {(incidentType === 'bug' || incidentType === 'autre') && (
-            <Button variant="outline" size="sm" onClick={() => openBugReporter(session, details)}>
-              <ExternalLink className="h-4 w-4 mr-1" />
-              Bug reporter
-            </Button>
           )}
         </div>
       </AlertDescription>
