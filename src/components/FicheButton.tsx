@@ -6,6 +6,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
+  SheetClose,
 } from '@/components/ui/sheet';
 import { Info } from 'lucide-react';
 import { ProcedureFiche } from '@/lib/database.types';
@@ -27,7 +28,7 @@ export function FicheButton({ fiches, label = 'Comment faire ?' }: FicheButtonPr
           {label}
         </Button>
       </SheetTrigger>
-      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto pb-0">
         <SheetHeader>
           <SheetTitle>Procédures associées</SheetTitle>
           <SheetDescription>
@@ -40,6 +41,13 @@ export function FicheButton({ fiches, label = 'Comment faire ?' }: FicheButtonPr
               <FicheViewer fiche={fiche} />
             </div>
           ))}
+        </div>
+        <div className="sticky bottom-0 -mx-6 mt-6 border-t bg-background/95 px-6 py-3 backdrop-blur">
+          <SheetClose asChild>
+            <Button variant="outline" className="w-full">
+              Fermer
+            </Button>
+          </SheetClose>
         </div>
       </SheetContent>
     </Sheet>

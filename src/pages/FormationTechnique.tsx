@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/button';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -9,6 +10,7 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
+  SheetClose,
 } from '@/components/ui/sheet';
 import { Search } from 'lucide-react';
 import { useProcedureFiches } from '@/hooks/useProcedureFiches';
@@ -268,7 +270,7 @@ export function FormationTechnique() {
       <Sheet open={!!selectedFiche} onOpenChange={() => setSelectedFiche(null)}>
         <SheetContent
           side="right"
-          className="w-full max-w-full bg-background sm:max-w-lg overflow-y-auto"
+          className="w-full max-w-full bg-background sm:max-w-lg overflow-y-auto pb-0"
         >
           {selectedFiche && (
             <>
@@ -290,6 +292,13 @@ export function FormationTechnique() {
                     }}
                   />
                 )}
+              </div>
+              <div className="sticky bottom-0 -mx-6 mt-6 border-t bg-background/95 px-6 py-3 backdrop-blur">
+                <SheetClose asChild>
+                  <Button variant="outline" className="w-full">
+                    Fermer
+                  </Button>
+                </SheetClose>
               </div>
             </>
           )}
