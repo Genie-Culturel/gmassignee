@@ -35,13 +35,13 @@ export const DEMO_LOCATIONS: VenueLocation[] = [
 ];
 
 export const DEMO_GAMES: VenueGame[] = [
-  { id: 'game-planta', location_id: 'loc-vr_center', slug: 'planta', name: 'Planta', sort_index: 1 },
-  { id: 'game-serviteur', location_id: 'loc-vr_center', slug: 'serviteur', name: 'Serviteur', sort_index: 2 },
-  { id: 'game-saga', location_id: 'loc-vr_center', slug: 'saga', name: 'Saga', sort_index: 3 },
+  { id: 'game-planta', location_id: 'loc-vr_center', slug: 'planta', name: 'Bataille de la Planta', sort_index: 1 },
+  { id: 'game-serviteur', location_id: 'loc-vr_center', slug: 'serviteur', name: 'Le Serviteur 1 & 2', sort_index: 2 },
+  { id: 'game-saga', location_id: 'loc-vr_center', slug: 'saga', name: 'La Saga', sort_index: 3 },
   { id: 'game-schoolcrafter', location_id: 'loc-vr_center', slug: 'schoolcrafter', name: 'Schoolcrafter', sort_index: 4 },
-  { id: 'game-usine_chandoline', location_id: 'loc-chandoline', slug: 'usine_chandoline', name: 'Usine de Chandoline', sort_index: 1 },
-  { id: 'game-davinci', location_id: 'loc-escape_sion', slug: 'davinci', name: 'Davinci', sort_index: 1 },
-  { id: 'game-feux_sacres', location_id: 'loc-escape_sierre', slug: 'feux_sacres', name: 'Feux sacrés', sort_index: 1 },
+  { id: 'game-usine_chandoline', location_id: 'loc-chandoline', slug: 'usine_chandoline', name: 'Novasphère', sort_index: 1 },
+  { id: 'game-davinci', location_id: 'loc-escape_sion', slug: 'davinci', name: 'Da Vinci Code', sort_index: 1 },
+  { id: 'game-feux_sacres', location_id: 'loc-escape_sierre', slug: 'feux_sacres', name: 'Le Feu sacré', sort_index: 1 },
 ];
 
 export const DEMO_CATALOG: VenueCatalog = { locations: DEMO_LOCATIONS, games: DEMO_GAMES };
@@ -117,7 +117,7 @@ export const DEMO_EXTRA_FICHES: ProcedureFiche[] = [
   extraFiche(
     'demo-chandoline-launch',
     'formation_technique',
-    '🚧 Lancement Usine de Chandoline',
+    '🚧 Lancement Novasphère',
     'Lancement du jeu XR.',
     'games',
     [],
