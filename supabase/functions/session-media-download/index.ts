@@ -68,17 +68,17 @@ Deno.serve(async (req: Request) => {
 
   const { data: session, error } = await admin
     .from("vr_sessions")
-    .select("id, game")
+    .select("id, game, parcours_id")
     .eq("videos_download_token", token)
     .maybeSingle();
-  if (error) return json({ ok: false, error: "server", message: "Erreur serveur, réessaie plus tard." }, 500);
+  if (error) return json({ ok: false, error: "server", message: "Erreur serveur, réessayez plus tard." }, 500);
   if (!session) {
     return json({ ok: false, error: "not_found", message: "Ce lien n'existe pas ou n'est plus valable." }, 404);
   }
 
   const { data: media } = await admin
     .from("session_media")
-    .select("path, original_name, expires_at, size")
+    .select("path, original_name, expires_at, size, mime")
     .eq("session_id", session.id)
     .gt("expires_at", new Date().toISOString())
     .order("uploaded_at", { ascending: true });
@@ -92,20 +92,53 @@ Deno.serve(async (req: Request) => {
     }, 410);
   }
 
-  const files: { name: string; size: number | null; url: string; expires_at: string }[] = [];
+  const files: { name: string; size: number | null; url: string; expires_at: string; kind: "video" | "photo" | "file" }[] = [];
   for (const row of rows) {
     const name = row.original_name || row.path.split("/").pop() || "video";
     const signed = await admin.storage
       .from("session-media")
       .createSignedUrl(row.path, SIGNED_URL_SECONDS, { download: safeDownloadName(name) });
     if (signed.data?.signedUrl) {
-      files.push({ name, size: row.size ?? null, url: signed.data.signedUrl, expires_at: row.expires_at });
+      files.push({
+        name,
+        size: row.size ?? null,
+        url: signed.data.signedUrl,
+        expires_at: row.expires_at,
+        kind: mediaKind(row.mime, name),
+      });
     }
   }
   if (!files.length) {
-    return json({ ok: false, error: "server", message: "Fichiers momentanément indisponibles, réessaie plus tard." }, 500);
+    return json({ ok: false, error: "server", message: "Fichiers momentanément indisponibles, réessayez plus tard." }, 500);
   }
 
   const expiresAt = rows.map((row) => row.expires_at).sort()[0];
-  return json({ ok: true, game: session.game || null, expires_at: expiresAt, files });
+  const brand = await sessionBrand(admin, session.game, session.parcours_id);
+  return json({ ok: true, game: session.game || null, brand, expires_at: expiresAt, files });
 });
+
+function mediaKind(mime: string | null, name: string): "video" | "photo" | "file" {
+  const m = (mime || "").toLowerCase();
+  if (m.startsWith("video/")) return "video";
+  if (m.startsWith("image/")) return "photo";
+  const ext = name.toLowerCase().split(".").pop() || "";
+  if (["mp4", "mov", "m4v", "webm", "avi", "mkv", "3gp"].includes(ext)) return "video";
+  if (["jpg", "jpeg", "png", "heic", "heif", "webp", "gif"].includes(ext)) return "photo";
+  return "file";
+}
+
+/** « escape_life » for Escape Life games (Sion / Sierre), else « vr_center ». */
+// deno-lint-ignore no-explicit-any
+async function sessionBrand(admin: any, game: string | null, parcoursId: string | null): Promise<"escape_life" | "vr_center"> {
+  if ((parcoursId || "").startsWith("escape_life")) return "escape_life";
+  if (!game) return "vr_center";
+  try {
+    const { data } = await admin.from("games").select("name, locations(slug)").ilike("name", game).limit(1);
+    const loc = data?.[0]?.locations;
+    const slug = Array.isArray(loc) ? loc[0]?.slug : loc?.slug;
+    if (typeof slug === "string" && slug.startsWith("escape_")) return "escape_life";
+  } catch {
+    /* ignore */
+  }
+  return "vr_center";
+}

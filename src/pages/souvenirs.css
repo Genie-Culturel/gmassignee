@@ -1,0 +1,34 @@
+/* Brand fonts of virtualrealitycenter.ch (self-hosted, latin subset, OFL / Apache). */
+@font-face {
+  font-family: 'Mina';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/brand/mina-400-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Mina';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/brand/mina-700-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/brand/roboto-latin.woff2') format('woff2');
+}
+
+.souvenirs-page {
+  --vrc-blue: #1a3fff;
+  --vrc-blue-hover: #3a5bff;
+  --vrc-dark: #03090d;
+  --vrc-teal: #009592;
+  font-family: 'Roboto', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background-color: var(--vrc-dark);
+}
+.souvenirs-page .font-brand {
+  font-family: 'Mina', 'Roboto', system-ui, sans-serif;
+}
