@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Circle } from 'lucide-react';
+import { CheckCircle2, Circle, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -24,6 +24,8 @@ interface SessionConsultSheetProps {
   row: RecordedSessionRow | null;
   onClose: () => void;
   onReviewedChange: (row: RecordedSessionRow, reviewed: boolean) => void;
+  /** Admin only: shows « Supprimer la session ». */
+  onDeleteRequest?: (row: RecordedSessionRow) => void;
   reviewBusy: boolean;
 }
 
@@ -49,7 +51,13 @@ const chf = (value: number) => `CHF ${value.toFixed(2)}`;
 
 const FLAG_TEXT = { incident: 'text-red-700', remark: 'text-amber-800', cash: 'text-emerald-700' } as const;
 
-export function SessionConsultSheet({ row, onClose, onReviewedChange, reviewBusy }: SessionConsultSheetProps) {
+export function SessionConsultSheet({
+  row,
+  onClose,
+  onReviewedChange,
+  onDeleteRequest,
+  reviewBusy,
+}: SessionConsultSheetProps) {
   const [session, setSession] = useState<PersistedSession | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -283,11 +291,24 @@ export function SessionConsultSheet({ row, onClose, onReviewedChange, reviewBusy
               )}
             </div>
             <div className="sticky bottom-0 -mx-6 mt-2 border-t bg-background/95 px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
-              <SheetClose asChild>
-                <Button variant="outline" className="w-full">
-                  Fermer
-                </Button>
-              </SheetClose>
+              <div className="flex flex-col gap-2 sm:flex-row-reverse">
+                <SheetClose asChild>
+                  <Button variant="outline" className="w-full sm:flex-1">
+                    Fermer
+                  </Button>
+                </SheetClose>
+                {onDeleteRequest && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800 sm:flex-1"
+                    onClick={() => onDeleteRequest(row)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" aria-hidden />
+                    Supprimer la session
+                  </Button>
+                )}
+              </div>
             </div>
           </>
         )}

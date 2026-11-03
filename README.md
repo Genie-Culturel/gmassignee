@@ -157,7 +157,7 @@ VITE_FORCE_DEMO=true
 | `020_step_fiches_per_parcours.sql` | `session_step_fiches.parcours_id` (liens fiche ↔ étape par parcours, unique `(parcours_id, step, fiche_id)`), liens VR existants rattachés à `vr_centre_client`. |
 | `021_parcours_step_fiches_content.sql` | 13 fiches d’étapes (Escape Life, Da Vinci Code, Le Feu sacré, VR, 🚧 Novasphère) et leurs liens : chaque étape active des 4 parcours a « Comment faire ? ». Généré par `scripts/gen_parcours_fiches.py`. |
 
-Sur **gm-vrcenter**, 001–**023** sont appliqués. `pg_cron` n’est pas activé sur le plan gratuit : la purge 14 jours passe par l’edge function `cleanup-session-media` (ou un appel SQL manuel à `cleanup_expired_session_media()`).
+Sur **gm-vrcenter**, 001–**024** sont appliqués. `pg_cron` n’est pas activé sur le plan gratuit : la purge 14 jours passe par l’edge function `cleanup-session-media` (ou un appel SQL manuel à `cleanup_expired_session_media()`).
 
 ### Secrets e-mail / nettoyage (à configurer)
 

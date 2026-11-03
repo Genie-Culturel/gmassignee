@@ -1,12 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronRight, Clapperboard } from 'lucide-react';
+import { ChevronRight, Clapperboard, Loader2, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ManualSessionBadge, SessionFlagBadges } from '@/components/SessionFlagBadge';
 import { SessionConsultSheet } from '@/components/SessionConsultSheet';
-import { RecordedSessionRow, listRecordedSessions, setSessionFlagReviewed } from '@/lib/sessionView';
+import {
+  RecordedSessionRow,
+  deleteSessionAsAdmin,
+  listRecordedSessions,
+  setSessionFlagReviewed,
+} from '@/lib/sessionView';
 import { formatDate, formatTime } from '@/lib/utils';
 
 function flagText(row: RecordedSessionRow): string {
@@ -38,6 +53,35 @@ export function SessionMediaAdmin() {
   const [onlyFlagged, setOnlyFlagged] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const { isAdmin } = useAuth();
+  const [toDelete, setToDelete] = useState<RecordedSessionRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  const confirmDelete = async () => {
+    if (!toDelete) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteSessionAsAdmin(toDelete.sessionId);
+      const label = `${toDelete.game} du ${toDelete.date ? formatDate(toDelete.date + 'T12:00:00') : '—'}`;
+      setRows((current) => current.filter((item) => item.sessionId !== toDelete.sessionId));
+      if (openId === toDelete.sessionId) setOpenId(null);
+      setToDelete(null);
+      setToast(`Session ${label} supprimée.`);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Suppression impossible');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => {
     listRecordedSessions()
@@ -174,6 +218,11 @@ export function SessionMediaAdmin() {
                 <th className="px-3 py-2 font-medium">Client</th>
                 <th className="px-3 py-2 font-medium">Vidéos envoyées</th>
                 <th className="px-3 py-2 font-medium">À relever</th>
+                {isAdmin && (
+                  <th className="w-10 px-1 py-2">
+                    <span className="sr-only">Supprimer</span>
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -211,6 +260,24 @@ export function SessionMediaAdmin() {
                       <span className="text-muted-foreground">—</span>
                     )}
                   </td>
+                  {isAdmin && (
+                    <td className="px-1 py-2">
+                      <button
+                        type="button"
+                        className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+                        aria-label={`Supprimer la session ${row.game} du ${row.date} ${row.time}`}
+                        title="Supprimer la session"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setDeleteError(null);
+                          setToDelete(row);
+                        }}
+                        onKeyDown={(event) => event.stopPropagation()}
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -226,8 +293,67 @@ export function SessionMediaAdmin() {
         row={openRow}
         onClose={() => setOpenId(null)}
         onReviewedChange={toggleReviewed}
+        onDeleteRequest={
+          isAdmin
+            ? (row) => {
+                setDeleteError(null);
+                setToDelete(row);
+              }
+            : undefined
+        }
         reviewBusy={!!openRow && busyId === openRow.sessionId}
       />
+      <Dialog open={!!toDelete} onOpenChange={(open) => !open && !deleting && setToDelete(null)}>
+        <DialogContent role="alertdialog" className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <DialogHeader className="text-left">
+            <DialogTitle>Supprimer définitivement cette session ?</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                {toDelete && (
+                  <p className="rounded-md border bg-muted/40 px-3 py-2 text-foreground">
+                    <span className="font-medium">{toDelete.game}</span>
+                    <br />
+                    {toDelete.date ? formatDate(toDelete.date + 'T12:00:00') : '—'} · {toDelete.time} · GM{' '}
+                    {toDelete.gmName || '—'}
+                  </p>
+                )}
+                <p>Seront supprimés :</p>
+                <ul className="list-disc space-y-0.5 pl-5">
+                  <li>les étapes cochées et leurs horaires ;</li>
+                  <li>les ventes et le commentaire de vente ;</li>
+                  <li>l’incident, les notes et remarques ;</li>
+                  <li>les vidéos &amp; photos et le lien client (la page souvenirs ne fonctionnera plus).</li>
+                </ul>
+                <p className="font-medium text-red-700">Cette action est irréversible.</p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError && (
+            <Alert variant="destructive">
+              <AlertDescription>{deleteError}</AlertDescription>
+            </Alert>
+          )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" disabled={deleting} onClick={() => setToDelete(null)}>
+              Annuler
+            </Button>
+            <Button type="button" variant="destructive" disabled={deleting} onClick={() => void confirmDelete()}>
+              {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : <Trash2 className="mr-2 h-4 w-4" aria-hidden />}
+              Supprimer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {toast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed inset-x-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-[60] mx-auto max-w-sm rounded-lg bg-slate-900 px-4 py-3 text-sm text-white shadow-lg"
+        >
+          {toast}
+        </div>
+      )}
     </Card>
   );
 }

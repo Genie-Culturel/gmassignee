@@ -129,7 +129,23 @@ function readDemoReviews(): Record<string, string> {
   }
 }
 
+const DEMO_DELETED_KEY = 'gmassignee_demo_deleted_sessions';
+
+function readDemoDeleted(): string[] {
+  try {
+    const value = JSON.parse(localStorage.getItem(DEMO_DELETED_KEY) || '[]');
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+}
+
 function demoSessions(): PersistedSession[] {
+  const deleted = new Set(readDemoDeleted());
+  return allDemoSessions().filter((s) => !deleted.has(s.sessionId));
+}
+
+function allDemoSessions(): PersistedSession[] {
   const today = new Date().toISOString().slice(0, 10);
   const at = (hhmm: string) => new Date(`${today}T${hhmm}:00`).toISOString();
   const base = {
@@ -383,4 +399,40 @@ export async function loadSessionMediaForAdmin(sessionId: string): Promise<Admin
   });
   const liveExpiries = items.filter((item) => !item.expired).map((item) => item.expiresAt).sort();
   return { items, souvenirsUrl, expiresAt: liveExpiries[0] || null };
+}
+
+/**
+ * Admin only: delete a session for good.
+ * 1. Storage files of the session (API Storage, policy delete is_admin()) — SQL cannot delete them.
+ * 2. RPC admin_delete_session (migration 024): checks is_admin(), deletes steps, sales, media rows,
+ *    unlinks bug reports and deletes vr_sessions (the client souvenirs token dies with it).
+ */
+export async function deleteSessionAsAdmin(sessionId: string): Promise<{ filesRemoved: number }> {
+  if (isMockMode || !supabase) {
+    const deleted = new Set(readDemoDeleted());
+    deleted.add(sessionId);
+    try {
+      localStorage.setItem(DEMO_DELETED_KEY, JSON.stringify([...deleted]));
+    } catch {
+      /* ignore */
+    }
+    return { filesRemoved: 0 };
+  }
+  const paths = new Set<string>();
+  const { data: mediaRows, error: mediaErr } = await supabase
+    .from('session_media')
+    .select('path')
+    .eq('session_id', sessionId);
+  if (mediaErr) throw new Error(mediaErr.message);
+  for (const row of mediaRows || []) if (row.path) paths.add(row.path as string);
+  const { data: listed } = await supabase.storage.from(SESSION_MEDIA_BUCKET).list(sessionId, { limit: 1000 });
+  for (const obj of listed || []) if (obj.name) paths.add(`${sessionId}/${obj.name}`);
+
+  if (paths.size) {
+    const { error: removeErr } = await supabase.storage.from(SESSION_MEDIA_BUCKET).remove([...paths]);
+    if (removeErr) throw new Error(`Suppression des fichiers impossible : ${removeErr.message}`);
+  }
+  const { error } = await supabase.rpc('admin_delete_session', { p_session_id: sessionId });
+  if (error) throw new Error(error.message);
+  return { filesRemoved: paths.size };
 }
