@@ -1,5 +1,6 @@
 import { isMockMode, supabase } from './supabase';
 import { DEMO_PARCOURS, ParcoursDefinition, ParcoursStep, newStepKey } from './parcours';
+import { DEMO_STEP_FICHE_LINKS } from './demoParcoursFiches';
 
 const DEMO_PARCOURS_STORAGE_KEY = 'gmassignee_demo_parcours';
 
@@ -164,4 +165,88 @@ export async function reorderParcoursSteps(updates: { id: string; sort_order: nu
       .eq('id', update.id);
     if (error) throw new Error(`Ordre : ${error.message}`);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Step → fiche links (session_step_fiches, keyed by parcours_id + step key)
+
+const DEMO_LINKS_STORAGE_KEY = 'gmassignee_demo_step_fiches';
+
+/** stepKey → fiche ids for one parcours. */
+export type StepFicheLinks = Record<string, string[]>;
+
+function readDemoLinks(): Record<string, string[]> {
+  try {
+    const raw = window.localStorage.getItem(DEMO_LINKS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Record<string, string[]>;
+      if (parsed && typeof parsed === 'object') return parsed;
+    }
+  } catch {
+    /* ignore */
+  }
+  return { ...DEMO_STEP_FICHE_LINKS };
+}
+
+function writeDemoLinks(links: Record<string, string[]>) {
+  try {
+    window.localStorage.setItem(DEMO_LINKS_STORAGE_KEY, JSON.stringify(links));
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function listStepFicheLinks(parcoursId: string): Promise<StepFicheLinks> {
+  if (isMockMode || !supabase) {
+    const result: StepFicheLinks = {};
+    const prefix = `${parcoursId}:`;
+    for (const [key, ids] of Object.entries(readDemoLinks())) {
+      if (key.startsWith(prefix)) result[key.slice(prefix.length)] = [...ids];
+    }
+    return result;
+  }
+  const { data, error } = await supabase
+    .from('session_step_fiches')
+    .select('step, fiche_id')
+    .eq('parcours_id', parcoursId);
+  if (error) throw new Error(`Fiches des étapes : ${error.message}`);
+  const result: StepFicheLinks = {};
+  for (const row of (data || []) as { step: string; fiche_id: string }[]) {
+    (result[row.step] ||= []).push(row.fiche_id);
+  }
+  return result;
+}
+
+export async function linkStepFiche(parcoursId: string, stepKey: string, ficheId: string) {
+  if (isMockMode || !supabase) {
+    const links = readDemoLinks();
+    const key = `${parcoursId}:${stepKey}`;
+    links[key] = Array.from(new Set([...(links[key] || []), ficheId]));
+    writeDemoLinks(links);
+    return;
+  }
+  const { error } = await supabase
+    .from('session_step_fiches')
+    .upsert(
+      { parcours_id: parcoursId, step: stepKey, fiche_id: ficheId },
+      { onConflict: 'parcours_id,step,fiche_id', ignoreDuplicates: true }
+    );
+  if (error) throw new Error(`Lien fiche : ${error.message}`);
+}
+
+export async function unlinkStepFiche(parcoursId: string, stepKey: string, ficheId: string) {
+  if (isMockMode || !supabase) {
+    const links = readDemoLinks();
+    const key = `${parcoursId}:${stepKey}`;
+    links[key] = (links[key] || []).filter((id) => id !== ficheId);
+    writeDemoLinks(links);
+    return;
+  }
+  const { error } = await supabase
+    .from('session_step_fiches')
+    .delete()
+    .eq('parcours_id', parcoursId)
+    .eq('step', stepKey)
+    .eq('fiche_id', ficheId);
+  if (error) throw new Error(`Lien fiche : ${error.message}`);
 }

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase, isMockMode } from '@/lib/supabase';
-import { ProcedureFiche, SessionStep } from '@/lib/database.types';
-import { mockStepFichesMapping } from '@/lib/mockData';
+import { ProcedureFiche } from '@/lib/database.types';
 import { hydrateTrainingFiche, loadDemoFiches } from '@/lib/trainingRepository';
 import { isFicheDeleted, sortFichesByOrder } from '@/lib/training';
 
@@ -65,56 +64,6 @@ export function useProcedureFiches(opts?: { includeInactive?: boolean }) {
   }, [tick, includeInactive]);
 
   return { fiches, isLoading, error, reload };
-}
-
-export function useFichesByStep(step: SessionStep) {
-  const [fiches, setFiches] = useState<ProcedureFiche[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchStepFiches() {
-      if (isMockMode) {
-        // Mock mode: use mapping
-        setTimeout(() => {
-          const ficheIds = mockStepFichesMapping[step] || [];
-          const matchedFiches = loadDemoFiches().filter(
-            (f) => ficheIds.includes(f.id) && !isFicheDeleted(f) && f.is_active
-          );
-          setFiches(matchedFiches);
-          setIsLoading(false);
-        }, 200);
-        return;
-      }
-
-      try {
-        const { data, error } = await supabase!
-          .from('session_step_fiches')
-          .select('fiche_id, procedure_fiches(*)')
-          .eq('step', step);
-
-        if (error) throw error;
-
-        const rows = (data || []) as unknown as {
-          procedure_fiches: ProcedureFiche | ProcedureFiche[] | null;
-        }[];
-        const ficheData = rows
-          .map((item) =>
-            Array.isArray(item.procedure_fiches) ? item.procedure_fiches[0] : item.procedure_fiches
-          )
-          .filter((fiche): fiche is ProcedureFiche => Boolean(fiche && !isFicheDeleted(fiche)));
-
-        setFiches(ficheData);
-      } catch (err) {
-        console.error('Error fetching step fiches:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchStepFiches();
-  }, [step]);
-
-  return { fiches, isLoading };
 }
 
 export function useFichesByIncidentType(incidentType: string) {

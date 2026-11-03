@@ -15,9 +15,10 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { SESSION_STEP_LABELS, INCIDENT_TYPE_LABELS, buildBugReporterUrl } from '@/lib/constants';
-import { IncidentType, LegacyVrStep, SalesProduct, SessionStep } from '@/lib/database.types';
+import { IncidentType, LegacyVrStep, ProcedureFiche, SalesProduct, SessionStep } from '@/lib/database.types';
 import { FicheButton } from '@/components/FicheButton';
-import { useFichesByStep, useFichesByIncidentType } from '@/hooks/useProcedureFiches';
+import { useFichesByIncidentType } from '@/hooks/useProcedureFiches';
+import { useStepFiches } from '@/hooks/useStepFiches';
 import { formatDate, formatTime } from '@/lib/utils';
 import { SessionSales } from '@/components/SessionSales';
 import { AssignedActivities } from '@/components/AssignedActivities';
@@ -251,6 +252,7 @@ export function SuiviParties() {
     () => buildSessionSteps(activeSession?.stepsSnapshot ?? null, parcours, stepTimes),
     [activeSession?.stepsSnapshot, parcours, stepTimes]
   );
+  const { byStep: stepFiches } = useStepFiches(activeSession ? parcours.id : undefined);
   const completedCount = sessionSteps.filter((step) => stepTimes[step.key]).length;
   const showVideos = hasVideoStep(sessionSteps);
 
@@ -597,6 +599,7 @@ export function SuiviParties() {
                 step={step}
                 isCompleted={Boolean(stepTimes[step.key])}
                 completedAt={stepTimes[step.key]}
+                fiches={stepFiches[step.key] || []}
                 onToggle={() => toggleStep(step.key)}
               />
             ))}
@@ -747,14 +750,15 @@ function SessionStepItem({
   step,
   isCompleted,
   completedAt,
+  fiches,
   onToggle,
 }: {
   step: ParcoursStepDef;
   isCompleted: boolean;
   completedAt?: string;
+  fiches: ProcedureFiche[];
   onToggle: () => void;
 }) {
-  const { fiches, isLoading } = useFichesByStep(step.key);
 
   return (
     <div
@@ -791,7 +795,7 @@ function SessionStepItem({
           <p className="mt-1 text-xs leading-snug text-muted-foreground">{step.hint}</p>
         )}
       </div>
-      {!isLoading && fiches.length > 0 && (
+      {fiches.length > 0 && (
         <FicheButton fiches={fiches} />
       )}
     </div>

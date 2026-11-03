@@ -12,6 +12,7 @@ import { DEMO_GM_ID } from './assignedSessions';
 import { FORMATION_PAGE_CATEGORIES } from './constants';
 import { isFicheDeleted } from './training';
 import { DEMO_EXTRA_FICHES, FicheScopeKind } from './venues';
+import { DEMO_PARCOURS_FICHES } from './demoParcoursFiches';
 
 export const TRAINING_STORAGE_KEY = 'gmassignee_fiche_validations';
 
@@ -259,7 +260,7 @@ function ensureDemoSortOrders(fiches: ProcedureFiche[]) {
 
 export function loadDemoFiches(): ProcedureFiche[] {
   if (!demoFichesStore) {
-    demoFichesStore = [...mockFiches, ...DEMO_EXTRA_FICHES].map(hydrateTrainingFiche);
+    demoFichesStore = [...mockFiches, ...DEMO_EXTRA_FICHES, ...DEMO_PARCOURS_FICHES].map(hydrateTrainingFiche);
     ensureDemoSortOrders(demoFichesStore);
   }
   return demoFichesStore;

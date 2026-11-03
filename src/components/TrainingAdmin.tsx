@@ -70,7 +70,7 @@ export function TrainingAdmin({ fiches, catalog, gmId, myValidations, onFichesCh
           <TabsTrigger value="suivi" className="px-1 text-xs sm:text-sm">Suivi des GM</TabsTrigger>
         </TabsList>
         <TabsContent value="parcours" className="mt-4">
-          <ParcoursAdmin catalog={catalog} filterGameId={filterGameId} />
+          <ParcoursAdmin catalog={catalog} fiches={fiches} filterGameId={filterGameId} />
         </TabsContent>
         <TabsContent value="suivi" className="mt-4">
           <AdminTracking fiches={visible} gmId={gmId} myValidations={myValidations} />

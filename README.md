@@ -104,6 +104,8 @@ Un parcours par lieu, stocké en base (`parcours` + `parcours_steps`, migration 
 - `session_steps.step` est du texte (ex-enum) : les clés VR historiques sont inchangées ; les autres lieux utilisent `sion_*`, `sierre_*`, `nova_*`.
 - L'encadré d'envoi des vidéos n'apparaît que si le parcours contient l'étape `videos_sent` (VR Center, Chandoline ; pas Sion ni Sierre).
 - Admin : glisser ⋮⋮ pour réordonner (appui long sur mobile), nom, rappel et condition modifiables, case Active, suppression logique (`deleted_at`).
+- Fiches « Comment faire ? » : sous chaque étape, « + Lier une fiche… » (fiches actives globales, du lieu ou de ses jeux) et × pour délier. Liens dans `session_step_fiches` (`parcours_id` + `step`), écriture admin seulement.
+- Contenu des fiches d’étapes : `scripts/parcours_fiches_data.py` → `python3 scripts/gen_parcours_fiches.py` régénère la migration 021 et `src/lib/demoParcoursFiches.ts` (mode démo).
 - Mode démo : mêmes 4 parcours dans `src/lib/parcours.ts` (modifs admin en localStorage).
 
 ## Bug reporter
@@ -152,8 +154,10 @@ VITE_FORCE_DEMO=true
 | `017_game_official_names.sql` | Noms officiels des jeux (Bataille de la Planta, Novasphère, Da Vinci Code, Le Feu sacré…). |
 | `018_parcours_per_location.sql` | Parcours par lieu : tables `parcours` / `parcours_steps` (RLS lecture authentifiée, écriture admin), seed des 4 parcours, `session_steps.step` et `session_step_fiches.step` en texte, `vr_sessions.steps_snapshot`. |
 | `019_placeholder_fiches_nova_schoolcrafter.sql` | Fiches 🚧 « Procédure Novasphère » et « Procédure GM Schoolcrafter » (à compléter), rattachées à leur jeu. |
+| `020_step_fiches_per_parcours.sql` | `session_step_fiches.parcours_id` (liens fiche ↔ étape par parcours, unique `(parcours_id, step, fiche_id)`), liens VR existants rattachés à `vr_centre_client`. |
+| `021_parcours_step_fiches_content.sql` | 13 fiches d’étapes (Escape Life, Da Vinci Code, Le Feu sacré, VR, 🚧 Novasphère) et leurs liens : chaque étape active des 4 parcours a « Comment faire ? ». Généré par `scripts/gen_parcours_fiches.py`. |
 
-Sur **gm-vrcenter**, 001–**019** sont appliqués. `pg_cron` n’est pas activé sur le plan gratuit : la purge 14 jours passe par l’edge function `cleanup-session-media` (ou un appel SQL manuel à `cleanup_expired_session_media()`).
+Sur **gm-vrcenter**, 001–**021** sont appliqués. `pg_cron` n’est pas activé sur le plan gratuit : la purge 14 jours passe par l’edge function `cleanup-session-media` (ou un appel SQL manuel à `cleanup_expired_session_media()`).
 
 ### Secrets e-mail / nettoyage (à configurer)
 
