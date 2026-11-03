@@ -130,14 +130,14 @@ export function FicheValidationPanel({
                 key={question.id}
                 className={`space-y-2 rounded-lg border p-3 ${isWrong ? 'border-red-400 bg-red-50' : ''}`}
               >
-                <p className="text-sm font-medium leading-snug">
+                <div className="text-sm font-medium leading-snug">
                   {question.prompt}
                   {question.is_example && (
                     <Badge variant="secondary" className="ml-2 text-[10px]">
                       exemple
                     </Badge>
                   )}
-                </p>
+                </div>
                 <p className="text-xs text-muted-foreground">Coche la ou les bonnes réponses.</p>
                 <div className="space-y-1">
                   {question.choices.map((choice) => {
