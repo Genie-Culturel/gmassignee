@@ -577,7 +577,12 @@ export function SuiviParties() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Parcours client</CardTitle>
+            <CardTitle>
+              Parcours client –{' '}
+              {catalog.locations.find((l) => l.slug === parcours.locationSlug)?.name ||
+                parcours.name.replace(/^Parcours (client )?/, '')}
+              {parcours.isProvisional ? ' (provisoire)' : ''}
+            </CardTitle>
             <CardDescription>
               Coche chaque étape au fur et à mesure. Clique sur &quot;Comment faire ?&quot; pour voir les procédures.
             </CardDescription>
