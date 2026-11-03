@@ -1,6 +1,6 @@
 import * as tus from 'tus-js-client';
 import { isMockMode, supabase } from './supabase';
-import { DEFAULT_SUPABASE_ANON_KEY, DEFAULT_SUPABASE_URL } from './config';
+import { DEFAULT_SUPABASE_ANON_KEY, DEFAULT_SUPABASE_URL, souvenirsPageUrl } from './config';
 
 export const SESSION_MEDIA_BUCKET = 'session-media';
 export const SESSION_MEDIA_MAX_BYTES = 50 * 1024 * 1024;
@@ -212,8 +212,7 @@ export interface SendVideosResult {
 }
 
 function downloadPageUrl(token: string): string {
-  const base = import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
-  return `${base}/functions/v1/session-media-download?token=${encodeURIComponent(token)}`;
+  return souvenirsPageUrl(token);
 }
 
 export function mailtoVideosDraft(clientEmail: string, downloadUrl: string): string {

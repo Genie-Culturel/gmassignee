@@ -170,6 +170,9 @@ Dans **Supabase → Project Settings → Edge Functions → Secrets** :
 | `RESEND_API_KEY` | pour l’envoi auto | clé API Resend (ne pas committer) |
 | `EMAIL_FROM` | pour l’envoi auto | expéditeur vérifié, ex. `VR Center Valais <souvenirs@ton-domaine.ch>` |
 | `CRON_SECRET` | pour le cron de purge | chaîne aléatoire longue ; header `x-cron-secret` ou `?secret=` sur `cleanup-session-media` |
+| `PUBLIC_APP_URL` | non | URL publique de l’app (défaut `https://genie-culturel.github.io/gmassignee`) ; sert au lien envoyé aux clients |
+
+**Lien client (souvenirs)** : `https://genie-culturel.github.io/gmassignee/souvenirs/?token=<uuid>` — page publique (sans PIN ni login) qui appelle `session-media-download?format=json`. L’ancienne URL de la fonction redirige (302) vers cette page. Côté app, la base vient de `VITE_PUBLIC_APP_URL` (même défaut).
 
 Chez **Resend** : vérifier le domaine d’envoi (SPF/DKIM) ; sans ça `EMAIL_FROM` sera refusé.
 

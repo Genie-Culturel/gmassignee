@@ -10,6 +10,15 @@ export default defineConfig({
     port: 8080,
   },
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, "index.html"),
+        // Public client page (no PIN): /souvenirs/?token=…
+        souvenirs: path.resolve(__dirname, "souvenirs/index.html"),
+      },
+    },
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

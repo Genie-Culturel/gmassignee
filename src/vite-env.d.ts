@@ -4,6 +4,8 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_URL?: string;
   readonly VITE_SUPABASE_ANON_KEY?: string;
   readonly VITE_FORCE_DEMO?: string;
+  /** Public base URL of the app (client souvenirs page). */
+  readonly VITE_PUBLIC_APP_URL?: string;
 }
 
 interface ImportMeta {

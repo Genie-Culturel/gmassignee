@@ -77,7 +77,8 @@ Deno.serve(async (req: Request) => {
     }
 
     const token = session.videos_download_token || crypto.randomUUID();
-    const downloadUrl = `${supabaseUrl}/functions/v1/session-media-download?token=${encodeURIComponent(token)}`;
+    const publicAppUrl = (Deno.env.get("PUBLIC_APP_URL") || "https://genie-culturel.github.io/gmassignee").replace(/\/+$/, "");
+    const downloadUrl = `${publicAppUrl}/souvenirs/?token=${encodeURIComponent(token)}`;
     const sentAt = new Date().toISOString();
 
     const { error: updErr } = await admin
