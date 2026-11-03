@@ -44,6 +44,12 @@ export interface PersistedSession {
   endedAt: string | null;
   clientEmail: string;
   videosSentAt: string | null;
+  /** Started via « Démarrer une session manuelle » (vr_sessions.is_manual). */
+  isManual: boolean;
+  /** Planned end (planning GMassignee), HH:MM. */
+  plannedEndTime: string | null;
+  /** activities.id in the GMassignee planning. */
+  planningActivityId: string | null;
 }
 
 export interface SessionBug {
@@ -134,6 +140,9 @@ function rowToSession(
     endedAt: (row.ended_at as string) || null,
     clientEmail: (row.client_email as string) || '',
     videosSentAt: (row.videos_sent_at as string) || null,
+    isManual: typeof row.is_manual === 'boolean' ? row.is_manual : !row.assignment_id,
+    plannedEndTime: row.planned_end_time ? String(row.planned_end_time).slice(0, 5) : null,
+    planningActivityId: (row.planning_activity_id as string) || null,
   };
 }
 
@@ -211,12 +220,17 @@ export async function listOpenSessions(gmId: string): Promise<PersistedSession[]
 
 const demoSessions = new Map<string, PersistedSession>();
 
-function emptyDemoSession(partial: Omit<PersistedSession, 'startedAt' | 'completedSteps' | 'stepTimes' | 'sales' | 'salesComment' | 'endedAt' | 'incidentType' | 'incidentDetails' | 'notes' | 'clientEmail' | 'videosSentAt'> & {
+function emptyDemoSession(partial: Omit<PersistedSession, 'startedAt' | 'completedSteps' | 'stepTimes' | 'sales' | 'salesComment' | 'endedAt' | 'incidentType' | 'incidentDetails' | 'notes' | 'clientEmail' | 'videosSentAt' | 'isManual' | 'plannedEndTime' | 'planningActivityId'> & {
   notes?: string;
   clientEmail?: string;
+  plannedEndTime?: string | null;
+  planningActivityId?: string | null;
 }): PersistedSession {
   const session: PersistedSession = {
     ...partial,
+    isManual: !partial.assignmentId,
+    plannedEndTime: partial.plannedEndTime || null,
+    planningActivityId: partial.planningActivityId || null,
     notes: partial.notes || '',
     startedAt: new Date().toISOString(),
     incidentType: null,
@@ -260,6 +274,8 @@ export async function createOrResumeFromAssignment(params: {
       stepsSnapshot: params.stepsSnapshot,
       notes: params.assignment.notes || '',
       clientEmail: params.assignment.clientEmail || '',
+      plannedEndTime: params.assignment.endTime || null,
+      planningActivityId: params.assignment.id,
     });
   }
 
@@ -297,6 +313,8 @@ export async function createOrResumeFromAssignment(params: {
     notes: params.assignment.notes || '',
     assignmentId: key,
     clientEmail: params.assignment.clientEmail || '',
+    plannedEndTime: params.assignment.endTime || null,
+    planningActivityId: params.assignment.id,
   });
 }
 
@@ -341,6 +359,8 @@ async function insertSession(params: {
   notes: string;
   assignmentId: string | null;
   clientEmail?: string;
+  plannedEndTime?: string | null;
+  planningActivityId?: string | null;
 }): Promise<PersistedSession> {
   // Real clock time = GM arrival. Planned slot stays in session_time.
   const startedAt = new Date().toISOString();
@@ -361,6 +381,8 @@ async function insertSession(params: {
       started_at: startedAt,
       has_incident: false,
       client_email: params.clientEmail || null,
+      planned_end_time: params.plannedEndTime || null,
+      planning_activity_id: params.planningActivityId || null,
     })
     .select('*')
     .single();

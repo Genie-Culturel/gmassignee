@@ -62,6 +62,7 @@ export interface RecordedSessionRow {
   gmName: string;
   clientEmail: string | null;
   videosSentAt: string | null;
+  isManual: boolean;
   incidentType: IncidentType | null;
   flag: SessionFlag | null;
   flagReviewedAt: string | null;
@@ -88,11 +89,17 @@ function demoSessions(): PersistedSession[] {
     stepsSnapshot: null,
     sales: [],
     salesComment: '',
+    plannedEndTime: null,
+    planningActivityId: null,
   };
   return [
     {
       ...base,
       sessionId: 'demo-sent',
+      assignmentId: 'asgn-demo-saga',
+      isManual: false,
+      plannedEndTime: '16:25',
+      planningActivityId: 'asgn-demo-saga',
       game: 'Saga le Serviteur',
       time: '14:30',
       startedAt: at('14:12'),
@@ -115,6 +122,7 @@ function demoSessions(): PersistedSession[] {
     {
       ...base,
       sessionId: 'demo-pending',
+      isManual: true,
       game: 'La Planta',
       time: '16:30',
       startedAt: at('16:20'),
@@ -142,6 +150,7 @@ function sessionToRow(session: PersistedSession, hasIncident: boolean, reviewedA
     gmName: session.gmName,
     clientEmail: session.clientEmail || null,
     videosSentAt: session.videosSentAt,
+    isManual: session.isManual,
     incidentType: session.incidentType,
     flag: computeSessionFlag({
       hasIncident,
@@ -162,7 +171,7 @@ export async function listRecordedSessions(): Promise<RecordedSessionRow[]> {
   const { data, error } = await supabase
     .from('vr_sessions')
     .select(
-      'id, game, session_date, session_time, group_name, gm_name, client_email, videos_sent_at, has_incident, incident_type, incident_details, notes, sales_comment, flag_reviewed_at'
+      'id, game, session_date, session_time, group_name, gm_name, client_email, videos_sent_at, has_incident, incident_type, incident_details, notes, sales_comment, flag_reviewed_at, is_manual, assignment_id'
     )
     .order('started_at', { ascending: false })
     .limit(60);
@@ -176,6 +185,7 @@ export async function listRecordedSessions(): Promise<RecordedSessionRow[]> {
     gmName: row.gm_name || '',
     clientEmail: row.client_email,
     videosSentAt: row.videos_sent_at,
+    isManual: typeof row.is_manual === 'boolean' ? row.is_manual : !row.assignment_id,
     incidentType: row.incident_type,
     flag: computeSessionFlag({
       hasIncident: Boolean(row.has_incident),

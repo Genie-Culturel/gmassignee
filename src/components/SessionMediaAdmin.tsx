@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { SessionFlagBadge } from '@/components/SessionFlagBadge';
+import { ManualSessionBadge, SessionFlagBadge } from '@/components/SessionFlagBadge';
 import { SessionConsultSheet } from '@/components/SessionConsultSheet';
 import { RecordedSessionRow, listRecordedSessions, setSessionFlagReviewed } from '@/lib/sessionView';
 import { formatDate, formatTime } from '@/lib/utils';
@@ -126,6 +126,7 @@ export function SessionMediaAdmin() {
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-medium">{row.game}</p>
+                    {row.isManual && <ManualSessionBadge />}
                     <SessionFlagBadge flag={row.flag} reviewed={!!row.flagReviewedAt} />
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -165,7 +166,10 @@ export function SessionMediaAdmin() {
                   onKeyDown={(event) => rowKeyDown(event, row.sessionId)}
                 >
                   <td className="px-3 py-2">
-                    <p className="font-medium">{row.game}</p>
+                    <p className="flex flex-wrap items-center gap-2 font-medium">
+                      {row.game}
+                      {row.isManual && <ManualSessionBadge />}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       {row.date} {row.time}
                       {row.groupName ? ` · ${row.groupName}` : ''}

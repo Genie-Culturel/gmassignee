@@ -314,6 +314,9 @@ export interface Database {
           videos_download_token: string;
           flag_reviewed_at: string | null;
           flag_reviewed_by: string | null;
+          is_manual: boolean;
+          planned_end_time: string | null;
+          planning_activity_id: string | null;
           created_at: string;
         };
         Insert: {

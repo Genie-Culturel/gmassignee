@@ -11,7 +11,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { SessionFlagBadge } from '@/components/SessionFlagBadge';
+import { ManualSessionBadge, SessionFlagBadge } from '@/components/SessionFlagBadge';
 import { useParcoursList } from '@/hooks/useParcoursList';
 import { INCIDENT_TYPE_LABELS, PAYMENT_METHOD_LABELS } from '@/lib/constants';
 import { getParcoursById, getParcoursOrDefault } from '@/lib/parcours';
@@ -104,7 +104,10 @@ export function SessionConsultSheet({ row, onClose, onReviewedChange, reviewBusy
         {row && (
           <>
             <SheetHeader className="pr-8 text-left">
-              <SheetTitle>{row.game}</SheetTitle>
+              <SheetTitle className="flex flex-wrap items-center gap-2">
+                {row.game}
+                {row.isManual && <ManualSessionBadge />}
+              </SheetTitle>
               <SheetDescription>
                 Consultation (lecture seule) · {row.date ? formatDate(`${row.date}T12:00:00`) : '—'} {row.time}
               </SheetDescription>
@@ -153,12 +156,23 @@ export function SessionConsultSheet({ row, onClose, onReviewedChange, reviewBusy
                       <Field label="Lieu / parcours" value={parcoursName} />
                       <Field label="GM" value={session.gmName} />
                       <Field label="Date" value={session.date ? formatDate(`${session.date}T12:00:00`) : '—'} />
-                      <Field label="Heure prévue" value={session.time} />
+                      <Field
+                        label="Heure prévue"
+                        value={`${session.time}${session.plannedEndTime ? ` - ${session.plannedEndTime}` : ''}`}
+                      />
                       <Field label="Joueurs" value={String(session.playerCount)} />
                       <Field label="Début réel" value={formatTime(session.startedAt)} />
                       <Field label="Fin" value={session.endedAt ? formatTime(session.endedAt) : 'En cours / non clôturée'} />
                       <Field label="Groupe" value={session.groupName} />
                       <Field label="E-mail client" value={session.clientEmail} />
+                      <Field
+                        label="Origine"
+                        value={
+                          session.isManual
+                            ? 'Session manuelle (hors planning)'
+                            : `Planning GMassignee${session.planningActivityId ? ` · réf. ${session.planningActivityId}` : ''}`
+                        }
+                      />
                       <Field
                         label="Vidéos envoyées"
                         value={session.videosSentAt ? `Oui · ${formatDateTime(session.videosSentAt)}` : 'Non'}

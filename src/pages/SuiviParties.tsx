@@ -13,6 +13,7 @@ import {
   Clock,
   PlayCircle,
   ExternalLink,
+  Users,
 } from 'lucide-react';
 import { INCIDENT_TYPE_LABELS, buildBugReporterUrl } from '@/lib/constants';
 import { IncidentType, ProcedureFiche, SalesProduct, SessionStep } from '@/lib/database.types';
@@ -23,6 +24,7 @@ import { formatDate, formatTime } from '@/lib/utils';
 import { SessionSales } from '@/components/SessionSales';
 import { AssignedActivities } from '@/components/AssignedActivities';
 import { SessionStartNotice } from '@/components/SessionStartNotice';
+import { ManualSessionBadge } from '@/components/SessionFlagBadge';
 import { SessionVideos } from '@/components/SessionVideos';
 import {
   AssignedSession,
@@ -79,6 +81,7 @@ interface ActiveSession {
   notes: string;
   clientEmail: string;
   videosSentAt: string | null;
+  isManual: boolean;
 }
 
 function nowDate(): string {
@@ -100,7 +103,7 @@ function toActive(row: PersistedSession, endTime?: string): ActiveSession {
     game: row.game,
     date: row.date,
     time: row.time,
-    endTime,
+    endTime: endTime || row.plannedEndTime || undefined,
     startedAt: row.startedAt,
     groupName: row.groupName,
     playerCount: row.playerCount,
@@ -110,6 +113,7 @@ function toActive(row: PersistedSession, endTime?: string): ActiveSession {
     notes: row.notes,
     clientEmail: row.clientEmail || '',
     videosSentAt: row.videosSentAt,
+    isManual: row.isManual,
   };
 }
 
@@ -410,7 +414,10 @@ export function SuiviParties() {
                   onClick={() => resumeOpen(row)}
                   className="w-full text-left rounded-lg border bg-background p-3 hover:border-primary transition-colors"
                 >
-                  <p className="font-medium">{row.game}</p>
+                  <p className="flex flex-wrap items-center gap-2 font-medium">
+                    {row.game}
+                    {row.isManual && <ManualSessionBadge />}
+                  </p>
                   <p className="text-sm text-muted-foreground">
                     {row.date} · {row.time}
                     {row.groupName ? ` · ${row.groupName}` : ''}
@@ -426,7 +433,7 @@ export function SuiviParties() {
           <div>
             <h2 className="text-xl font-semibold tracking-tight">Mes sessions</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Tes parties assignées. Clique une ligne pour démarrer, déjà pré-remplie.
+              Tes parties assignées : « Démarrer la session » reprend toutes les infos du planning.
             </p>
           </div>
           <SessionStartNotice />
@@ -438,16 +445,22 @@ export function SuiviParties() {
           />
         </div>
 
-        <Card>
+        <Card className="border-2 border-dashed border-violet-300 bg-violet-50/30">
           <CardHeader>
-            <CardTitle>Démarrer une nouvelle session</CardTitle>
+            <CardTitle className="flex flex-wrap items-center gap-2">
+              Démarrer une session manuelle
+              <ManualSessionBadge />
+            </CardTitle>
             <CardDescription>
-              Fallback si la session n&apos;est pas dans le planning
+              Uniquement si la partie n&apos;est pas dans le planning. Elle sera marquée « Session manuelle » partout.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <SessionStartNotice compact />
+              <p className="flex items-start gap-2 text-xs text-amber-900">
+                <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                Démarre à ton arrivée : l&apos;heure de démarrage = heure d&apos;arrivée du GM.
+              </p>
               <div>
                 <Label htmlFor="manual-game">Jeu</Label>
                 <select
@@ -493,7 +506,12 @@ export function SuiviParties() {
                   onChange={(e) => setManualPlayers(e.target.value)}
                 />
               </div>
-              <Button onClick={startManualSession} className="w-full" size="lg" disabled={busy || setupLoading}>
+              <Button
+                onClick={startManualSession}
+                className="w-full bg-violet-600 hover:bg-violet-700"
+                size="lg"
+                disabled={busy || setupLoading}
+              >
                 <PlayCircle className="mr-2 h-5 w-5" />
                 Démarrer une session manuelle
               </Button>
@@ -521,20 +539,26 @@ export function SuiviParties() {
       )}
 
       <div className="space-y-6">
-        <Card className="border-primary">
+        <Card className={activeSession.isManual ? 'border-2 border-dashed border-violet-400' : 'border-primary'}>
           <CardHeader>
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex flex-wrap items-center gap-2">
                   <Clock className="h-5 w-5 text-primary animate-pulse" />
                   Session en cours
+                  {activeSession.isManual && <ManualSessionBadge />}
                 </CardTitle>
                 <CardDescription className="mt-1 space-y-0.5">
                   <span className="block font-medium text-foreground">{activeSession.game}</span>
+                  {activeSession.groupName && (
+                    <span className="flex items-center gap-1.5 font-medium text-foreground">
+                      <Users className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      {activeSession.groupName}
+                    </span>
+                  )}
                   <span className="block">
                     {formatDate(activeSession.date + 'T12:00:00')} · {activeSession.time}
                     {activeSession.endTime ? ` - ${activeSession.endTime}` : ''}
-                    {activeSession.groupName ? ` · ${activeSession.groupName}` : ''}
                     {` · ${activeSession.playerCount} joueur${activeSession.playerCount > 1 ? 's' : ''}`}
                   </span>
                   <span className="block">

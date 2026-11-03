@@ -114,6 +114,7 @@ export function getMockAssignedSessions(gmId: string = DEMO_GM_ID): AssignedSess
       startTime: todaySlot.startTime,
       endTime: todaySlot.endTime,
       status: 'assigned',
+      groupName: 'Famille Dupont',
       clientEmail: 'client.demo@vrcenter.ch',
     },
     {
@@ -137,6 +138,7 @@ export function getMockAssignedSessions(gmId: string = DEMO_GM_ID): AssignedSess
       startTime: '14:00',
       endTime: '16:45',
       status: 'assigned',
+      groupName: 'Entreprise ABC',
     },
     {
       id: 'asgn-feu-sacre-2026-11-08-1000',
@@ -225,20 +227,21 @@ export async function getAssignedSessions(gmId: string): Promise<AssignedSession
 /**
  * Placeholder for the real GMassignee planning source.
  *
- * When the Lovable app's Supabase is reachable, query its events /
- * assignments tables here and map rows to AssignedSession:
+ * The Lovable app (gmassignee.lovable.app) uses its own Supabase project
+ * (dnxyidnkmtrmkxucqrry), not gm-vrcenter. Tables seen in its bundle:
+ *   activities(id, title, date, start_time, end_time, description, location,
+ *              status, notes, game_type_id, make_event_id)
+ *   event_assignments(activity_id, gm_id, status, confirmed_at, …)
+ * `title` = « Jeu [joueurs] » (player count parsed from [XX]). No dedicated
+ * team / client name / client email columns were seen (maybe in description).
  *
- *   const { data } = await planningClient
- *     .from('events')
- *     .select('id, game_name, start_at, end_at, player_count, status, gm_id, gm_name')
- *     .eq('gm_id', gmId)
- *     .gte('start_at', startOfToday)
- *     .order('start_at');
- *
- *   game ← game_name
- *   playerCount ← player_count
- *   date / startTime / endTime ← start_at, end_at
- *   status ← 'assigned' when the GM is assigned
+ * Mapping onto AssignedSession (all carried into vr_sessions on start):
+ *   id ← activities.id            → vr_sessions.planning_activity_id (+ assignment_id = id:date)
+ *   game / playerCount ← title    → game, player_count
+ *   date, startTime, endTime      → session_date, session_time, planned_end_time
+ *   groupName ← (team, if any)    → group_name
+ *   notes ← notes/description     → notes
+ *   clientEmail ← (if any)        → client_email
  */
 export async function fetchFromGmassigneePlanning(gmId: string): Promise<AssignedSession[]> {
   console.warn(

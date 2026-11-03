@@ -1,4 +1,4 @@
-import { AlertTriangle, Flag } from 'lucide-react';
+import { AlertTriangle, Flag, PencilLine } from 'lucide-react';
 import { SessionFlag } from '@/lib/sessionView';
 import { cn } from '@/lib/utils';
 
@@ -33,6 +33,22 @@ export function SessionFlagBadge({ flag, reviewed, className }: SessionFlagBadge
       <Icon className="h-3 w-3" aria-hidden />
       {label}
       {reviewed && <span className="font-normal">· relevé</span>}
+    </span>
+  );
+}
+
+/** Distinct marker for sessions started outside the planning (« Démarrer une session manuelle »). */
+export function ManualSessionBadge({ className }: { className?: string }) {
+  return (
+    <span
+      title="Session démarrée manuellement, hors planning GMassignee"
+      className={cn(
+        'inline-flex shrink-0 items-center gap-1 rounded-full border border-dashed border-violet-400 bg-violet-50 px-2 py-0.5 text-xs font-semibold text-violet-700',
+        className
+      )}
+    >
+      <PencilLine className="h-3 w-3" aria-hidden />
+      Session manuelle
     </span>
   );
 }

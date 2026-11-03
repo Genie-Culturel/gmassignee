@@ -1,5 +1,5 @@
-import { ReactNode, useState } from 'react';
-import { Calendar, ChevronDown, Clock, PlayCircle } from 'lucide-react';
+import { ReactNode } from 'react';
+import { Calendar, Clock, PlayCircle, Users } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,6 @@ import {
 } from '@/lib/assignedSessions';
 import { assignmentKey, PersistedSession } from '@/lib/sessionRepository';
 import { formatLongWeekdayDate } from '@/lib/utils';
-import { SessionStartNotice } from '@/components/SessionStartNotice';
 
 interface AssignedActivitiesProps {
   sessions: AssignedSession[];
@@ -122,76 +121,41 @@ function ActivityRow({
   busy: boolean;
   onStart: (session: AssignedSession) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const title = assignmentTitle(session);
   const range = assignmentTimeRange(session);
   const longDate = formatLongWeekdayDate(session.date);
+  const players = `${session.playerCount} joueur${session.playerCount > 1 ? 's' : ''}`;
 
   return (
-    <li>
-      <div className="flex items-start gap-1 px-2 py-1 sm:px-4">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => onStart(session)}
-          aria-label={`${existing ? 'Reprendre' : 'Démarrer'} ${title}, ${longDate}, ${range}`}
-          className="min-w-0 flex-1 rounded-md px-2 py-2 text-left hover:bg-muted/50 disabled:opacity-50 sm:px-2"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-start gap-2">
-                <span className="min-w-0 font-medium leading-snug">{title}</span>
-                <span className="flex shrink-0 flex-wrap items-center gap-1 pt-0.5">
-                  <Badge variant="assigned">{assignmentStatusLabel(session.status)}</Badge>
-                  {existing && <Badge variant="success">En cours</Badge>}
-                </span>
-              </div>
-              <div className="mt-1 text-sm text-muted-foreground sm:hidden">
-                <p>{longDate}</p>
-                <p>{range}</p>
-              </div>
-            </div>
-            <div className="hidden shrink-0 text-right text-sm text-muted-foreground sm:block">
-              <p>{longDate}</p>
-              <p>{range}</p>
-            </div>
-          </div>
-        </button>
-        <button
-          type="button"
-          aria-expanded={open}
-          aria-label={open ? `Replier ${title}` : `Déplier ${title}`}
-          onClick={() => setOpen((value) => !value)}
-          className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
-        >
-          <ChevronDown className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} />
-        </button>
-      </div>
-      {open && (
-        <div className="space-y-3 border-t bg-muted/30 px-4 py-3 sm:px-6">
-          <SessionStartNotice compact />
-          {session.groupName && (
-            <p className="text-sm">
-              <span className="text-muted-foreground">Groupe · </span>
-              {session.groupName}
-            </p>
-          )}
-          {session.notes && <p className="text-sm text-muted-foreground">{session.notes}</p>}
-          <p className="text-sm text-muted-foreground">
-            {longDate} · {range}
-            {` · ${session.playerCount} joueur${session.playerCount > 1 ? 's' : ''}`}
-          </p>
-          <Button
-            type="button"
-            className="w-full sm:w-auto"
-            disabled={busy}
-            onClick={() => onStart(session)}
-          >
-            <PlayCircle className="mr-2 h-4 w-4" />
-            {existing ? 'Reprendre la session' : 'Démarrer la session'}
-          </Button>
+    <li className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:gap-4 sm:px-6">
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="min-w-0 font-medium leading-snug">{title}</span>
+          <Badge variant="assigned">{assignmentStatusLabel(session.status)}</Badge>
+          {existing && <Badge variant="success">En cours</Badge>}
         </div>
-      )}
+        {session.groupName && (
+          <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+            <Users className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+            {session.groupName}
+          </p>
+        )}
+        <p className="text-sm text-muted-foreground">
+          {longDate} · {range} · {players}
+        </p>
+        {session.notes && <p className="text-xs text-muted-foreground">{session.notes}</p>}
+      </div>
+      <Button
+        type="button"
+        className="h-11 w-full shrink-0 sm:w-auto"
+        variant={existing ? 'secondary' : 'default'}
+        disabled={busy}
+        onClick={() => onStart(session)}
+        aria-label={`${existing ? 'Reprendre' : 'Démarrer'} la session ${title}, ${longDate}, ${range}`}
+      >
+        <PlayCircle className="mr-2 h-4 w-4" />
+        {existing ? 'Reprendre la session' : 'Démarrer la session'}
+      </Button>
     </li>
   );
 }
