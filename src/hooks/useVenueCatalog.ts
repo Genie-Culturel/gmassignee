@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { isMockMode, supabase } from '@/lib/supabase';
 import { DEMO_CATALOG, VenueCatalog } from '@/lib/venues';
 
+const EMPTY_CATALOG: VenueCatalog = { locations: [], games: [] };
+
 export function useVenueCatalog() {
-  const [catalog, setCatalog] = useState<VenueCatalog>(DEMO_CATALOG);
+  const [catalog, setCatalog] = useState<VenueCatalog>(isMockMode ? DEMO_CATALOG : EMPTY_CATALOG);
   const [isLoading, setIsLoading] = useState(!isMockMode);
 
   useEffect(() => {
@@ -20,7 +22,7 @@ export function useVenueCatalog() {
       ]);
       if (cancelled) return;
       if (locRes.error || gameRes.error || !locRes.data?.length) {
-        setCatalog(DEMO_CATALOG);
+        setCatalog(EMPTY_CATALOG);
       } else {
         setCatalog({
           locations: locRes.data as VenueCatalog['locations'],

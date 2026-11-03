@@ -46,7 +46,7 @@ function statusVariant(status: 'todo' | 'done' | 'revalidate') {
 export function FormationTechnique() {
   const { user, isAdmin } = useAuth();
   const { fiches, isLoading, reload } = useProcedureFiches({ includeInactive: isAdmin });
-  const { catalog } = useVenueCatalog();
+  const { catalog, isLoading: catalogLoading } = useVenueCatalog();
   const gmId = user?.id || DEMO_GM_ID;
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFiche, setSelectedFiche] = useState<ProcedureFiche | null>(null);
@@ -91,7 +91,7 @@ export function FormationTechnique() {
     );
   });
 
-  if (isLoading) {
+  if (isLoading || catalogLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-muted-foreground">Chargement...</div>

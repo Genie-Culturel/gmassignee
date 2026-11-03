@@ -240,9 +240,12 @@ export function defaultScopeForNewFiche(catalog: VenueCatalog, filterGameId: str
     return { scope_kind: 'games', scope_location_ids: [], scope_game_ids: [game.id] };
   }
   const vr = catalog.locations.find((location) => location.slug === 'vr_center');
+  if (!vr) {
+    return { scope_kind: 'all', scope_location_ids: [], scope_game_ids: [] };
+  }
   return {
     scope_kind: 'locations',
-    scope_location_ids: vr ? [vr.id] : [],
+    scope_location_ids: [vr.id],
     scope_game_ids: [],
   };
 }

@@ -364,6 +364,7 @@ function AdminFicheEditor({
         <Button
           type="button"
           variant="outline"
+          disabled={!isMockMode && catalog.locations.length === 0}
           onClick={async () => {
             const created = await saveFiche({
               fiche: {

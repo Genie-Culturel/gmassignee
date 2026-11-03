@@ -311,6 +311,17 @@ function loadDemoQuiz(): QuizQuestionAdmin[] {
   return demoQuizStore;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function assertLiveIds(ids: string[], kind: 'lieu' | 'jeu') {
+  const bad = ids.filter((id) => !UUID_RE.test(id));
+  if (bad.length) {
+    throw new Error(
+      `Identifiants de ${kind} pas encore chargés (${bad.join(', ')}). Réessaie dans une seconde.`
+    );
+  }
+}
+
 async function replaceFicheScope(
   ficheId: string,
   scope: { kind: FicheScopeKind; locationIds: string[]; gameIds: string[] }
@@ -319,12 +330,14 @@ async function replaceFicheScope(
   await supabase.from('fiche_scope_locations').delete().eq('fiche_id', ficheId);
   await supabase.from('fiche_scope_games').delete().eq('fiche_id', ficheId);
   if (scope.kind === 'locations' && scope.locationIds.length) {
+    assertLiveIds(scope.locationIds, 'lieu');
     const { error } = await supabase
       .from('fiche_scope_locations')
       .insert(scope.locationIds.map((location_id) => ({ fiche_id: ficheId, location_id })));
     if (error) throw new Error(error.message);
   }
   if (scope.kind === 'games' && scope.gameIds.length) {
+    assertLiveIds(scope.gameIds, 'jeu');
     const { error } = await supabase
       .from('fiche_scope_games')
       .insert(scope.gameIds.map((game_id) => ({ fiche_id: ficheId, game_id })));
