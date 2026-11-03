@@ -91,7 +91,13 @@ Colonnes `game`, `session_date`, `session_time`, `player_count`, `parcours_id`, 
 
 Fichier : `supabase/migrations/012_gm_training.sql`
 
-**Pas encore appliqué sur gm-vrcenter — à lancer toi-même dans le SQL Editor.** Colonnes `version`, `is_required`, `skip_version_bump` ; tables `quiz_questions`, `fiche_validations` ; triggers de bump de version (case admin « Correction mineure » via `skip_version_bump`) ; RPC `get_quiz_questions` (sans les bonnes réponses) / `submit_fiche_validation` / `list_gm_profiles`. Seed : 2 QCM exemple sur « Installation au lobby », 1 sur « Dépannage : Malaise client ».
+Déjà appliqué sur **gm-vrcenter**. Colonnes `version`, `is_required`, `skip_version_bump` ; tables `quiz_questions`, `fiche_validations` ; triggers de bump de version (case admin « Correction mineure » via `skip_version_bump`) ; RPC `get_quiz_questions` (sans les bonnes réponses) / `submit_fiche_validation` / `list_gm_profiles`.
+
+#### 013 : Vidéos clients
+
+Fichier : `supabase/migrations/013_session_media.sql`
+
+Colonnes `client_email`, `videos_sent_at`, `videos_download_token` sur `vr_sessions` ; table `session_media` ; bucket privé `session-media` (50 Mo/fichier) ; RLS GM/admin ; fonction `cleanup_expired_session_media()`. Edge functions : `send-session-videos` (JWT), `session-media-download` (public, jeton), `cleanup-session-media` (`CRON_SECRET`).
 
 ### 3. Vérifier les données
 

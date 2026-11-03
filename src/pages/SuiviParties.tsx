@@ -22,6 +22,8 @@ import { formatDate, formatTime } from '@/lib/utils';
 import { SessionSales } from '@/components/SessionSales';
 import { AssignedActivities } from '@/components/AssignedActivities';
 import { SessionStartNotice } from '@/components/SessionStartNotice';
+import { SessionVideos } from '@/components/SessionVideos';
+import { FilmingNotice } from '@/components/FilmingNotice';
 import {
   AssignedSession,
   DEMO_GM_ID,
@@ -66,6 +68,8 @@ interface ActiveSession {
   gmName: string;
   parcoursId: string;
   notes: string;
+  clientEmail: string;
+  videosSentAt: string | null;
 }
 
 function nowDate(): string {
@@ -94,6 +98,8 @@ function toActive(row: PersistedSession, endTime?: string): ActiveSession {
     gmName: row.gmName,
     parcoursId: row.parcoursId,
     notes: row.notes,
+    clientEmail: row.clientEmail || '',
+    videosSentAt: row.videosSentAt,
   };
 }
 
@@ -134,6 +140,7 @@ export function SuiviParties() {
   const [manualParcoursId, setManualParcoursId] = useState(DEFAULT_PARCOURS_ID);
 
   const notesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const emailTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const applyLoaded = useCallback((row: PersistedSession, endTime?: string) => {
     setActiveSession(toActive(row, endTime));
@@ -259,6 +266,7 @@ export function SuiviParties() {
       setSalesItems([]);
       setSalesComment('');
       setBugs([]);
+      if (emailTimer.current) clearTimeout(emailTimer.current);
       if (user && !isMockMode) {
         setOpenSessions(await listOpenSessions(user.id));
       }
@@ -388,6 +396,7 @@ export function SuiviParties() {
             </p>
           </div>
           <SessionStartNotice />
+          <FilmingNotice />
           <AssignedActivities
             sessions={assigned}
             openByAssignment={openByAssignment}
@@ -406,6 +415,7 @@ export function SuiviParties() {
           <CardContent>
             <div className="space-y-4">
               <SessionStartNotice compact />
+              <FilmingNotice />
               <div>
                 <Label htmlFor="parcours">Parcours</Label>
                 <select
@@ -614,6 +624,29 @@ export function SuiviParties() {
             )}
           </CardContent>
         </Card>
+
+        <SessionVideos
+          key={`${activeSession.sessionId}-videos`}
+          sessionId={activeSession.sessionId}
+          gmId={gmId}
+          clientEmail={activeSession.clientEmail}
+          videosSentAt={activeSession.videosSentAt}
+          onClientEmailChange={(email) => {
+            setActiveSession({ ...activeSession, clientEmail: email });
+            if (emailTimer.current) clearTimeout(emailTimer.current);
+            emailTimer.current = setTimeout(() => {
+              updateSessionFields(activeSession.sessionId, { clientEmail: email }).catch((err) =>
+                setError(err instanceof Error ? err.message : 'E-mail non enregistré')
+              );
+            }, 600);
+          }}
+          onSent={(sentAt) => {
+            setActiveSession({ ...activeSession, videosSentAt: sentAt });
+            setStepTimes((prev) => ({ ...prev, videos_sent: sentAt }));
+            void setStepCompleted(activeSession.sessionId, 'videos_sent', true);
+            void updateSessionFields(activeSession.sessionId, { videosSentAt: sentAt });
+          }}
+        />
 
         <SessionSales
           key={activeSession.sessionId}

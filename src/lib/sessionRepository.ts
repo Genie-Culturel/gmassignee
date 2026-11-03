@@ -40,6 +40,8 @@ export interface PersistedSession {
   sales: SaleItem[];
   salesComment: string;
   endedAt: string | null;
+  clientEmail: string;
+  videosSentAt: string | null;
 }
 
 export interface SessionBug {
@@ -117,6 +119,8 @@ function rowToSession(
     sales,
     salesComment,
     endedAt: (row.ended_at as string) || null,
+    clientEmail: (row.client_email as string) || '',
+    videosSentAt: (row.videos_sent_at as string) || null,
   };
 }
 
@@ -194,8 +198,9 @@ export async function listOpenSessions(gmId: string): Promise<PersistedSession[]
 
 const demoSessions = new Map<string, PersistedSession>();
 
-function emptyDemoSession(partial: Omit<PersistedSession, 'startedAt' | 'completedSteps' | 'stepTimes' | 'sales' | 'salesComment' | 'endedAt' | 'incidentType' | 'incidentDetails' | 'notes'> & {
+function emptyDemoSession(partial: Omit<PersistedSession, 'startedAt' | 'completedSteps' | 'stepTimes' | 'sales' | 'salesComment' | 'endedAt' | 'incidentType' | 'incidentDetails' | 'notes' | 'clientEmail' | 'videosSentAt'> & {
   notes?: string;
+  clientEmail?: string;
 }): PersistedSession {
   const session: PersistedSession = {
     ...partial,
@@ -208,6 +213,8 @@ function emptyDemoSession(partial: Omit<PersistedSession, 'startedAt' | 'complet
     sales: [],
     salesComment: '',
     endedAt: null,
+    clientEmail: partial.clientEmail || '',
+    videosSentAt: null,
   };
   demoSessions.set(session.sessionId, session);
   return session;
@@ -234,6 +241,7 @@ export async function createOrResumeFromAssignment(params: {
       gmName: params.gmName,
       parcoursId: params.assignment.parcoursId || DEFAULT_PARCOURS_ID,
       notes: params.assignment.notes || '',
+      clientEmail: params.assignment.clientEmail || '',
     });
   }
 
@@ -269,6 +277,7 @@ export async function createOrResumeFromAssignment(params: {
     parcoursId: params.assignment.parcoursId || DEFAULT_PARCOURS_ID,
     notes: params.assignment.notes || '',
     assignmentId: key,
+    clientEmail: params.assignment.clientEmail || '',
   });
 }
 
@@ -295,7 +304,7 @@ export async function createManualSession(params: {
       parcoursId: params.parcoursId,
     });
   }
-  return insertSession({ ...params, notes: '', assignmentId: null });
+  return insertSession({ ...params, notes: '', assignmentId: null, clientEmail: '' });
 }
 
 async function insertSession(params: {
@@ -309,6 +318,7 @@ async function insertSession(params: {
   parcoursId: string;
   notes: string;
   assignmentId: string | null;
+  clientEmail?: string;
 }): Promise<PersistedSession> {
   // Real clock time = GM arrival. Planned slot stays in session_time.
   const startedAt = new Date().toISOString();
@@ -327,6 +337,7 @@ async function insertSession(params: {
       assignment_id: params.assignmentId,
       started_at: startedAt,
       has_incident: false,
+      client_email: params.clientEmail || null,
     })
     .select('*')
     .single();
@@ -346,9 +357,22 @@ export async function updateSessionFields(
     totalCollected?: number;
     totalToInvoice?: number;
     endedAt?: string | null;
+    clientEmail?: string;
+    videosSentAt?: string | null;
   }
 ) {
-  if (isMockMode || !supabase) return;
+  if (isMockMode || !supabase) {
+    const session = demoSessions.get(sessionId);
+    if (!session) return;
+    if (patch.notes !== undefined) session.notes = patch.notes;
+    if (patch.incidentType !== undefined) session.incidentType = patch.incidentType;
+    if (patch.incidentDetails !== undefined) session.incidentDetails = patch.incidentDetails;
+    if (patch.salesComment !== undefined) session.salesComment = patch.salesComment;
+    if (patch.endedAt !== undefined) session.endedAt = patch.endedAt;
+    if (patch.clientEmail !== undefined) session.clientEmail = patch.clientEmail;
+    if (patch.videosSentAt !== undefined) session.videosSentAt = patch.videosSentAt;
+    return;
+  }
   const body: Record<string, unknown> = {};
   if (patch.notes !== undefined) body.notes = patch.notes;
   if (patch.incidentType !== undefined) {
@@ -360,6 +384,8 @@ export async function updateSessionFields(
   if (patch.totalCollected !== undefined) body.total_collected = patch.totalCollected;
   if (patch.totalToInvoice !== undefined) body.total_to_invoice = patch.totalToInvoice;
   if (patch.endedAt !== undefined) body.ended_at = patch.endedAt;
+  if (patch.clientEmail !== undefined) body.client_email = patch.clientEmail;
+  if (patch.videosSentAt !== undefined) body.videos_sent_at = patch.videosSentAt;
   if (Object.keys(body).length === 0) return;
   const { error } = await supabase.from('vr_sessions').update(body).eq('id', sessionId);
   throwIfError(error, 'Mise à jour de la session');

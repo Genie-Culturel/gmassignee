@@ -10,6 +10,7 @@ Deux parties liées :
 
 - **Mes sessions** : même structure que le dashboard GM GMassignee — **Mes Activités Aujourd'hui** et **Mes Prochaines Activités**. Chaque ligne : jeu + `[nb joueurs]`, badge Assigné, date, créneau début–fin. Un clic démarre / reprend la session pré-remplie. Un bandeau rappelle de démarrer **à l'arrivée** : `started_at` = heure d'arrivée GM, chaque étape cochée garde `completed_at`.
 - **Démarrage manuel** : fallback si la partie n'est pas dans le planning. Le GM choisit le **parcours** (aujourd'hui un seul : « Parcours client VR au centre », 14 étapes).
+- **Vidéos clients** : depuis le suivi de session, le GM envoie 1–2 vidéos (téléphone perso) vers un bucket privé `session-media` (TUS, 50 Mo/fichier en plan gratuit). Un e-mail chaleureux part au client (Resend) avec une page de téléchargement valable 14 jours ; les fichiers sont ensuite supprimés. En mode démo, upload et envoi sont simulés localement.
 - **Incidents** : Bug / Freeze ouvre le [Bug reporter](https://genie-culturel.github.io/Bug_report_VR/) pré-rempli + la fiche de dépannage. Malaise / Casse / Autre gardent fiche + note ; Autre affiche aussi le lien bug reporter.
 - **Ventes & encaissement** : lignes, CHF, Twint / Espèces / Carte / Facture.
 
@@ -134,8 +135,29 @@ VITE_FORCE_DEMO=true
 | `010_move_troubleshooting_to_depannage.sql` | Déplace les fiches Dépannage vers `depannage_bugs` |
 | `011_session_persistence.sql` | Colonnes de reprise (`game`, `session_date`, `session_time`, `player_count`, `parcours_id`, `assignment_id`, `gm_name`), `event_id` nullable, unique étape |
 | `012_gm_training.sql` | Formation obligatoire : `version` / `is_required` sur les fiches, `quiz_questions`, `fiche_validations`, triggers de version, RPC quiz sans exposer les bonnes réponses |
+| `013_session_media.sql` | Vidéos clients : `client_email` / `videos_sent_at` / `videos_download_token` sur `vr_sessions`, table `session_media`, bucket privé `session-media` (50 Mo), RLS, `cleanup_expired_session_media()` |
 
-Sur **gm-vrcenter**, 001–011 sont déjà appliqués. **`012_gm_training.sql` n’est pas encore appliqué** — à lancer dans le SQL Editor.
+Sur **gm-vrcenter**, 001–**013** sont appliqués (013 via MCP le 2026-11-03). `pg_cron` n’est pas activé sur le plan gratuit : la purge 14 jours passe par l’edge function `cleanup-session-media` (ou un appel SQL manuel à `cleanup_expired_session_media()`).
+
+### Secrets e-mail / nettoyage (à configurer)
+
+Projet `gm-vrcenter` (`vxeprhyswkqugyewpwfm`), plan **gratuit** pour l’instant (50 Mo/fichier, 1 Go total).
+
+Dans **Supabase → Project Settings → Edge Functions → Secrets** :
+
+| Secret | Obligatoire | Valeur |
+| --- | --- | --- |
+| `RESEND_API_KEY` | pour l’envoi auto | clé API Resend (ne pas committer) |
+| `EMAIL_FROM` | pour l’envoi auto | expéditeur vérifié, ex. `VR Center Valais <souvenirs@ton-domaine.ch>` |
+| `CRON_SECRET` | pour le cron de purge | chaîne aléatoire longue ; header `x-cron-secret` ou `?secret=` sur `cleanup-session-media` |
+
+Chez **Resend** : vérifier le domaine d’envoi (SPF/DKIM) ; sans ça `EMAIL_FROM` sera refusé.
+
+Sans `RESEND_API_KEY` / `EMAIL_FROM`, la fonction **ne plante pas** : l’app affiche le lien de téléchargement à copier + un bouton `mailto` prérempli.
+
+**Plan Pro plus tard** : augmenter `storage.buckets.file_size_limit` du bucket `session-media` (aujourd’hui 52 428 800) et `SESSION_MEDIA_MAX_BYTES` dans `src/lib/sessionMedia.ts`. L’upload TUS est déjà en place.
+
+**Purge 14 jours** : `cleanup_expired_session_media()` + tentative `pg_cron` `20 3 * * *`. Si pg_cron n’est pas dispo (cas actuel), planifier un appel quotidien à `https://vxeprhyswkqugyewpwfm.supabase.co/functions/v1/cleanup-session-media` avec `CRON_SECRET`.
 
 Pour qu'un compte soit admin, dans Authentication → user → `app_metadata` :
 

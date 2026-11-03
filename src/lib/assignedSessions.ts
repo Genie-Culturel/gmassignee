@@ -36,6 +36,8 @@ export interface AssignedSession {
   status: AssignmentStatus;
   groupName?: string;
   notes?: string;
+  /** Client / group email for souvenir videos. */
+  clientEmail?: string;
   /** Parcours to run; defaults to VR Center client flow. */
   parcoursId: string;
 }
@@ -112,6 +114,7 @@ export function getMockAssignedSessions(gmId: string = DEMO_GM_ID): AssignedSess
       endTime: todaySlot.endTime,
       status: 'assigned',
       parcoursId: DEFAULT_PARCOURS_ID,
+      clientEmail: 'client.demo@vrcenter.ch',
     },
     {
       id: 'asgn-saga-2026-11-06-1430',

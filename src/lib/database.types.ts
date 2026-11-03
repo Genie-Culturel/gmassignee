@@ -299,6 +299,9 @@ export interface Database {
           parcours_id: string | null;
           assignment_id: string | null;
           gm_name: string | null;
+          client_email: string | null;
+          videos_sent_at: string | null;
+          videos_download_token: string;
           created_at: string;
         };
         Insert: {
@@ -322,6 +325,9 @@ export interface Database {
           parcours_id?: string | null;
           assignment_id?: string | null;
           gm_name?: string | null;
+          client_email?: string | null;
+          videos_sent_at?: string | null;
+          videos_download_token?: string;
           created_at?: string;
         };
         Update: {
@@ -345,7 +351,45 @@ export interface Database {
           parcours_id?: string | null;
           assignment_id?: string | null;
           gm_name?: string | null;
+          client_email?: string | null;
+          videos_sent_at?: string | null;
+          videos_download_token?: string;
           created_at?: string;
+        };
+      };
+      session_media: {
+        Row: {
+          id: string;
+          session_id: string;
+          path: string;
+          original_name: string | null;
+          size: number;
+          mime: string | null;
+          uploaded_by: string | null;
+          uploaded_at: string;
+          expires_at: string;
+        };
+        Insert: {
+          id?: string;
+          session_id: string;
+          path: string;
+          original_name?: string | null;
+          size?: number;
+          mime?: string | null;
+          uploaded_by?: string | null;
+          uploaded_at?: string;
+          expires_at?: string;
+        };
+        Update: {
+          id?: string;
+          session_id?: string;
+          path?: string;
+          original_name?: string | null;
+          size?: number;
+          mime?: string | null;
+          uploaded_by?: string | null;
+          uploaded_at?: string;
+          expires_at?: string;
         };
       };
       session_steps: {

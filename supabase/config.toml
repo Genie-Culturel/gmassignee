@@ -1,0 +1,10 @@
+project_id = "vxeprhyswkqugyewpwfm"
+
+[functions.send-session-videos]
+verify_jwt = true
+
+[functions.session-media-download]
+verify_jwt = false
+
+[functions.cleanup-session-media]
+verify_jwt = false
