@@ -196,6 +196,8 @@ export function SuiviParties() {
       window.removeEventListener('focus', onFocus);
       window.clearInterval(tick);
     };
+    // Refresh on this session id only; the whole activeSession object changes often.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSession?.sessionId, refreshBugs]);
 
   const openByAssignment = useMemo(() => {

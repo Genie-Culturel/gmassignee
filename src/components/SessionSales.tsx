@@ -50,7 +50,7 @@ export function SessionSales({
     onSalesChange?.(updated, salesComment);
   };
 
-  const updateSaleItem = (id: string, field: keyof SaleItem, value: any) => {
+  const updateSaleItem = (id: string, field: keyof SaleItem, value: SaleItem[keyof SaleItem]) => {
     const updated = salesItems.map(item =>
       item.id === id ? { ...item, [field]: value } : item
     );

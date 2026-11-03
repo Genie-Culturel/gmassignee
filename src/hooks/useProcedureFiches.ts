@@ -93,11 +93,16 @@ export function useFichesByStep(step: SessionStep) {
           .eq('step', step);
 
         if (error) throw error;
-        
-        const ficheData = data
-          ?.map((item: any) => item.procedure_fiches)
-          .filter((fiche: ProcedureFiche | null) => fiche && !isFicheDeleted(fiche)) || [];
-        
+
+        const rows = (data || []) as unknown as {
+          procedure_fiches: ProcedureFiche | ProcedureFiche[] | null;
+        }[];
+        const ficheData = rows
+          .map((item) =>
+            Array.isArray(item.procedure_fiches) ? item.procedure_fiches[0] : item.procedure_fiches
+          )
+          .filter((fiche): fiche is ProcedureFiche => Boolean(fiche && !isFicheDeleted(fiche)));
+
         setFiches(ficheData);
       } catch (err) {
         console.error('Error fetching step fiches:', err);
