@@ -99,6 +99,12 @@ Fichier : `supabase/migrations/013_session_media.sql`
 
 Colonnes `client_email`, `videos_sent_at`, `videos_download_token` sur `vr_sessions` ; table `session_media` ; bucket privé `session-media` (50 Mo/fichier) ; RLS GM/admin ; fonction `cleanup_expired_session_media()`. Edge functions : `send-session-videos` (JWT), `session-media-download` (public, jeton), `cleanup-session-media` (`CRON_SECRET`).
 
+#### 014 : Suppression logique des fiches
+
+Fichier : `supabase/migrations/014_soft_delete_fiches.sql`
+
+Colonne `deleted_at` sur `procedure_fiches`. Distinct de `is_active` (masquage temporaire). Pas de `DELETE` SQL : `fiche_validations` reste. RLS : les GM ne voient que `is_active AND deleted_at IS NULL` ; seul `is_admin()` peut poser `deleted_at`.
+
 ### 3. Vérifier les données
 
 Dans **Table Editor**, vérifie que tu as :

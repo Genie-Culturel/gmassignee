@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase, isMockMode } from '@/lib/supabase';
 import { ProcedureFiche, SessionStep } from '@/lib/database.types';
-import { mockFiches, mockStepFichesMapping } from '@/lib/mockData';
+import { mockStepFichesMapping } from '@/lib/mockData';
 import { hydrateTrainingFiche, loadDemoFiches } from '@/lib/trainingRepository';
+import { isFicheDeleted } from '@/lib/training';
 
 export function useProcedureFiches(opts?: { includeInactive?: boolean }) {
   const [fiches, setFiches] = useState<ProcedureFiche[]>([]);
@@ -16,7 +17,9 @@ export function useProcedureFiches(opts?: { includeInactive?: boolean }) {
   useEffect(() => {
     async function fetchFiches() {
       if (isMockMode) {
-        const rows = loadDemoFiches().map(hydrateTrainingFiche);
+        const rows = loadDemoFiches()
+          .map(hydrateTrainingFiche)
+          .filter((fiche) => !isFicheDeleted(fiche));
         setFiches(includeInactive ? rows : rows.filter((fiche) => fiche.is_active));
         setIsLoading(false);
         return;
@@ -26,6 +29,7 @@ export function useProcedureFiches(opts?: { includeInactive?: boolean }) {
         let query = supabase!
           .from('procedure_fiches')
           .select('*')
+          .is('deleted_at', null)
           .order('category', { ascending: true })
           .order('title', { ascending: true });
         if (!includeInactive) query = query.eq('is_active', true);
@@ -56,7 +60,9 @@ export function useFichesByStep(step: SessionStep) {
         // Mock mode: use mapping
         setTimeout(() => {
           const ficheIds = mockStepFichesMapping[step] || [];
-          const matchedFiches = mockFiches.filter(f => ficheIds.includes(f.id));
+          const matchedFiches = loadDemoFiches().filter(
+            (f) => ficheIds.includes(f.id) && !isFicheDeleted(f) && f.is_active
+          );
           setFiches(matchedFiches);
           setIsLoading(false);
         }, 200);
@@ -73,7 +79,7 @@ export function useFichesByStep(step: SessionStep) {
         
         const ficheData = data
           ?.map((item: any) => item.procedure_fiches)
-          .filter(Boolean) || [];
+          .filter((fiche: ProcedureFiche | null) => fiche && !isFicheDeleted(fiche)) || [];
         
         setFiches(ficheData);
       } catch (err) {

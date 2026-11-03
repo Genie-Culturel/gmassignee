@@ -17,9 +17,14 @@ export function ficheIsRequired(fiche: ProcedureFiche): boolean {
   return fiche.is_required !== false;
 }
 
+export function isFicheDeleted(fiche: Pick<ProcedureFiche, 'deleted_at'>): boolean {
+  return Boolean(fiche.deleted_at);
+}
+
 export function requiredTrainingFiches(fiches: ProcedureFiche[]): ProcedureFiche[] {
   return fiches.filter(
     (fiche) =>
+      !isFicheDeleted(fiche) &&
       fiche.is_active &&
       ficheIsRequired(fiche) &&
       FORMATION_PAGE_CATEGORIES.includes(fiche.category)

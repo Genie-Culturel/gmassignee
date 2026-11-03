@@ -54,7 +54,7 @@ export function FormationTechnique() {
   const global = progressFor(fiches, validations);
 
   const filteredFiches = fiches.filter((fiche) => {
-    if (!fiche.is_active) return false;
+    if (!fiche.is_active || fiche.deleted_at) return false;
     const searchLower = searchTerm.toLowerCase();
     if (!searchLower) return true;
     return (

@@ -136,8 +136,9 @@ VITE_FORCE_DEMO=true
 | `011_session_persistence.sql` | Colonnes de reprise (`game`, `session_date`, `session_time`, `player_count`, `parcours_id`, `assignment_id`, `gm_name`), `event_id` nullable, unique étape |
 | `012_gm_training.sql` | Formation obligatoire : `version` / `is_required` sur les fiches, `quiz_questions`, `fiche_validations`, triggers de version, RPC quiz sans exposer les bonnes réponses |
 | `013_session_media.sql` | Vidéos clients : `client_email` / `videos_sent_at` / `videos_download_token` sur `vr_sessions`, table `session_media`, bucket privé `session-media` (50 Mo), RLS, `cleanup_expired_session_media()` |
+| `014_soft_delete_fiches.sql` | Suppression logique des fiches : `procedure_fiches.deleted_at` (distinct de `is_active`). L’historique `fiche_validations` est conservé. |
 
-Sur **gm-vrcenter**, 001–**013** sont appliqués (013 via MCP le 2026-11-03). `pg_cron` n’est pas activé sur le plan gratuit : la purge 14 jours passe par l’edge function `cleanup-session-media` (ou un appel SQL manuel à `cleanup_expired_session_media()`).
+Sur **gm-vrcenter**, 001–**014** sont appliqués. `pg_cron` n’est pas activé sur le plan gratuit : la purge 14 jours passe par l’edge function `cleanup-session-media` (ou un appel SQL manuel à `cleanup_expired_session_media()`).
 
 ### Secrets e-mail / nettoyage (à configurer)
 

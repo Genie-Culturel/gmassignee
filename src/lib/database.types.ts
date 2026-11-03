@@ -50,6 +50,7 @@ export interface ProcedureFiche {
   version?: number;
   is_required?: boolean;
   skip_version_bump?: boolean;
+  deleted_at?: string | null;
   created_at: string;
   updated_at: string;
 }

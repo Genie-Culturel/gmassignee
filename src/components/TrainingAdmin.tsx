@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { FicheCategory, FicheValidation, ProcedureFiche, QuizQuestionAdmin } from '@/lib/database.types';
 import { FORMATION_PAGE_CATEGORIES, FICHE_CATEGORY_LABELS } from '@/lib/constants';
 import {
+  deleteFiche,
   deleteQuizQuestion,
   demoTrackingRows,
   listAdminValidations,
@@ -22,6 +23,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 interface TrainingAdminProps {
   fiches: ProcedureFiche[];
@@ -187,6 +196,7 @@ function AdminFicheEditor({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     if (!selected) return;
@@ -198,6 +208,9 @@ function AdminFicheEditor({
     setActive(selected.is_active);
     setPlaceholder(Boolean(selected.is_placeholder));
     setMinor(false);
+    setMessage(null);
+    setError(null);
+    setConfirmDelete(false);
     listQuizQuestionsAdmin(selected.id).then(setQuestions).catch(() => setQuestions([]));
   }, [selected]);
 
@@ -247,6 +260,24 @@ function AdminFicheEditor({
       onFichesChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Enregistrement impossible');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeFiche = async () => {
+    if (!selected) return;
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const nextId = fiches.find((fiche) => fiche.id !== selected.id)?.id || '';
+      await deleteFiche(selected.id);
+      setConfirmDelete(false);
+      setSelectedId(nextId);
+      onFichesChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Suppression impossible');
     } finally {
       setBusy(false);
     }
@@ -480,9 +511,41 @@ function AdminFicheEditor({
             <Button className="w-full" disabled={busy} onClick={save}>
               {busy ? 'Enregistrement…' : 'Enregistrer'}
             </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              className="w-full"
+              disabled={busy}
+              onClick={() => setConfirmDelete(true)}
+            >
+              Supprimer la fiche
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              La suppression est définitive pour les GM. La case « Active » sert seulement à masquer
+              temporairement.
+            </p>
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <DialogContent className="max-w-[calc(100%-2rem)] bg-background sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Supprimer la fiche</DialogTitle>
+            <DialogDescription>
+              Supprimer définitivement « {selected?.title} » ? Elle disparaîtra pour tous les GM.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" disabled={busy} onClick={() => setConfirmDelete(false)}>
+              Annuler
+            </Button>
+            <Button type="button" variant="destructive" disabled={busy} onClick={() => void removeFiche()}>
+              {busy ? 'Suppression…' : 'Supprimer'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

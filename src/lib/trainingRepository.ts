@@ -10,6 +10,7 @@ import {
 import { mockFiches } from './mockData';
 import { DEMO_GM_ID } from './assignedSessions';
 import { FORMATION_PAGE_CATEGORIES } from './constants';
+import { isFicheDeleted } from './training';
 
 export const TRAINING_STORAGE_KEY = 'gmassignee_fiche_validations';
 
@@ -97,6 +98,7 @@ export function hydrateTrainingFiche(fiche: ProcedureFiche): ProcedureFiche {
     ...fiche,
     version: fiche.id === 'pc-1' ? fiche.version ?? 2 : fiche.version ?? 1,
     is_required: fiche.is_required ?? true,
+    deleted_at: fiche.deleted_at ?? null,
   };
 }
 
@@ -257,6 +259,7 @@ export async function saveFiche(params: {
         id: prev.id,
         version,
         updated_at: now,
+        deleted_at: prev.deleted_at ?? null,
       };
       if (idx >= 0) list[idx] = next;
       else list.push(next);
@@ -273,6 +276,7 @@ export async function saveFiche(params: {
       is_active: params.fiche.is_active ?? true,
       is_required: params.fiche.is_required ?? true,
       version: 1,
+      deleted_at: null,
       created_at: now,
       updated_at: now,
     };
@@ -351,6 +355,22 @@ export async function clearSkipVersionBump(ficheId: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+export async function deleteFiche(ficheId: string): Promise<void> {
+  const now = new Date().toISOString();
+  if (isMockMode || !supabase) {
+    const list = loadDemoFiches();
+    const idx = list.findIndex((row) => row.id === ficheId);
+    if (idx >= 0) list[idx] = { ...list[idx], deleted_at: now, updated_at: now };
+    return;
+  }
+  const { error } = await supabase
+    .from('procedure_fiches')
+    .update({ deleted_at: now })
+    .eq('id', ficheId)
+    .is('deleted_at', null);
+  if (error) throw new Error(error.message);
+}
+
 export async function deleteQuizQuestion(id: string): Promise<void> {
   if (isMockMode || !supabase) {
     const list = loadDemoQuiz();
@@ -401,6 +421,7 @@ export function buildTrackingRows(
 ): GmTrainingRow[] {
   const required = fiches.filter(
     (fiche) =>
+      !isFicheDeleted(fiche) &&
       fiche.is_active &&
       fiche.is_required !== false &&
       FORMATION_PAGE_CATEGORIES.includes(fiche.category)
@@ -441,6 +462,7 @@ export function demoTrackingRows(
   ];
   const required = fiches.filter(
     (fiche) =>
+      !isFicheDeleted(fiche) &&
       fiche.is_active &&
       fiche.is_required !== false &&
       FORMATION_PAGE_CATEGORIES.includes(fiche.category)
