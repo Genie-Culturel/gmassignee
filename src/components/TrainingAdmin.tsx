@@ -62,10 +62,10 @@ export function TrainingAdmin({ fiches, catalog, gmId, myValidations, onFichesCh
         value={filterGameId}
         onChange={setFilterGameId}
       />
-      <Tabs defaultValue="suivi" className="w-full">
+      <Tabs defaultValue="fiches" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="suivi">Suivi des GM</TabsTrigger>
           <TabsTrigger value="fiches">Éditer les fiches</TabsTrigger>
+          <TabsTrigger value="suivi">Suivi des GM</TabsTrigger>
         </TabsList>
         <TabsContent value="suivi" className="mt-4">
           <AdminTracking fiches={visible} gmId={gmId} myValidations={myValidations} />
