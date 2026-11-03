@@ -312,6 +312,8 @@ export interface Database {
           client_email: string | null;
           videos_sent_at: string | null;
           videos_download_token: string;
+          flag_reviewed_at: string | null;
+          flag_reviewed_by: string | null;
           created_at: string;
         };
         Insert: {

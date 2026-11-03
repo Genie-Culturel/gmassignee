@@ -14,8 +14,8 @@ import {
   PlayCircle,
   ExternalLink,
 } from 'lucide-react';
-import { SESSION_STEP_LABELS, INCIDENT_TYPE_LABELS, buildBugReporterUrl } from '@/lib/constants';
-import { IncidentType, LegacyVrStep, ProcedureFiche, SalesProduct, SessionStep } from '@/lib/database.types';
+import { INCIDENT_TYPE_LABELS, buildBugReporterUrl } from '@/lib/constants';
+import { IncidentType, ProcedureFiche, SalesProduct, SessionStep } from '@/lib/database.types';
 import { FicheButton } from '@/components/FicheButton';
 import { useFichesByIncidentType } from '@/hooks/useProcedureFiches';
 import { useStepFiches } from '@/hooks/useStepFiches';
@@ -30,7 +30,6 @@ import {
   getAssignedSessions,
 } from '@/lib/assignedSessions';
 import {
-  ParcoursDefinition,
   ParcoursStepDef,
   activeSteps,
   getParcoursById,
@@ -44,6 +43,7 @@ import { useVenueCatalog } from '@/hooks/useVenueCatalog';
 import { useParcoursList } from '@/hooks/useParcoursList';
 import { isMockMode } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
+import { buildSessionSteps } from '@/lib/sessionView';
 import {
   PersistedSession,
   SaleItem,
@@ -111,28 +111,6 @@ function toActive(row: PersistedSession, endTime?: string): ActiveSession {
     clientEmail: row.clientEmail || '',
     videosSentAt: row.videosSentAt,
   };
-}
-
-/** Steps to show: snapshot taken at start, else current parcours; keep any completed legacy step. */
-function buildSessionSteps(
-  snapshot: ParcoursStepDef[] | null,
-  parcours: ParcoursDefinition,
-  stepTimes: Partial<Record<SessionStep, string>>
-): ParcoursStepDef[] {
-  const base = snapshot && snapshot.length ? snapshot : activeSteps(parcours);
-  const known = new Set(base.map((step) => step.key));
-  const extra = Object.keys(stepTimes)
-    .filter((key) => !known.has(key))
-    .map((key) => {
-      const fromParcours = parcours.steps.find((step) => step.key === key);
-      return {
-        key,
-        label: fromParcours?.label || SESSION_STEP_LABELS[key as LegacyVrStep] || key,
-        hint: null,
-        note: null,
-      };
-    });
-  return [...base, ...extra];
 }
 
 function openBugReporter(session: ActiveSession, remarks?: string) {
