@@ -2,6 +2,32 @@ import { ProcedureFiche, SessionStep, SalesProduct } from './database.types';
 
 // Mock data for testing without Supabase
 export const mockFiches: ProcedureFiche[] = [
+  {
+    id: 'pc-0',
+    category: 'procedure_deroulement',
+    title: 'Setup du lobby',
+    summary: "Préparer le lobby et le bar avant l'arrivée des premiers clients.",
+    content_steps: [
+      { order: 1, text: "Ouvrir la porte d'entrée du bâtiment au moins 15 minutes avant l'arrivée des premiers clients." },
+      {
+        order: 2,
+        text: "Préparation du bar : allumer les lumières, sans oublier celle du réfrigérateur des boissons clients ; mettre en marche la machine à pop-corn pour qu'elle chauffe.",
+      },
+      {
+        order: 3,
+        text: 'Contrôle des stocks : boissons dans le réfrigérateur ; papier toilette ; serviettes en papier pour les mains dans les WC.',
+      },
+      {
+        order: 4,
+        text: "Contrôler l'état de rangement et de propreté des espaces d'accueil (bar et accueil) et faire le nécessaire en cas de besoin.",
+      },
+    ],
+    is_placeholder: false,
+    tags: ['lobby', 'setup', 'ouverture', 'bar'],
+    is_active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
   // Parcours client fiches (14 - one per session step) - now in 'procedure_deroulement'
   {
     id: 'pc-1',
@@ -383,6 +409,7 @@ export const mockFiches: ProcedureFiche[] = [
 
 // Step-to-fiche mapping (1:1 primary + optional secondary)
 export const mockStepFichesMapping: Record<SessionStep, string[] | undefined> = {
+  lobby_setup: ['pc-0'],
   reception_seating: ['pc-1'],
   reception_drinks: ['pc-2'],
   reception_popcorn: ['pc-3'],

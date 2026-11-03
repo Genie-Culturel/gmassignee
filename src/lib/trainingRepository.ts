@@ -18,6 +18,32 @@ export const TRAINING_STORAGE_KEY = 'gmassignee_fiche_validations';
 
 const DEMO_QUIZ: QuizQuestionAdmin[] = [
   {
+    id: 'q-pc0-1',
+    fiche_id: 'pc-0',
+    prompt: "Combien de temps avant l'arrivée des premiers clients faut-il ouvrir la porte d'entrée du bâtiment ?",
+    choices: [
+      { id: '5', text: '5 minutes' },
+      { id: '15', text: 'Au moins 15 minutes' },
+      { id: 'arrivee', text: 'Seulement quand les clients sonnent' },
+    ],
+    correct_choice_ids: ['15'],
+    order_index: 1,
+    is_example: false,
+  },
+  {
+    id: 'q-pc0-2',
+    fiche_id: 'pc-0',
+    prompt: "Quelle lumière ne faut-il pas oublier d'allumer en préparant le bar ?",
+    choices: [
+      { id: 'frigo', text: 'Celle du réfrigérateur des boissons clients' },
+      { id: 'halle', text: 'Celle des halles de jeu' },
+      { id: 'wc', text: 'Celle des WC' },
+    ],
+    correct_choice_ids: ['frigo'],
+    order_index: 2,
+    is_example: false,
+  },
+  {
     id: 'q-pc1-1',
     fiche_id: 'pc-1',
     prompt: 'Où installer le premier groupe à son arrivée ? (exemple)',

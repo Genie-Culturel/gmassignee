@@ -53,6 +53,7 @@ const STEP_KEY_PREFIX: Record<string, string> = {
 };
 
 export const VR_CENTRE_CLIENT_STEPS: ParcoursStepDef[] = [
+  {key: "lobby_setup", label: "Setup du lobby", hint: "Avant l'arrivée des clients : porte ouverte 15 min avant, bar prêt, stocks et propreté contrôlés.", note: null},
   {key: "reception_seating", label: "Installation au lobby", hint: "Accueillir le groupe et l'installer : 1er groupe au salon, 2e au bar (accueil plein → salon).", note: null},
   {key: "reception_drinks", label: "Boissons", hint: "Proposer les boissons du frigo. Paiement par Twint, ou facture pour les entreprises.", note: null},
   {key: "reception_popcorn", label: "Pop-corn", hint: "Offrir le pop-corn, lancé pendant la préparation.", note: null},
