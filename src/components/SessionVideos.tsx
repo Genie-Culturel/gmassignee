@@ -12,14 +12,14 @@ import {
   formatBytes,
   isAllowedMedia,
   listSessionMedia,
-  mailtoVideosDraft,
   sendSessionVideos,
   uploadSessionFile,
   LocalUpload,
   SessionMediaFile,
   SESSION_MEDIA_MAX_BYTES,
 } from '@/lib/sessionMedia';
-import { formatTime } from '@/lib/utils';
+import { formatDate, formatTime } from '@/lib/utils';
+import { Copy, Share2, Upload } from 'lucide-react';
 
 interface SessionVideosProps {
   sessionId: string;
@@ -27,8 +27,11 @@ interface SessionVideosProps {
   clientEmail: string;
   videosSentAt: string | null;
   onClientEmailChange: (email: string) => void;
+  /** Link actually handed over (auto e-mail, copied or shared) → videos_sent_at + step « Prise et envoi vidéos ». */
   onSent: (sentAt: string) => void;
 }
+
+const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 
 export function SessionVideos({
   sessionId,
@@ -48,6 +51,7 @@ export function SessionVideos({
     downloadUrl: string;
     message?: string;
   } | null>(null);
+  const [handedOver, setHandedOver] = useState<'copied' | 'shared' | null>(null);
 
   useEffect(() => {
     listSessionMedia(sessionId)
@@ -55,6 +59,7 @@ export function SessionVideos({
       .catch(() => setRemote([]));
     setUploads([]);
     setResult(null);
+    setHandedOver(null);
     setError(null);
   }, [sessionId]);
 
@@ -115,8 +120,8 @@ export function SessionVideos({
 
   const send = async () => {
     const email = clientEmail.trim();
-    if (!email || !email.includes('@')) {
-      setError('Indique l’e-mail du client pour envoyer les vidéos.');
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError('E-mail du client invalide (ou laisse le champ vide).');
       return;
     }
     if (!remote.length) {
@@ -132,13 +137,52 @@ export function SessionVideos({
     try {
       const res = await sendSessionVideos({ sessionId, clientEmail: email });
       setResult({ emailed: res.emailed, downloadUrl: res.downloadUrl, message: res.message });
-      onSent(res.videosSentAt);
+      setHandedOver(null);
+      if (res.emailed && res.videosSentAt) onSent(res.videosSentAt);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Envoi impossible');
+      setError(err instanceof Error ? err.message : 'Création du lien impossible');
     } finally {
       setBusy(false);
     }
   };
+
+  const markHandedOver = (how: 'copied' | 'shared') => {
+    setHandedOver(how);
+    onSent(new Date().toISOString());
+  };
+
+  const copyLink = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      markHandedOver('copied');
+    } catch {
+      setError('Copie impossible : appuie longuement sur le lien pour le copier.');
+    }
+  };
+
+  const shareLink = async (url: string) => {
+    if (!canShare) {
+      await copyLink(url);
+      return;
+    }
+    try {
+      await navigator.share({
+        title: 'Tes souvenirs VR Center Valais',
+        text: `Voici tes vidéos souvenirs du VR Center Valais${expiryLabel ? ` (disponibles jusqu’au ${expiryLabel})` : ''} :`,
+        url,
+      });
+      markHandedOver('shared');
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      await copyLink(url);
+    }
+  };
+
+  const earliestExpiry = remote.reduce<string | null>(
+    (min, row) => (!min || row.expires_at < min ? row.expires_at : min),
+    null
+  );
+  const expiryLabel = earliestExpiry ? formatDate(earliestExpiry) : null;
 
   const doneUploads = uploads.filter((u) => u.status === 'done').length;
   const failed = uploads.filter((u) => u.status === 'error' || u.status === 'too_large');
@@ -146,17 +190,17 @@ export function SessionVideos({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Envoyer les vidéos</CardTitle>
+        <CardTitle>Vidéos souvenirs</CardTitle>
         <CardDescription>
-          Filme avec ton téléphone, puis envoie les souvenirs au client. Limite actuelle :{' '}
-          {SESSION_MEDIA_MAX_LABEL} par fichier (plan gratuit). Photos acceptées pour les tests.
+          Filme avec ton téléphone, téléverse les vidéos ici, puis transmets le lien au client. Limite
+          actuelle : {SESSION_MEDIA_MAX_LABEL} par fichier (plan gratuit). Photos acceptées pour les tests.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">{FILMING_NOTICE}</p>
 
         <div className="space-y-2">
-          <Label htmlFor="client-email">E-mail du client</Label>
+          <Label htmlFor="client-email">E-mail du client (optionnel)</Label>
           <Input
             id="client-email"
             type="email"
@@ -182,6 +226,7 @@ export function SessionVideos({
           className="w-full min-h-11"
           onClick={() => inputRef.current?.click()}
         >
+          <Upload className="mr-2 h-4 w-4" />
           Choisir des vidéos ou photos
         </Button>
 
@@ -237,7 +282,7 @@ export function SessionVideos({
         )}
 
         <Button className="w-full min-h-11" size="lg" disabled={busy} onClick={() => void send()}>
-          {busy ? 'Envoi…' : 'Envoyer les vidéos au client'}
+          {busy ? 'Création du lien…' : 'Créer le lien client'}
         </Button>
 
         {error && (
@@ -249,7 +294,7 @@ export function SessionVideos({
         {videosSentAt && !result && (
           <Alert>
             <AlertDescription>
-              Vidéos déjà envoyées à {formatTime(videosSentAt)}. Tu peux renvoyer si besoin.
+              Lien déjà transmis au client à {formatTime(videosSentAt)}. Tu peux recréer le lien si besoin.
             </AlertDescription>
           </Alert>
         )}
@@ -257,33 +302,56 @@ export function SessionVideos({
         {result && (
           <Alert className="border-emerald-200 bg-emerald-50">
             <AlertDescription className="space-y-3 text-emerald-950">
-              <p className="font-semibold">Envoi terminé, tu peux supprimer les vidéos de ton téléphone.</p>
+              <p className="font-semibold">Vidéos téléversées, lien client prêt.</p>
+              <p className="text-sm">Tu peux supprimer les vidéos de ton téléphone.</p>
               {result.emailed ? (
-                <p className="text-sm">E-mail envoyé à {clientEmail}.</p>
+                <p className="text-sm">Le lien a été envoyé automatiquement par e-mail à {clientEmail}.</p>
               ) : (
-                <p className="text-sm">
-                  {result.message ||
-                    'E-mail automatique non configuré (Resend). Copie le lien ou ouvre un e-mail prérempli.'}
-                </p>
+                <div className="space-y-1 text-sm">
+                  {result.message && <p className="font-medium">{result.message}</p>}
+                  <p className="font-medium">À faire :</p>
+                  <ol className="list-decimal space-y-1 pl-5">
+                    <li>Copie le lien{canShare ? ' (ou appuie sur « Partager le lien »)' : ''}.</li>
+                    <li>
+                      Transmets-le au client par SMS, WhatsApp ou e-mail (depuis l’adresse du centre, pas ta
+                      propre adresse).
+                    </li>
+                    <li>L’étape « Prise et envoi vidéos » se coche automatiquement quand tu copies ou partages le lien.</li>
+                  </ol>
+                  {expiryLabel && <p className="text-xs">Lien valable jusqu’au {expiryLabel}, ensuite les vidéos sont supprimées.</p>}
+                </div>
               )}
-              {result.downloadUrl && (
+              {result.downloadUrl ? (
                 <div className="space-y-2">
-                  <p className="break-all text-xs">{result.downloadUrl}</p>
+                  <p className="break-all rounded border border-emerald-200 bg-white px-2 py-1.5 text-xs select-all">
+                    {result.downloadUrl}
+                  </p>
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
                       className="min-h-11"
-                      onClick={() => void navigator.clipboard.writeText(result.downloadUrl)}
+                      onClick={() => void copyLink(result.downloadUrl)}
                     >
-                      Copier le lien
+                      <Copy className="mr-2 h-4 w-4" />
+                      {handedOver === 'copied' ? 'Lien copié ✓' : 'Copier le lien'}
                     </Button>
-                    <Button type="button" variant="outline" size="sm" className="min-h-11" asChild>
-                      <a href={mailtoVideosDraft(clientEmail, result.downloadUrl)}>Ouvrir un e-mail prérempli</a>
-                    </Button>
+                    {canShare && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="min-h-11"
+                        onClick={() => void shareLink(result.downloadUrl)}
+                      >
+                        <Share2 className="mr-2 h-4 w-4" />
+                        {handedOver === 'shared' ? 'Lien partagé ✓' : 'Partager le lien'}
+                      </Button>
+                    )}
                   </div>
                 </div>
+              ) : (
+                <p className="text-sm text-destructive">Lien indisponible pour le moment : réessaie « Créer le lien client ».</p>
               )}
             </AlertDescription>
           </Alert>

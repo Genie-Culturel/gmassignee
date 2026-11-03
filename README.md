@@ -176,7 +176,7 @@ Dans **Supabase → Project Settings → Edge Functions → Secrets** :
 
 Chez **Resend** : vérifier le domaine d’envoi (SPF/DKIM) ; sans ça `EMAIL_FROM` sera refusé.
 
-Sans `RESEND_API_KEY` / `EMAIL_FROM`, la fonction **ne plante pas** : l’app affiche le lien de téléchargement à copier + un bouton `mailto` prérempli.
+Sans `RESEND_API_KEY` / `EMAIL_FROM` (ou sans e-mail client), la fonction crée seulement le lien : l’app affiche la procédure GM (copier / partager le lien, le transmettre par SMS, WhatsApp ou e-mail du centre). Pas de `mailto` : les GM n’utilisent pas leur propre adresse. `videos_sent_at` + l’étape `videos_sent` sont posés quand le lien est copié/partagé, ou côté serveur si l’e-mail automatique part vraiment.
 
 **Plan Pro plus tard** : augmenter `storage.buckets.file_size_limit` du bucket `session-media` (aujourd’hui 52 428 800) et `SESSION_MEDIA_MAX_BYTES` dans `src/lib/sessionMedia.ts`. L’upload TUS est déjà en place.
 

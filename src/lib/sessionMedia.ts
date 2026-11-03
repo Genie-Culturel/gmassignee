@@ -8,7 +8,7 @@ export const SESSION_MEDIA_MAX_LABEL = '50 Mo';
 export const SESSION_MEDIA_TTL_DAYS = 14;
 
 export const FILMING_NOTICE =
-  'La partie sera filmée (2 courtes vidéos) et les vidéos vous seront envoyées par e-mail, puis supprimées après 14 jours.';
+  'La partie sera filmée (2 courtes vidéos) : vous recevrez un lien pour les télécharger, valable 14 jours, ensuite elles sont supprimées.';
 
 const DEMO_MEDIA_KEY = 'gmassignee_session_media';
 
@@ -205,9 +205,11 @@ export function uploadSessionFile(params: {
 
 export interface SendVideosResult {
   ok: boolean;
+  /** True only when the automatic e-mail (Resend) really went out. */
   emailed: boolean;
   downloadUrl: string;
-  videosSentAt: string;
+  /** Set only when emailed; otherwise the app sets it when the GM copies/shares the link. */
+  videosSentAt: string | null;
   message?: string;
 }
 
@@ -215,79 +217,50 @@ function downloadPageUrl(token: string): string {
   return souvenirsPageUrl(token);
 }
 
-export function mailtoVideosDraft(clientEmail: string, downloadUrl: string): string {
-  const subject = encodeURIComponent('Tes souvenirs VR Center Valais');
-  const body = encodeURIComponent(
-    `Salut !\n\nMerci d'avoir joué au VR Center Valais — voici tes vidéos souvenirs (lien valable 14 jours) :\n${downloadUrl}\n\nÀ très vite,\nL'équipe VR Center Valais`
-  );
-  return `mailto:${encodeURIComponent(clientEmail)}?subject=${subject}&body=${body}`;
-}
-
+/**
+ * Upload is done; create (or reuse) the client download link.
+ * Sends the automatic e-mail only if Resend is configured server-side and an e-mail is given.
+ */
 export async function sendSessionVideos(params: {
   sessionId: string;
   clientEmail: string;
 }): Promise<SendVideosResult> {
-  const sentAt = new Date().toISOString();
+  const email = params.clientEmail.trim();
   if (isMockMode || !supabase) {
-    const token = `demo-${params.sessionId}`;
-    const downloadUrl = downloadPageUrl(token);
-    return {
-      ok: true,
-      emailed: false,
-      downloadUrl,
-      videosSentAt: sentAt,
-      message:
-        'Mode démo : e-mail non envoyé. Copie le lien ou utilise « Ouvrir un e-mail prérempli ».',
-    };
+    return { ok: true, emailed: false, downloadUrl: downloadPageUrl(`demo-${params.sessionId}`), videosSentAt: null };
   }
 
-  await supabase
-    .from('vr_sessions')
-    .update({ client_email: params.clientEmail })
-    .eq('id', params.sessionId);
+  if (email) {
+    await supabase.from('vr_sessions').update({ client_email: email }).eq('id', params.sessionId);
+  }
 
   const { data, error } = await supabase.functions.invoke('send-session-videos', {
-    body: { session_id: params.sessionId, client_email: params.clientEmail },
+    body: { session_id: params.sessionId, client_email: email },
   });
-  if (error) {
-    const fallback = await fallbackSignedSend(params.sessionId, params.clientEmail, sentAt);
-    fallback.message = `Envoi e-mail indisponible (${error.message}). Lien à copier ci-dessous.`;
-    return fallback;
-  }
+  if (error) return fallbackLink(params.sessionId);
   const payload = (data || {}) as Partial<SendVideosResult> & { error?: string };
-  if (payload.ok === false && payload.error) {
-    const fallback = await fallbackSignedSend(params.sessionId, params.clientEmail, sentAt);
-    fallback.message = payload.error;
-    return fallback;
+  if (payload.ok === false) {
+    if (payload.error && /e-mail client invalide/i.test(payload.error)) throw new Error(payload.error);
+    if (payload.error && /aucun fichier/i.test(payload.error)) throw new Error(payload.error);
+    return fallbackLink(params.sessionId);
   }
   return {
     ok: true,
     emailed: Boolean(payload.emailed),
     downloadUrl: String(payload.downloadUrl || ''),
-    videosSentAt: String(payload.videosSentAt || sentAt),
+    videosSentAt: payload.videosSentAt ? String(payload.videosSentAt) : null,
     message: payload.message,
   };
 }
 
-async function fallbackSignedSend(
-  sessionId: string,
-  _clientEmail: string,
-  sentAt: string
-): Promise<SendVideosResult> {
-  if (!supabase) {
-    return { ok: true, emailed: false, downloadUrl: '', videosSentAt: sentAt };
-  }
+/** Edge function unreachable: build the link from the session token (no e-mail, nothing marked as sent). */
+async function fallbackLink(sessionId: string): Promise<SendVideosResult> {
+  if (!supabase) return { ok: true, emailed: false, downloadUrl: '', videosSentAt: null };
   const { data: sessionRow } = await supabase
     .from('vr_sessions')
     .select('videos_download_token')
     .eq('id', sessionId)
     .maybeSingle();
   const token = (sessionRow as { videos_download_token?: string } | null)?.videos_download_token;
-  await supabase.from('vr_sessions').update({ videos_sent_at: sentAt }).eq('id', sessionId);
-  return {
-    ok: true,
-    emailed: false,
-    downloadUrl: token ? downloadPageUrl(token) : '',
-    videosSentAt: sentAt,
-  };
+  return { ok: true, emailed: false, downloadUrl: token ? downloadPageUrl(token) : '', videosSentAt: null };
 }

@@ -51,7 +51,9 @@ Deno.serve(async (req: Request) => {
     const sessionId = String(payload.session_id || "");
     const clientEmail = String(payload.client_email || "").trim();
     if (!sessionId) return json({ ok: false, error: "session_id manquant" }, 400);
-    if (!isEmail(clientEmail)) {
+    // E-mail optionnel : sans e-mail (ou sans Resend), on crée seulement le lien,
+    // que le GM transmet au client (SMS, WhatsApp, e-mail du centre).
+    if (clientEmail && !isEmail(clientEmail)) {
       return json({ ok: false, error: "E-mail client invalide" }, 400);
     }
 
@@ -81,29 +83,19 @@ Deno.serve(async (req: Request) => {
     const downloadUrl = `${publicAppUrl}/souvenirs/?token=${encodeURIComponent(token)}`;
     const sentAt = new Date().toISOString();
 
-    const { error: updErr } = await admin
-      .from("vr_sessions")
-      .update({
-        client_email: clientEmail,
-        videos_sent_at: sentAt,
-        videos_download_token: token,
-      })
-      .eq("id", sessionId);
+    const linkPatch: Record<string, unknown> = { videos_download_token: token };
+    if (clientEmail) linkPatch.client_email = clientEmail;
+    const { error: updErr } = await admin.from("vr_sessions").update(linkPatch).eq("id", sessionId);
     if (updErr) return json({ ok: false, error: updErr.message }, 500);
-
-    await admin.from("session_steps").upsert(
-      { session_id: sessionId, step: "videos_sent", completed_at: sentAt },
-      { onConflict: "session_id,step" },
-    );
 
     const resendKey = Deno.env.get("RESEND_API_KEY") || "";
     const emailFrom = Deno.env.get("EMAIL_FROM") || "";
     let emailed = false;
     let message: string | undefined;
 
-    if (!resendKey || !emailFrom) {
-      message =
-        "E-mail automatique non configuré (secrets Resend manquants). Copie le lien ou ouvre un e-mail prérempli.";
+    if (!resendKey || !emailFrom || !clientEmail) {
+      // Pas d'e-mail automatique : le GM transmet le lien (videos_sent_at posé au partage côté app).
+      emailed = false;
     } else {
       const game = session.game || "ta partie VR";
       const subject = "Tes souvenirs VR Center Valais";
@@ -135,20 +127,29 @@ Deno.serve(async (req: Request) => {
           emailed = true;
         } else {
           const detail = await res.text();
-          message = `Resend n'a pas pu envoyer l'e-mail (${res.status}). Copie le lien ou ouvre un e-mail prérempli.`;
+          message = "L'e-mail automatique n'a pas pu partir : transmets le lien toi-même.";
           console.error("resend_error", detail);
         }
       } catch (err) {
-        message = "Envoi e-mail impossible. Copie le lien ou ouvre un e-mail prérempli.";
+        message = "L'e-mail automatique n'a pas pu partir : transmets le lien toi-même.";
         console.error("resend_throw", err);
       }
+    }
+
+    if (emailed) {
+      // Envoi réel au client : on marque « vidéos envoyées » + l'étape du parcours.
+      await admin.from("vr_sessions").update({ videos_sent_at: sentAt }).eq("id", sessionId);
+      await admin.from("session_steps").upsert(
+        { session_id: sessionId, step: "videos_sent", completed_at: sentAt },
+        { onConflict: "session_id,step" },
+      );
     }
 
     return json({
       ok: true,
       emailed,
       downloadUrl,
-      videosSentAt: sentAt,
+      videosSentAt: emailed ? sentAt : null,
       message,
     });
   } catch (err) {
