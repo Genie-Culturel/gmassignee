@@ -27,16 +27,21 @@ export function useProcedureFiches(opts?: { includeInactive?: boolean }) {
       }
 
       try {
+        console.log('[useProcedureFiches] Fetching fiches from gh_procedure_fiches...');
         let query = supabase!
-          .from('procedure_fiches')
-          .select('*, fiche_scope_locations(location_id), fiche_scope_games(game_id)')
+          .from('gh_procedure_fiches')
+          .select('*, gh_fiche_scope_locations(location_id), gh_fiche_scope_games(game_id)')
           .is('deleted_at', null)
           .order('sort_order', { ascending: true })
           .order('title', { ascending: true });
         if (!includeInactive) query = query.eq('is_active', true);
         const { data, error: fetchError } = await query;
 
-        if (fetchError) throw fetchError;
+        if (fetchError) {
+          console.error('[useProcedureFiches] Query error:', fetchError);
+          throw fetchError;
+        }
+        console.log('[useProcedureFiches] Loaded', data?.length || 0, 'fiches');
         setFiches(
           sortFichesByOrder(
             (data || []).map((row) => {

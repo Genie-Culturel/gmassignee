@@ -76,7 +76,7 @@ export function ParcoursAdmin({
   fiches: ProcedureFiche[];
   filterGameId: string;
 }) {
-  const { parcoursList, isLoading, reload } = useParcoursList();
+  const { parcoursList, isLoading, error: loadError, reload } = useParcoursList();
   const locations = catalog.locations.length ? catalog.locations : DEMO_LOCATIONS;
   const filterGame = findGame(catalog, filterGameId);
   const filterLocationSlug = catalog.locations.find((location) => location.id === filterGame?.location_id)?.slug;
@@ -133,6 +133,14 @@ export function ParcoursAdmin({
 
   return (
     <div className="space-y-4">
+      {loadError && (
+        <Alert variant="destructive">
+          <AlertDescription>
+            Erreur de chargement des parcours : {loadError.message}
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="space-y-1.5">
         <Label htmlFor="parcours-location">Lieu</Label>
         <select

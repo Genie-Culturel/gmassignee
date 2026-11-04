@@ -16,14 +16,20 @@ export function useVenueCatalog() {
     }
     let cancelled = false;
     (async () => {
+      console.log('[useVenueCatalog] Fetching locations and games...');
       const [locRes, gameRes] = await Promise.all([
-        supabase.from('locations').select('id, slug, name, short_name, kind, sort_index').order('sort_index'),
-        supabase.from('games').select('id, location_id, slug, name, sort_index').order('sort_index'),
+        supabase.from('gh_locations').select('id, slug, name, short_name, kind, sort_index').order('sort_index'),
+        supabase.from('gh_games').select('id, location_id, slug, name, sort_index').order('sort_index'),
       ]);
       if (cancelled) return;
-      if (locRes.error || gameRes.error || !locRes.data?.length) {
+      if (locRes.error || gameRes.error) {
+        console.error('[useVenueCatalog] Errors:', { locError: locRes.error, gameError: gameRes.error });
+        setCatalog(EMPTY_CATALOG);
+      } else if (!locRes.data?.length) {
+        console.warn('[useVenueCatalog] No locations found');
         setCatalog(EMPTY_CATALOG);
       } else {
+        console.log('[useVenueCatalog] Loaded', locRes.data.length, 'locations,', gameRes.data?.length || 0, 'games');
         setCatalog({
           locations: locRes.data as VenueCatalog['locations'],
           games: (gameRes.data || []) as VenueCatalog['games'],
