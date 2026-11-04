@@ -37,36 +37,33 @@ export function Layout() {
 
       <div className="container px-4 py-6">
         <Tabs value={currentPath} className="mb-6">
-          <TabsList className="relative flex w-full items-center justify-center gap-1">
-            <div className="flex items-center gap-1">
-              <TabsTrigger value="dashboard" asChild>
-                <Link to="/dashboard" className="flex items-center gap-2" aria-label="Historique des sessions">
-                  <LayoutDashboard className="h-4 w-4" />
-                  <span className="hidden sm:inline">Historique des sessions</span>
-                </Link>
-              </TabsTrigger>
-              <TabsTrigger value="suivi-parties" asChild>
-                <Link to="/suivi-parties" className="flex items-center gap-2" aria-label="Suivi parties">
-                  <PlayCircle className="h-4 w-4" />
-                  <span className="hidden sm:inline">Suivi parties</span>
-                </Link>
-              </TabsTrigger>
-              <TabsTrigger value="formation" asChild>
-                <Link to="/formation" className="flex items-center gap-2" aria-label="Formations et procédures">
-                  <BookOpen className="h-4 w-4" />
-                  <span className="hidden sm:inline">Formations et procédures</span>
-                </Link>
-              </TabsTrigger>
-            </div>
-            <a 
-              href="https://gmassignee.lovable.app/" 
-              target="_self"
-              className="absolute right-1 flex h-10 items-center gap-2 rounded-md px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="dashboard" asChild className="w-full justify-center">
+              <Link to="/dashboard" className="flex items-center gap-2" aria-label="Historique des sessions">
+                <LayoutDashboard className="h-4 w-4" />
+                <span className="hidden sm:inline">Historique des sessions</span>
+              </Link>
+            </TabsTrigger>
+            <TabsTrigger value="suivi-parties" asChild className="w-full justify-center">
+              <Link to="/suivi-parties" className="flex items-center gap-2" aria-label="Suivi parties">
+                <PlayCircle className="h-4 w-4" />
+                <span className="hidden sm:inline">Suivi parties</span>
+              </Link>
+            </TabsTrigger>
+            <TabsTrigger value="formation" asChild className="w-full justify-center">
+              <Link to="/formation" className="flex items-center gap-2" aria-label="Formations et procédures">
+                <BookOpen className="h-4 w-4" />
+                <span className="hidden sm:inline">Formations et procédures</span>
+              </Link>
+            </TabsTrigger>
+            <Link
+              to="https://gmassignee.lovable.app/"
+              className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 text-muted-foreground hover:bg-muted hover:text-foreground w-full"
               aria-label="Retour Dashboard GM"
             >
               <ExternalLink className="h-4 w-4" />
               <span className="hidden sm:inline">Retour Dashboard GM</span>
-            </a>
+            </Link>
           </TabsList>
         </Tabs>
 
