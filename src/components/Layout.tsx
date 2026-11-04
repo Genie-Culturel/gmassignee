@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { History, PlayCircle, BookOpen, LogOut, ExternalLink } from 'lucide-react';
+import { LayoutDashboard, PlayCircle, BookOpen, LogOut, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { isMockMode } from '@/lib/supabase';
 import { setDemoFlag } from '@/lib/config';
@@ -42,7 +42,7 @@ export function Layout() {
             <div className="flex items-center gap-3">
               <TabsTrigger value="dashboard" asChild>
                 <Link to="/dashboard" className="flex items-center gap-2" aria-label="Historique des sessions">
-                  <History className="h-4 w-4" />
+                  <LayoutDashboard className="h-4 w-4" />
                   <span className="hidden sm:inline">Historique des sessions</span>
                 </Link>
               </TabsTrigger>
