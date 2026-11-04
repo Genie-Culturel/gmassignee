@@ -27,20 +27,6 @@ export function Layout() {
               {isAdmin && !isMockMode ? ' · admin' : ''}
             </p>
           </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            asChild
-          >
-            <a 
-              href="https://gmassignee.lovable.app/" 
-              target="_self"
-              className="flex items-center gap-2"
-            >
-              <ExternalLink className="h-4 w-4" />
-              <span className="hidden sm:inline">Retour Dashboard GM</span>
-            </a>
-          </Button>
           {!isMockMode && (
             <Button variant="ghost" size="sm" onClick={() => signOut()} aria-label="Se déconnecter">
               <LogOut className="h-4 w-4" />
@@ -51,25 +37,36 @@ export function Layout() {
 
       <div className="container px-4 py-6">
         <Tabs value={currentPath} className="mb-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="dashboard" asChild>
-              <Link to="/dashboard" className="flex items-center gap-2" aria-label="Historique des sessions">
-                <LayoutDashboard className="h-4 w-4" />
-                <span className="hidden sm:inline">Historique des sessions</span>
-              </Link>
-            </TabsTrigger>
-            <TabsTrigger value="suivi-parties" asChild>
-              <Link to="/suivi-parties" className="flex items-center gap-2" aria-label="Suivi parties">
-                <PlayCircle className="h-4 w-4" />
-                <span className="hidden sm:inline">Suivi parties</span>
-              </Link>
-            </TabsTrigger>
-            <TabsTrigger value="formation" asChild>
-              <Link to="/formation" className="flex items-center gap-2" aria-label="Formations et procédures">
-                <BookOpen className="h-4 w-4" />
-                <span className="hidden sm:inline">Formations et procédures</span>
-              </Link>
-            </TabsTrigger>
+          <TabsList className="flex w-full items-center justify-between gap-1">
+            <div className="flex items-center gap-1">
+              <TabsTrigger value="dashboard" asChild>
+                <Link to="/dashboard" className="flex items-center gap-2" aria-label="Historique des sessions">
+                  <LayoutDashboard className="h-4 w-4" />
+                  <span className="hidden sm:inline">Historique des sessions</span>
+                </Link>
+              </TabsTrigger>
+              <TabsTrigger value="suivi-parties" asChild>
+                <Link to="/suivi-parties" className="flex items-center gap-2" aria-label="Suivi parties">
+                  <PlayCircle className="h-4 w-4" />
+                  <span className="hidden sm:inline">Suivi parties</span>
+                </Link>
+              </TabsTrigger>
+              <TabsTrigger value="formation" asChild>
+                <Link to="/formation" className="flex items-center gap-2" aria-label="Formations et procédures">
+                  <BookOpen className="h-4 w-4" />
+                  <span className="hidden sm:inline">Formations et procédures</span>
+                </Link>
+              </TabsTrigger>
+            </div>
+            <a 
+              href="https://gmassignee.lovable.app/" 
+              target="_self"
+              className="flex h-10 items-center gap-2 rounded-md px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              aria-label="Retour Dashboard GM"
+            >
+              <ExternalLink className="h-4 w-4" />
+              <span className="hidden sm:inline">Retour Dashboard GM</span>
+            </a>
           </TabsList>
         </Tabs>
 

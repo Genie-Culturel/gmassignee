@@ -58,6 +58,12 @@ export function SessionMediaAdmin() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false);
+  
+  const SESSIONS_PER_PAGE = 20;
 
   useEffect(() => {
     if (!toast) return;
@@ -90,11 +96,84 @@ export function SessionMediaAdmin() {
   }, []);
 
   const pendingCount = rows.filter((row) => row.flags.length > 0 && !row.flagReviewedAt).length;
-  const visible = useMemo(
+  const filtered = useMemo(
     () => (onlyFlagged ? rows.filter((row) => row.flags.length > 0 && !row.flagReviewedAt) : rows),
     [rows, onlyFlagged]
   );
+  
+  const totalPages = Math.max(1, Math.ceil(filtered.length / SESSIONS_PER_PAGE));
+  const startIdx = (currentPage - 1) * SESSIONS_PER_PAGE;
+  const visible = filtered.slice(startIdx, startIdx + SESSIONS_PER_PAGE);
+  
   const openRow = rows.find((row) => row.sessionId === openId) || null;
+  
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+    setSelectedIds(new Set());
+  }, [onlyFlagged]);
+  
+  const allPageIdsSelected = visible.length > 0 && visible.every((row) => selectedIds.has(row.sessionId));
+  const somePageIdsSelected = visible.some((row) => selectedIds.has(row.sessionId));
+  
+  const toggleSelectAll = () => {
+    if (allPageIdsSelected) {
+      // Deselect all on current page
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        visible.forEach((row) => next.delete(row.sessionId));
+        return next;
+      });
+    } else {
+      // Select all on current page
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        visible.forEach((row) => next.add(row.sessionId));
+        return next;
+      });
+    }
+  };
+  
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+  
+  const confirmBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    setBulkDeleting(true);
+    setDeleteError(null);
+    const toDeleteList = rows.filter((row) => selectedIds.has(row.sessionId));
+    let successCount = 0;
+    let errorCount = 0;
+    
+    for (const row of toDeleteList) {
+      try {
+        await deleteSessionAsAdmin(row.sessionId);
+        successCount++;
+      } catch {
+        errorCount++;
+      }
+    }
+    
+    setRows((current) => current.filter((item) => !selectedIds.has(item.sessionId)));
+    setSelectedIds(new Set());
+    setShowBulkConfirm(false);
+    setBulkDeleting(false);
+    
+    if (errorCount === 0) {
+      setToast(`${successCount} session(s) supprimée(s).`);
+    } else {
+      setToast(`${successCount} session(s) supprimée(s), ${errorCount} erreur(s).`);
+    }
+  };
 
   const toggleReviewed = useCallback(async (row: RecordedSessionRow, reviewed: boolean) => {
     setBusyId(row.sessionId);
@@ -173,6 +252,22 @@ export function SessionMediaAdmin() {
             À relever uniquement
           </label>
         </div>
+        
+        {isAdmin && selectedIds.size > 0 && (
+          <div className="flex items-center gap-3 rounded-md border bg-muted/40 px-3 py-2">
+            <span className="text-sm font-medium">{selectedIds.size} session(s) sélectionnée(s)</span>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowBulkConfirm(true)}
+            >
+              <Trash2 className="mr-2 h-4 w-4" aria-hidden />
+              Supprimer la sélection
+            </Button>
+          </div>
+        )}
+        
         {reviewError && (
           <Alert variant="destructive">
             <AlertDescription>{reviewError}</AlertDescription>
@@ -213,6 +308,16 @@ export function SessionMediaAdmin() {
           <table className="w-full min-w-[620px] text-sm">
             <thead>
               <tr className="border-b text-left text-muted-foreground">
+                {isAdmin && (
+                  <th className="w-10 px-3 py-2">
+                    <Checkbox
+                      checked={allPageIdsSelected}
+                      onCheckedChange={toggleSelectAll}
+                      aria-label="Tout sélectionner sur cette page"
+                      className={somePageIdsSelected && !allPageIdsSelected ? 'opacity-50' : ''}
+                    />
+                  </th>
+                )}
                 <th className="px-3 py-2 font-medium">Session</th>
                 <th className="px-3 py-2 font-medium">GM</th>
                 <th className="px-3 py-2 font-medium">Client</th>
@@ -236,6 +341,15 @@ export function SessionMediaAdmin() {
                   onClick={() => setOpenId(row.sessionId)}
                   onKeyDown={(event) => rowKeyDown(event, row.sessionId)}
                 >
+                  {isAdmin && (
+                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedIds.has(row.sessionId)}
+                        onCheckedChange={() => toggleSelect(row.sessionId)}
+                        aria-label={`Sélectionner ${row.game}`}
+                      />
+                    </td>
+                  )}
                   <td className="px-3 py-2">
                     <p className="flex flex-wrap items-center gap-2 font-medium">
                       {row.game}
@@ -287,6 +401,34 @@ export function SessionMediaAdmin() {
           <p className="text-sm text-muted-foreground">
             {onlyFlagged ? 'Rien à relever.' : 'Aucune session pour l’instant.'}
           </p>
+        )}
+        
+        {filtered.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3 text-sm">
+            <div className="text-muted-foreground">
+              Page {currentPage} / {totalPages} · {filtered.length} session(s)
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              >
+                Précédent
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Suivant
+              </Button>
+            </div>
+          </div>
         )}
       </CardContent>
       <SessionConsultSheet
@@ -340,6 +482,41 @@ export function SessionMediaAdmin() {
             <Button type="button" variant="destructive" disabled={deleting} onClick={() => void confirmDelete()}>
               {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : <Trash2 className="mr-2 h-4 w-4" aria-hidden />}
               Supprimer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showBulkConfirm} onOpenChange={(open) => !open && !bulkDeleting && setShowBulkConfirm(false)}>
+        <DialogContent role="alertdialog" className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <DialogHeader className="text-left">
+            <DialogTitle>Supprimer {selectedIds.size} session(s) ?</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <p>Vous allez supprimer définitivement {selectedIds.size} session(s) sélectionnée(s).</p>
+                <p>Pour chaque session, seront supprimés :</p>
+                <ul className="list-disc space-y-0.5 pl-5">
+                  <li>les étapes cochées et leurs horaires ;</li>
+                  <li>les ventes et le commentaire de vente ;</li>
+                  <li>l'incident, les notes et remarques ;</li>
+                  <li>les vidéos &amp; photos et le lien client (la page souvenirs ne fonctionnera plus).</li>
+                </ul>
+                <p className="font-medium text-red-700">Cette action est irréversible.</p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError && (
+            <Alert variant="destructive">
+              <AlertDescription>{deleteError}</AlertDescription>
+            </Alert>
+          )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" disabled={bulkDeleting} onClick={() => setShowBulkConfirm(false)}>
+              Annuler
+            </Button>
+            <Button type="button" variant="destructive" disabled={bulkDeleting} onClick={() => void confirmBulkDelete()}>
+              {bulkDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : <Trash2 className="mr-2 h-4 w-4" aria-hidden />}
+              Supprimer {selectedIds.size} session(s)
             </Button>
           </DialogFooter>
         </DialogContent>
