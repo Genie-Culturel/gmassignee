@@ -26,13 +26,11 @@ export function FicheButton({ fiches, label = 'Voir la procédure' }: FicheButto
         <Button
           variant="outline"
           size="sm"
-          className="h-7 gap-1.5 rounded-full border-primary/40 bg-primary/5 px-3 text-xs font-medium text-primary hover:bg-primary/10 hover:text-primary"
+          className="h-7 w-44 shrink-0 justify-center gap-1.5 rounded-full border-primary/40 bg-primary/5 px-3 text-xs font-medium text-primary hover:bg-primary/10 hover:text-primary"
         >
           <BookOpen className="h-3.5 w-3.5" />
           {label}
-          {fiches.length > 1 && (
-            <span className="ml-0.5 rounded-full bg-primary/15 px-1.5 text-[10px] leading-4">{fiches.length}</span>
-          )}
+          <span className="ml-0.5 min-w-[1.25rem] rounded-full bg-primary/15 px-1.5 text-center text-[10px] leading-4">{fiches.length}</span>
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto pb-0">
