@@ -18,7 +18,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical } from 'lucide-react';
+import { ChevronRight, GripVertical } from 'lucide-react';
 import { ProcedureFiche } from '@/lib/database.types';
 import { FICHE_CATEGORY_LABELS, FORMATION_PAGE_CATEGORIES } from '@/lib/constants';
 import { sortFichesByOrder, sortOrderUpdatesForVisibleReorder } from '@/lib/training';
@@ -58,14 +58,21 @@ export function FicheOrderList({
   };
 
   return (
-    <div className="space-y-4">
-      <div>
-        <p className="text-sm font-medium">Ordre d’affichage</p>
-        <p className="text-xs text-muted-foreground">
-          Glisser une fiche pour la déplacer. Sur mobile, rester appuyé un instant puis glisser.
-          Enregistré tout de suite.
-        </p>
-      </div>
+    <details className="group/order rounded-lg border bg-card">
+      <summary className="flex cursor-pointer list-none items-start gap-2 p-3 [&::-webkit-details-marker]:hidden">
+        <ChevronRight
+          className="mt-0.5 h-4 w-4 shrink-0 transition-transform group-open/order:rotate-90"
+          aria-hidden
+        />
+        <span>
+          <span className="block text-sm font-medium">Ordre d’affichage</span>
+          <span className="block text-xs text-muted-foreground">
+            Cliquer pour déplier. Glisser une fiche pour la déplacer (sur mobile : rester appuyé puis
+            glisser). Enregistré tout de suite.
+          </span>
+        </span>
+      </summary>
+      <div className="space-y-3 border-t p-3">
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
@@ -75,10 +82,12 @@ export function FicheOrderList({
         const rows = sortFichesByOrder(fiches.filter((fiche) => fiche.category === category));
         if (!rows.length) return null;
         return (
-          <div key={category} className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {FICHE_CATEGORY_LABELS[category]}
-            </p>
+          <details key={category} className="group/cat">
+            <summary className="flex cursor-pointer list-none items-center gap-1.5 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground [&::-webkit-details-marker]:hidden">
+              <ChevronRight className="h-3.5 w-3.5 transition-transform group-open/cat:rotate-90" aria-hidden />
+              {FICHE_CATEGORY_LABELS[category]} ({rows.length})
+            </summary>
+            <div className="space-y-2 pl-2">
             {groupFichesBySubGroup(rows).map((group) => (
               <CategoryOrderList
                 key={`${category}-${group.value ?? 'general'}`}
@@ -98,10 +107,12 @@ export function FicheOrderList({
                 }}
               />
             ))}
-          </div>
+            </div>
+          </details>
         );
       })}
-    </div>
+      </div>
+    </details>
   );
 }
 
@@ -157,8 +168,12 @@ function CategoryOrderList({
   const onDragCancel = () => setActiveId(null);
 
   return (
-    <div className="space-y-2 pt-2">
-      <p className="border-l-4 border-primary pl-2 text-sm font-bold leading-tight text-foreground">{title}</p>
+    <details className="group/sub pt-2">
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 border-l-4 border-primary pl-2 text-sm font-bold leading-tight text-foreground [&::-webkit-details-marker]:hidden">
+        <ChevronRight className="h-4 w-4 transition-transform group-open/sub:rotate-90" aria-hidden />
+        {title} ({rows.length})
+      </summary>
+      <div className="mt-2">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -192,7 +207,8 @@ function CategoryOrderList({
           {activeFiche ? <FicheRowPreview fiche={activeFiche} /> : null}
         </DragOverlay>
       </DndContext>
-    </div>
+      </div>
+    </details>
   );
 }
 
