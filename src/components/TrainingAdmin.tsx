@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FicheCategory, FicheValidation, ProcedureFiche, QuizQuestionAdmin } from '@/lib/database.types';
+import { FicheStep, FicheCategory, FicheValidation, ProcedureFiche, QuizQuestionAdmin } from '@/lib/database.types';
 import { FORMATION_PAGE_CATEGORIES, FICHE_CATEGORY_LABELS } from '@/lib/constants';
 import {
   deleteFiche,
@@ -15,6 +15,7 @@ import {
   GmTrainingRow,
 } from '@/lib/trainingRepository';
 import { isMockMode } from '@/lib/supabase';
+import { FicheStepsEditor } from '@/components/FicheStepsEditor';
 import { GameScopeSelect } from '@/components/GameScopeSelect';
 import { FicheOrderList } from '@/components/FicheOrderList';
 import { FICHE_SUB_GROUPS, ficheSubGroup, ficheSubGroupLabel } from '@/lib/ficheSubGroups';
@@ -225,7 +226,7 @@ function AdminFicheEditor({
   const [summary, setSummary] = useState('');
   const [category, setCategory] = useState<FicheCategory>('formation_technique');
   const [subGroup, setSubGroup] = useState<string>('');
-  const [stepsText, setStepsText] = useState('');
+  const [steps, setSteps] = useState<FicheStep[]>([]);
   const [required, setRequired] = useState(true);
   const [active, setActive] = useState(true);
   const [placeholder, setPlaceholder] = useState(false);
@@ -251,7 +252,7 @@ function AdminFicheEditor({
     setSummary(selected.summary || '');
     setCategory(selected.category);
     setSubGroup(ficheSubGroup(selected) ?? '');
-    setStepsText(selected.content_steps.map((step) => step.text).join('\n'));
+    setSteps(selected.content_steps.map((step) => ({ ...step, images: step.images ? [...step.images] : undefined })));
     setRequired(selected.is_required !== false);
     setActive(selected.is_active);
     setPlaceholder(Boolean(selected.is_placeholder));
@@ -271,11 +272,14 @@ function AdminFicheEditor({
     setError(null);
     setMessage(null);
     try {
-      const steps = stepsText
-        .split('\n')
-        .map((text) => text.trim())
-        .filter(Boolean)
-        .map((text, index) => ({ order: index + 1, text }));
+      const cleanedSteps: FicheStep[] = steps
+        .map((step) => ({ ...step, text: step.text.trim() }))
+        .filter((step) => step.text || (step.images && step.images.length > 0))
+        .map((step, index) => {
+          const next: FicheStep = { ...step, order: index + 1 };
+          if (!next.images || next.images.length === 0) delete next.images;
+          return next;
+        });
       const cleanedQuestions = questions.map((question) => {
         const choices = question.choices.filter((choice) => choice.text.trim());
         return {
@@ -303,7 +307,7 @@ function AdminFicheEditor({
           summary,
           category,
           sub_group: subGroup || null,
-          content_steps: steps,
+          content_steps: cleanedSteps,
           is_required: required,
           is_active: active,
           is_placeholder: placeholder,
@@ -460,8 +464,8 @@ function AdminFicheEditor({
               <Textarea id="fiche-summary" rows={2} value={summary} onChange={(e) => setSummary(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="fiche-steps">Étapes (une par ligne)</Label>
-              <Textarea id="fiche-steps" rows={6} value={stepsText} onChange={(e) => setStepsText(e.target.value)} />
+              <Label>Étapes</Label>
+              <FicheStepsEditor ficheId={selected.id} steps={steps} onChange={setSteps} disabled={busy} />
             </div>
             <div className="space-y-2 rounded-md border p-3">
               <p className="text-sm font-medium">Portée</p>

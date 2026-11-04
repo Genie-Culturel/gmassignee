@@ -40,6 +40,14 @@ export type LegacyVrStep =
   | 'socials_shared'
   | 'cleaning';
 
+/** One point of a fiche. `images`: optional public URLs (screenshots/photos). */
+export interface FicheStep {
+  order: number;
+  text: string;
+  completed?: boolean;
+  images?: string[];
+}
+
 /** Step key of any parcours (parcours_steps.step_key). VR keys = LegacyVrStep. */
 export type SessionStep = string;
 
@@ -48,7 +56,7 @@ export interface ProcedureFiche {
   category: FicheCategory;
   title: string;
   summary: string | null;
-  content_steps: Array<{ order: number; text: string; completed?: boolean }>;
+  content_steps: Array<FicheStep>;
   is_placeholder: boolean;
   tags: string[] | null;
   is_active: boolean;

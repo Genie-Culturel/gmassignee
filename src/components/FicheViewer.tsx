@@ -3,6 +3,8 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { FICHE_CATEGORY_LABELS } from '@/lib/constants';
+import { useState } from 'react';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 interface FicheViewerProps {
   fiche: ProcedureFiche;
@@ -10,6 +12,7 @@ interface FicheViewerProps {
 }
 
 export function FicheViewer({ fiche, compact = false }: FicheViewerProps) {
+  const [zoom, setZoom] = useState<string | null>(null);
   return (
     <div className="space-y-4">
       {!compact && (
@@ -51,10 +54,38 @@ export function FicheViewer({ fiche, compact = false }: FicheViewerProps) {
             <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium">
               {step.order}
             </div>
-            <div className="flex-1 text-sm whitespace-pre-line">{step.text}</div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm whitespace-pre-line">{step.text}</div>
+              {step.images && step.images.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {step.images.map((src, i) => (
+                    <button
+                      key={src + i}
+                      type="button"
+                      onClick={() => setZoom(src)}
+                      className="block overflow-hidden rounded-md border border-border"
+                    >
+                      <img
+                        src={src}
+                        alt={`Point ${step.order} – image ${i + 1}`}
+                        loading="lazy"
+                        className="h-28 max-w-[220px] w-auto object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         ))}
       </div>
+
+      <Dialog open={zoom !== null} onOpenChange={(open) => !open && setZoom(null)}>
+        <DialogContent className="max-w-[95vw] sm:max-w-3xl p-2">
+          <DialogTitle className="sr-only">Image</DialogTitle>
+          {zoom && <img src={zoom} alt="" className="max-h-[85vh] w-full object-contain rounded" />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
