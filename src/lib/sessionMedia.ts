@@ -1,8 +1,8 @@
 import * as tus from 'tus-js-client';
 import { isMockMode, supabase } from './supabase';
-import { DEFAULT_SUPABASE_ANON_KEY, DEFAULT_SUPABASE_URL, souvenirsPageUrl } from './config';
+import { DEFAULT_SUPABASE_ANON_KEY, DEFAULT_SUPABASE_URL, souvenirsPageUrl, STORAGE_BUCKET_SESSION_MEDIA, EDGE_FUNCTION_SEND_SESSION_VIDEOS } from './config';
 
-export const SESSION_MEDIA_BUCKET = 'session-media';
+export const SESSION_MEDIA_BUCKET = STORAGE_BUCKET_SESSION_MEDIA;
 export const SESSION_MEDIA_MAX_BYTES = 50 * 1024 * 1024;
 export const SESSION_MEDIA_MAX_LABEL = '50 Mo';
 export const SESSION_MEDIA_TTL_DAYS = 14;
@@ -78,7 +78,7 @@ function writeDemoMedia(sessionId: string, rows: SessionMediaFile[]) {
 export async function listSessionMedia(sessionId: string): Promise<SessionMediaFile[]> {
   if (isMockMode || !supabase) return readDemoMedia(sessionId);
   const { data, error } = await supabase
-    .from('session_media')
+    .from('gh_session_media')
     .select('id, session_id, path, original_name, size, mime, uploaded_at, expires_at')
     .eq('session_id', sessionId)
     .order('uploaded_at', { ascending: true });
@@ -173,7 +173,7 @@ export function uploadSessionFile(params: {
           async onSuccess() {
             const expiresAt = expiresIn14Days();
             const { data, error } = await supabase!
-              .from('session_media')
+              .from('gh_session_media')
               .upsert(
                 {
                   session_id: sessionId,
@@ -231,10 +231,10 @@ export async function sendSessionVideos(params: {
   }
 
   if (email) {
-    await supabase.from('vr_sessions').update({ client_email: email }).eq('id', params.sessionId);
+    await supabase.from('gh_vr_sessions').update({ client_email: email }).eq('id', params.sessionId);
   }
 
-  const { data, error } = await supabase.functions.invoke('send-session-videos', {
+  const { data, error } = await supabase.functions.invoke(EDGE_FUNCTION_SEND_SESSION_VIDEOS, {
     body: { session_id: params.sessionId, client_email: email },
   });
   if (error) return fallbackLink(params.sessionId);
@@ -257,7 +257,7 @@ export async function sendSessionVideos(params: {
 async function fallbackLink(sessionId: string): Promise<SendVideosResult> {
   if (!supabase) return { ok: true, emailed: false, downloadUrl: '', videosSentAt: null };
   const { data: sessionRow } = await supabase
-    .from('vr_sessions')
+    .from('gh_vr_sessions')
     .select('videos_download_token')
     .eq('id', sessionId)
     .maybeSingle();

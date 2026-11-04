@@ -1,7 +1,6 @@
-/** Default gm-vrcenter project. Overridable via VITE_SUPABASE_* env vars. */
-export const DEFAULT_SUPABASE_URL = 'https://vxeprhyswkqugyewpwfm.supabase.co';
-export const DEFAULT_SUPABASE_ANON_KEY =
-  'sb_publishable_COByzOZPOYT1_9zELSfo4w_EpEhOc5u';
+/** Default Lovable project (shared with GMassignee planning). Overridable via VITE_SUPABASE_* env vars. */
+export const DEFAULT_SUPABASE_URL = 'https://dnxyidnkmtrmkxucqrry.supabase.co';
+export const DEFAULT_SUPABASE_ANON_KEY = '';
 
 /** Public base URL of the deployed app (GitHub Pages). Used for client souvenirs links. */
 export const PUBLIC_APP_URL = (
@@ -43,3 +42,11 @@ export function setDemoFlag(enabled: boolean) {
     /* ignore */
   }
 }
+
+/** Storage bucket name for session media (videos, photos). */
+export const STORAGE_BUCKET_SESSION_MEDIA = 'session-media';
+
+/** Edge function names (being recreated in Lovable project). */
+export const EDGE_FUNCTION_SEND_SESSION_VIDEOS = 'send-session-videos';
+export const EDGE_FUNCTION_SESSION_MEDIA_DOWNLOAD = 'session-media-download';
+export const EDGE_FUNCTION_CLEANUP_SESSION_MEDIA = 'cleanup-session-media';

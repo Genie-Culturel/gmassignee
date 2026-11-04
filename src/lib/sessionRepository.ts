@@ -152,9 +152,9 @@ async function loadParts(sessionId: string): Promise<{
   salesComment: string;
 }> {
   const [stepsRes, salesRes, sessionRes] = await Promise.all([
-    supabase!.from('session_steps').select('step, completed_at').eq('session_id', sessionId),
-    supabase!.from('session_sales').select('*').eq('session_id', sessionId),
-    supabase!.from('vr_sessions').select('sales_comment').eq('id', sessionId).maybeSingle(),
+    supabase!.from('gh_session_steps').select('step, completed_at').eq('session_id', sessionId),
+    supabase!.from('gh_session_sales').select('*').eq('session_id', sessionId),
+    supabase!.from('gh_vr_sessions').select('sales_comment').eq('id', sessionId).maybeSingle(),
   ]);
   throwIfError(stepsRes.error, 'Chargement des étapes');
   throwIfError(salesRes.error, 'Chargement des ventes');
@@ -179,7 +179,7 @@ async function loadParts(sessionId: string): Promise<{
 export async function fetchSalesProducts(): Promise<SalesProduct[]> {
   if (isMockMode || !supabase) return mockSalesProducts;
   const { data, error } = await supabase
-    .from('sales_products')
+    .from('gh_sales_products')
     .select('*')
     .eq('is_active', true)
     .order('order_index', { ascending: true });
@@ -190,7 +190,7 @@ export async function fetchSalesProducts(): Promise<SalesProduct[]> {
 export async function loadSession(sessionId: string): Promise<PersistedSession | null> {
   if (isMockMode || !supabase) return null;
   const { data, error } = await supabase
-    .from('vr_sessions')
+    .from('gh_vr_sessions')
     .select('*')
     .eq('id', sessionId)
     .maybeSingle();
@@ -203,7 +203,7 @@ export async function loadSession(sessionId: string): Promise<PersistedSession |
 export async function listOpenSessions(gmId: string): Promise<PersistedSession[]> {
   if (isMockMode || !supabase) return [];
   const { data, error } = await supabase
-    .from('vr_sessions')
+    .from('gh_vr_sessions')
     .select('*')
     .eq('gm_id', gmId)
     .is('ended_at', null)
@@ -280,7 +280,7 @@ export async function createOrResumeFromAssignment(params: {
   }
 
   const existing = await supabase
-    .from('vr_sessions')
+    .from('gh_vr_sessions')
     .select('*')
     .eq('gm_id', params.gmId)
     .eq('assignment_id', key)
@@ -365,7 +365,7 @@ async function insertSession(params: {
   // Real clock time = GM arrival. Planned slot stays in session_time.
   const startedAt = new Date().toISOString();
   const { data, error } = await supabase!
-    .from('vr_sessions')
+    .from('gh_vr_sessions')
     .insert({
       gm_id: params.gmId,
       gm_name: params.gmName,
@@ -432,7 +432,7 @@ export async function updateSessionFields(
   if (patch.clientEmail !== undefined) body.client_email = patch.clientEmail;
   if (patch.videosSentAt !== undefined) body.videos_sent_at = patch.videosSentAt;
   if (Object.keys(body).length === 0) return;
-  const { error } = await supabase.from('vr_sessions').update(body).eq('id', sessionId);
+  const { error } = await supabase.from('gh_vr_sessions').update(body).eq('id', sessionId);
   throwIfError(error, 'Mise à jour de la session');
 }
 
@@ -452,14 +452,14 @@ export async function setStepCompleted(sessionId: string, step: SessionStep, com
     return;
   }
   if (completed) {
-    const { error } = await supabase.from('session_steps').upsert(
+    const { error } = await supabase.from('gh_session_steps').upsert(
       { session_id: sessionId, step, completed_at: new Date().toISOString() },
       { onConflict: 'session_id,step' }
     );
     throwIfError(error, 'Étape');
   } else {
     const { error } = await supabase
-      .from('session_steps')
+      .from('gh_session_steps')
       .delete()
       .eq('session_id', sessionId)
       .eq('step', step);
@@ -474,7 +474,7 @@ export async function replaceSales(
   products: SalesProduct[]
 ) {
   if (isMockMode || !supabase) return;
-  const { error: delErr } = await supabase.from('session_sales').delete().eq('session_id', sessionId);
+  const { error: delErr } = await supabase.from('gh_session_sales').delete().eq('session_id', sessionId);
   throwIfError(delErr, 'Ventes');
   if (items.length) {
     const rows = items.map((item) => {
@@ -489,7 +489,7 @@ export async function replaceSales(
         is_invoiced: item.paymentMethod === 'facture',
       };
     });
-    const { error } = await supabase.from('session_sales').insert(rows);
+    const { error } = await supabase.from('gh_session_sales').insert(rows);
     throwIfError(error, 'Ventes');
   }
   const totals = items.reduce(
@@ -523,14 +523,14 @@ export async function ensureCheckin(gmId: string) {
   if (isMockMode || !supabase) return;
   const today = new Date().toISOString().slice(0, 10);
   const { data, error } = await supabase
-    .from('gm_checkins')
+    .from('gh_gm_checkins')
     .select('id')
     .eq('gm_id', gmId)
     .gte('checkin_time', `${today}T00:00:00`)
     .limit(1);
   throwIfError(error, 'Check-in');
   if (data && data.length > 0) return;
-  const { error: insErr } = await supabase.from('gm_checkins').insert({
+  const { error: insErr } = await supabase.from('gh_gm_checkins').insert({
     gm_id: gmId,
     checkin_time: new Date().toISOString(),
   });
@@ -543,7 +543,7 @@ export async function listCheckinsThisMonth(gmId: string): Promise<number> {
   start.setDate(1);
   start.setHours(0, 0, 0, 0);
   const { count, error } = await supabase
-    .from('gm_checkins')
+    .from('gh_gm_checkins')
     .select('id', { count: 'exact', head: true })
     .eq('gm_id', gmId)
     .gte('checkin_time', start.toISOString());
@@ -557,7 +557,7 @@ export async function listSessionsThisMonth(gmId: string): Promise<number> {
   start.setDate(1);
   start.setHours(0, 0, 0, 0);
   const { count, error } = await supabase
-    .from('vr_sessions')
+    .from('gh_vr_sessions')
     .select('id', { count: 'exact', head: true })
     .eq('gm_id', gmId)
     .gte('started_at', start.toISOString());
@@ -579,12 +579,12 @@ const CRIT_ORDER: Record<string, number> = {
 export async function listBugsForSession(sessionId: string): Promise<SessionBug[]> {
   if (isMockMode || !supabase) return [];
   const { data: byId, error: e1 } = await supabase
-    .from('bug_sessions')
+    .from('gh_bug_sessions')
     .select('id, ref')
     .eq('vr_session_id', sessionId);
   throwIfError(e1, 'Bugs');
   const { data: byRef, error: e2 } = await supabase
-    .from('bug_sessions')
+    .from('gh_bug_sessions')
     .select('id, ref')
     .eq('ref', sessionId);
   throwIfError(e2, 'Bugs');
@@ -594,7 +594,7 @@ export async function listBugsForSession(sessionId: string): Promise<SessionBug[
   if (!ids.length) return [];
 
   const { data: entries, error: e3 } = await supabase
-    .from('bug_entries')
+    .from('gh_bug_entries')
     .select('*')
     .in('bug_session_id', ids);
   throwIfError(e3, 'Bugs');

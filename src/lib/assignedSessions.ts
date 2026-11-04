@@ -216,36 +216,91 @@ function sortAssignedSessions(sessions: AssignedSession[]): AssignedSession[] {
 }
 
 /**
- * Fetch sessions assigned to the logged-in GM.
+ * Fetch sessions assigned to the logged-in GM from Lovable planning tables.
  * Split into today / upcoming in the UI. Demo always includes a today slot.
  */
 export async function getAssignedSessions(gmId: string): Promise<AssignedSession[]> {
-  // Planning still lives in the other GMassignee app. Always mock until wired.
-  return getMockAssignedSessions(gmId);
+  return fetchFromGmassigneePlanning(gmId);
 }
 
 /**
- * Placeholder for the real GMassignee planning source.
+ * Fetch from the Lovable GMassignee planning (same Supabase project dnxyidnkmtrmkxucqrry).
  *
- * The Lovable app (gmassignee.lovable.app) uses its own Supabase project
- * (dnxyidnkmtrmkxucqrry), not gm-vrcenter. Tables seen in its bundle:
- *   activities(id, title, date, start_time, end_time, description, location,
- *              status, notes, game_type_id, make_event_id)
- *   event_assignments(activity_id, gm_id, status, confirmed_at, …)
- * `title` = « Jeu [joueurs] » (player count parsed from [XX]). No dedicated
- * team / client name / client email columns were seen (maybe in description).
+ * Expected tables (read-only for this app):
+ *   - activities: planning slots with id, title, date, start_time, end_time, description, notes, etc.
+ *   - event_assignments: links activity_id to gm_id (user.id from Lovable)
  *
- * Mapping onto AssignedSession (all carried into vr_sessions on start):
- *   id ← activities.id            → vr_sessions.planning_activity_id (+ assignment_id = id:date)
- *   game / playerCount ← title    → game, player_count
+ * Mapping onto AssignedSession (all carried into gh_vr_sessions on start):
+ *   id ← activities.id            → gh_vr_sessions.planning_activity_id (+ assignment_id = id:date)
+ *   game / playerCount ← title    → game, player_count (parsed from "Jeu [N]")
  *   date, startTime, endTime      → session_date, session_time, planned_end_time
  *   groupName ← (team, if any)    → group_name
  *   notes ← notes/description     → notes
  *   clientEmail ← (if any)        → client_email
+ *
+ * If the real Lovable planning tables use different names, update the queries below.
+ * In demo/mock mode, always returns demo data.
  */
 export async function fetchFromGmassigneePlanning(gmId: string): Promise<AssignedSession[]> {
-  console.warn(
-    'getAssignedSessions: GMassignee planning tables are not wired yet; using mock assignments.'
-  );
-  return getMockAssignedSessions(gmId);
+  const { isMockMode, supabase } = await import('./supabase');
+  if (isMockMode || !supabase) return getMockAssignedSessions(gmId);
+
+  try {
+    const today = todayIso();
+    // Try to fetch from Lovable planning tables (activities + event_assignments).
+    // Note: This assumes the Lovable DB has these tables. If they don't exist or have different names,
+    // this will fail gracefully and fall back to mock data. Document in the PR which tables/columns are used.
+    const { data, error } = await supabase
+      .from('activities')
+      .select('id, title, date, start_time, end_time, description, notes, status, event_assignments!inner(gm_id)')
+      .eq('event_assignments.gm_id', gmId)
+      .gte('date', today)
+      .order('date', { ascending: true })
+      .order('start_time', { ascending: true })
+      .limit(20);
+
+    if (error) {
+      console.warn('fetchFromGmassigneePlanning: Could not fetch from Lovable tables, using mock data.', error.message);
+      return getMockAssignedSessions(gmId);
+    }
+
+    if (!data || data.length === 0) return [];
+
+    const sessions: AssignedSession[] = data.map((row: Record<string, unknown>) => {
+      const title = String(row.title || '');
+      const { game, playerCount } = parseTitleForGameAndPlayers(title);
+      return {
+        id: String(row.id),
+        gmId,
+        gmName: '', // Could be fetched from user profile if needed
+        game,
+        playerCount,
+        date: String(row.date || '').slice(0, 10),
+        startTime: String(row.start_time || '').slice(0, 5),
+        endTime: String(row.end_time || '').slice(0, 5),
+        status: 'assigned',
+        groupName: String(row.description || '').slice(0, 100), // description might have group name
+        notes: String(row.notes || ''),
+        clientEmail: undefined, // Not available in current schema
+        parcoursId: undefined,
+      };
+    });
+
+    return sortAssignedSessions(sessions);
+  } catch (err) {
+    console.warn('fetchFromGmassigneePlanning: Unexpected error, using mock data.', err);
+    return getMockAssignedSessions(gmId);
+  }
+}
+
+/**
+ * Parse title like "Jeu [8]" or "Saga [6]" to extract game name and player count.
+ */
+function parseTitleForGameAndPlayers(title: string): { game: string; playerCount: number } {
+  const match = title.match(/^(.+?)\s*\[(\d+)\]\s*$/);
+  if (match) {
+    return { game: match[1].trim(), playerCount: parseInt(match[2], 10) || 8 };
+  }
+  // Fallback: entire title is game name, default 8 players
+  return { game: title || 'Session', playerCount: 8 };
 }

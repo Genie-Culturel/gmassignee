@@ -14,9 +14,19 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function readIsAdmin(user: User | null): boolean {
-  const role = user?.app_metadata?.role;
-  return role === 'admin';
+async function checkIsAdmin(user: User | null): Promise<boolean> {
+  if (!user || !supabase) return false;
+  try {
+    const { data } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .maybeSingle();
+    return Boolean(data);
+  } catch {
+    return false;
+  }
 }
 
 function readDisplayName(user: User | null): string {
@@ -33,23 +43,37 @@ function readDisplayName(user: User | null): string {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(!isMockMode);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (isMockMode || !supabase) {
       setLoading(false);
+      setIsAdmin(true);
       return;
     }
 
     let cancelled = false;
     supabase.auth.getSession().then(({ data }) => {
       if (!cancelled) {
-        setUser(data.session?.user ?? null);
+        const sessionUser = data.session?.user ?? null;
+        setUser(sessionUser);
+        if (sessionUser) {
+          checkIsAdmin(sessionUser).then((admin) => {
+            if (!cancelled) setIsAdmin(admin);
+          });
+        }
         setLoading(false);
       }
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      const sessionUser = session?.user ?? null;
+      setUser(sessionUser);
+      if (sessionUser) {
+        checkIsAdmin(sessionUser).then(setIsAdmin);
+      } else {
+        setIsAdmin(false);
+      }
     });
 
     return () => {
@@ -62,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       loading,
-      isAdmin: readIsAdmin(user) || isMockMode,
+      isAdmin,
       displayName: isMockMode ? 'GM Demo' : readDisplayName(user),
       signIn: async (email, password) => {
         if (!supabase) return 'Supabase non configuré';
@@ -86,7 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await supabase?.auth.signOut();
       },
     }),
-    [user, loading]
+    [user, loading, isAdmin]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

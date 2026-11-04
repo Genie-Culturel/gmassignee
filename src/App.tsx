@@ -4,7 +4,6 @@ import { Dashboard } from './pages/Dashboard';
 import { SuiviParties } from './pages/SuiviParties';
 import { FormationTechnique } from './pages/FormationTechnique';
 import { Login } from './pages/Login';
-import { PinGate } from './pages/PinGate';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { isMockMode } from './lib/supabase';
 
@@ -38,11 +37,9 @@ function AppRoutes() {
 function App() {
   return (
     <HashRouter>
-      <PinGate>
-        <AuthProvider>
-          <AppRoutes />
-        </AuthProvider>
-      </PinGate>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
     </HashRouter>
   );
 }

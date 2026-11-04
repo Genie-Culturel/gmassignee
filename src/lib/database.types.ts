@@ -6,6 +6,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
+/** GMassignee enums in Lovable Supabase (gh_ prefix). */
 export type ChecklistType = 'opening' | 'closing' | 'weekly_cleaning';
 export type FicheCategory =
   | 'formation_technique'
@@ -22,6 +23,9 @@ export type FicheCategory =
 export type IncidentType = 'bug' | 'malaise' | 'casse' | 'autre';
 export type PaymentMethod = 'twint' | 'especes' | 'carte' | 'facture';
 export type FicheScopeKind = 'all' | 'locations' | 'games';
+
+/** User role in the Lovable app (public.user_roles.role, enum app_role). */
+export type AppRole = 'admin' | 'gm' | 'stock_manager' | 'planificateur';
 
 /** Historical VR Center step keys (former Postgres enum session_step). */
 export type LegacyVrStep =
@@ -159,7 +163,7 @@ export interface BugEntry {
 export interface Database {
   public: {
     Tables: {
-      procedure_fiches: {
+      gh_procedure_fiches: {
         Row: ProcedureFiche;
         Insert: Omit<ProcedureFiche, 'id' | 'created_at' | 'updated_at'> & {
           id?: string;
@@ -168,7 +172,7 @@ export interface Database {
         };
         Update: Partial<Omit<ProcedureFiche, 'id' | 'created_at' | 'updated_at'>>;
       };
-      sales_products: {
+      gh_sales_products: {
         Row: SalesProduct;
         Insert: Omit<SalesProduct, 'id' | 'created_at' | 'updated_at'> & {
           id?: string;
@@ -177,7 +181,7 @@ export interface Database {
         };
         Update: Partial<Omit<SalesProduct, 'id' | 'created_at' | 'updated_at'>>;
       };
-      session_sales: {
+      gh_session_sales: {
         Row: SessionSale;
         Insert: Omit<SessionSale, 'id' | 'line_total' | 'created_at' | 'updated_at'> & {
           id?: string;
@@ -186,7 +190,7 @@ export interface Database {
         };
         Update: Partial<Omit<SessionSale, 'id' | 'line_total' | 'created_at' | 'updated_at'>>;
       };
-      gm_checkins: {
+      gh_gm_checkins: {
         Row: {
           id: string;
           gm_id: string;
@@ -216,7 +220,7 @@ export interface Database {
           created_at?: string;
         };
       };
-      checklist_templates: {
+      gh_checklist_templates: {
         Row: {
           id: string;
           type: ChecklistType;
@@ -248,7 +252,7 @@ export interface Database {
           updated_at?: string;
         };
       };
-      checklist_template_fiches: {
+      gh_checklist_template_fiches: {
         Row: {
           id: string;
           template_id: string;
@@ -268,7 +272,7 @@ export interface Database {
           created_at?: string;
         };
       };
-      checklist_completions: {
+      gh_checklist_completions: {
         Row: {
           id: string;
           template_id: string;
@@ -297,7 +301,7 @@ export interface Database {
           created_at?: string;
         };
       };
-      vr_sessions: {
+      gh_vr_sessions: {
         Row: {
           id: string;
           event_id: string | null;
@@ -382,7 +386,7 @@ export interface Database {
           created_at?: string;
         };
       };
-      session_media: {
+      gh_session_media: {
         Row: {
           id: string;
           session_id: string;
@@ -417,7 +421,7 @@ export interface Database {
           expires_at?: string;
         };
       };
-      session_steps: {
+      gh_session_steps: {
         Row: {
           id: string;
           session_id: string;
@@ -443,7 +447,7 @@ export interface Database {
           created_at?: string;
         };
       };
-      session_step_fiches: {
+      gh_session_step_fiches: {
         Row: {
           id: string;
           step: SessionStep;
@@ -463,7 +467,7 @@ export interface Database {
           created_at?: string;
         };
       };
-      bug_sessions: {
+      gh_bug_sessions: {
         Row: BugSession;
         Insert: Omit<BugSession, 'id' | 'created_at' | 'updated_at'> & {
           id?: string;
@@ -472,7 +476,7 @@ export interface Database {
         };
         Update: Partial<Omit<BugSession, 'id' | 'created_at' | 'updated_at'>>;
       };
-      bug_entries: {
+      gh_bug_entries: {
         Row: BugEntry;
         Insert: Omit<BugEntry, 'id' | 'created_at' | 'updated_at'> & {
           id?: string;
@@ -481,14 +485,250 @@ export interface Database {
         };
         Update: Partial<Omit<BugEntry, 'id' | 'created_at' | 'updated_at'>>;
       };
+      gh_locations: {
+        Row: {
+          id: string;
+          name: string;
+          slug: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          slug: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          slug?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      gh_games: {
+        Row: {
+          id: string;
+          name: string;
+          location_id: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          location_id: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          location_id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      gh_parcours: {
+        Row: {
+          id: string;
+          name: string;
+          location_slug: string | null;
+          is_default: boolean;
+          is_provisional: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          location_slug?: string | null;
+          is_default?: boolean;
+          is_provisional?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          location_slug?: string | null;
+          is_default?: boolean;
+          is_provisional?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      gh_parcours_steps: {
+        Row: {
+          id: string;
+          parcours_id: string;
+          step_key: string;
+          label: string;
+          hint: string | null;
+          note: string | null;
+          order_index: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          parcours_id: string;
+          step_key: string;
+          label: string;
+          hint?: string | null;
+          note?: string | null;
+          order_index: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          parcours_id?: string;
+          step_key?: string;
+          label?: string;
+          hint?: string | null;
+          note?: string | null;
+          order_index?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      gh_fiche_validations: {
+        Row: FicheValidation;
+        Insert: Omit<FicheValidation, 'id' | 'validated_at'> & {
+          id?: string;
+          validated_at?: string;
+        };
+        Update: Partial<Omit<FicheValidation, 'id'>>;
+      };
+      gh_fiche_scope_locations: {
+        Row: {
+          id: string;
+          fiche_id: string;
+          location_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          fiche_id: string;
+          location_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          fiche_id?: string;
+          location_id?: string;
+          created_at?: string;
+        };
+      };
+      gh_fiche_scope_games: {
+        Row: {
+          id: string;
+          fiche_id: string;
+          game_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          fiche_id: string;
+          game_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          fiche_id?: string;
+          game_id?: string;
+          created_at?: string;
+        };
+      };
+      gh_quiz_questions: {
+        Row: {
+          id: string;
+          fiche_id: string;
+          prompt: string;
+          correct_choice_ids: string[];
+          order_index: number;
+          is_example: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          fiche_id: string;
+          prompt: string;
+          correct_choice_ids: string[];
+          order_index: number;
+          is_example?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          fiche_id?: string;
+          prompt?: string;
+          correct_choice_ids?: string[];
+          order_index?: number;
+          is_example?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      user_roles: {
+        Row: {
+          id: string;
+          user_id: string;
+          role: AppRole;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          role: AppRole;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          role?: AppRole;
+          created_at?: string;
+        };
+      };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      gh_get_quiz_questions: {
+        Args: { p_fiche_id: string };
+        Returns: QuizQuestionPublic[];
+      };
+      gh_submit_fiche_validation: {
+        Args: { p_gm_id: string; p_fiche_id: string; p_version: number };
+        Returns: void;
+      };
+      gh_list_gm_profiles: {
+        Args: Record<string, never>;
+        Returns: { gm_id: string; display_name: string }[];
+      };
+      gh_set_session_flag_reviewed: {
+        Args: { p_session_id: string; p_reviewer_id: string };
+        Returns: void;
+      };
+      gh_admin_delete_session: {
+        Args: { p_session_id: string };
+        Returns: void;
+      };
+      has_role: {
+        Args: { _user_id: string; _role: AppRole };
+        Returns: boolean;
+      };
+    };
     Enums: {
-      checklist_type: ChecklistType;
-      fiche_category: FicheCategory;
-      incident_type: IncidentType;
-      payment_method: PaymentMethod;
+      gh_checklist_type: ChecklistType;
+      gh_fiche_category: FicheCategory;
+      gh_incident_type: IncidentType;
+      gh_payment_method: PaymentMethod;
+      gh_session_step: string;
     };
   };
 }
