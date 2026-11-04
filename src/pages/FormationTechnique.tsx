@@ -21,6 +21,7 @@ import { TrainingAdmin } from '@/components/TrainingAdmin';
 import { GameScopeSelect } from '@/components/GameScopeSelect';
 import { FicheValidation, ProcedureFiche, FicheCategory } from '@/lib/database.types';
 import { FICHE_CATEGORY_LABELS, FORMATION_PAGE_CATEGORIES } from '@/lib/constants';
+import { groupFichesBySubGroup } from '@/lib/ficheSubGroups';
 import { listMyValidations } from '@/lib/trainingRepository';
 import { ficheStatus, progressFor, sortFichesByOrder, TRAINING_STATUS_LABELS } from '@/lib/training';
 import { useAuth } from '@/hooks/useAuth';
@@ -200,54 +201,63 @@ export function FormationTechnique() {
                   </CardContent>
                 </Card>
               ) : (
-                <ul className="divide-y rounded-lg border bg-card">
-                  {categoryFiches.map((fiche) => {
-                    const required = fiche.is_required !== false;
-                    const status = ficheStatus(fiche, validationFor(fiche));
-                    return (
-                      <li key={fiche.id}>
-                        <button
-                          type="button"
-                          onClick={() => openFiche(fiche)}
-                          className="flex w-full items-start justify-between gap-3 px-3 py-3 text-left hover:bg-muted/50"
-                        >
-                          <span className="min-w-0">
-                            <span className="block font-medium leading-snug">{fiche.title}</span>
-                            <span className="mt-1 inline-flex">
-                              <Badge variant="outline" className="text-[10px] font-normal">
-                                {ficheScopeBadgeLabel(fiche, catalog)}
-                              </Badge>
-                            </span>
-                            {fiche.summary && (
-                              <span className="mt-0.5 block text-xs text-muted-foreground line-clamp-2">
-                                {fiche.summary}
-                              </span>
-                            )}
-                            {required && status === 'revalidate' && (
-                              <span className="mt-0.5 block text-xs text-amber-700">
-                                Procédure mise à jour — à relire
-                              </span>
-                            )}
-                          </span>
-                          <span className="flex shrink-0 flex-col items-end gap-1">
-                            {required ? (
-                              <Badge variant={statusVariant(status)}>
-                                {TRAINING_STATUS_LABELS[status]}
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline">Facultative</Badge>
-                            )}
-                            {fiche.is_placeholder && (
-                              <Badge variant="warning" className="text-[10px]">
-                                À compléter
-                              </Badge>
-                            )}
-                          </span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
+                <div className="space-y-4">
+                  {groupFichesBySubGroup(categoryFiches).map((group) => (
+                    <section key={group.value ?? 'general'} className="space-y-1.5">
+                      <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        {group.label}
+                      </h3>
+                      <ul className="divide-y rounded-lg border bg-card">
+                        {group.fiches.map((fiche) => {
+                          const required = fiche.is_required !== false;
+                          const status = ficheStatus(fiche, validationFor(fiche));
+                          return (
+                            <li key={fiche.id}>
+                              <button
+                                type="button"
+                                onClick={() => openFiche(fiche)}
+                                className="flex w-full items-start justify-between gap-3 px-3 py-3 text-left hover:bg-muted/50"
+                              >
+                                <span className="min-w-0">
+                                  <span className="block font-medium leading-snug">{fiche.title}</span>
+                                  <span className="mt-1 inline-flex">
+                                    <Badge variant="outline" className="text-[10px] font-normal">
+                                      {ficheScopeBadgeLabel(fiche, catalog)}
+                                    </Badge>
+                                  </span>
+                                  {fiche.summary && (
+                                    <span className="mt-0.5 block text-xs text-muted-foreground line-clamp-2">
+                                      {fiche.summary}
+                                    </span>
+                                  )}
+                                  {required && status === 'revalidate' && (
+                                    <span className="mt-0.5 block text-xs text-amber-700">
+                                      Procédure mise à jour — à relire
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="flex shrink-0 flex-col items-end gap-1">
+                                  {required ? (
+                                    <Badge variant={statusVariant(status)}>
+                                      {TRAINING_STATUS_LABELS[status]}
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline">Facultative</Badge>
+                                  )}
+                                  {fiche.is_placeholder && (
+                                    <Badge variant="warning" className="text-[10px]">
+                                      À compléter
+                                    </Badge>
+                                  )}
+                                </span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </section>
+                  ))}
+                </div>
               )}
             </TabsContent>
           );

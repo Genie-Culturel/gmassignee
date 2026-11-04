@@ -400,6 +400,7 @@ export async function saveFiche(params: {
     is_active: params.fiche.is_active ?? true,
     is_required: params.fiche.is_required ?? true,
   };
+  if (params.fiche.sub_group !== undefined) body.sub_group = params.fiche.sub_group;
   if (params.scope) body.scope_kind = params.scope.kind;
   // Always explicit so a stale flag from an earlier minor save never blocks a real version bump.
   body.skip_version_bump = params.minorCorrection;

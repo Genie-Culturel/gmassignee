@@ -19,12 +19,13 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical } from 'lucide-react';
-import { FicheCategory, ProcedureFiche } from '@/lib/database.types';
+import { ProcedureFiche } from '@/lib/database.types';
 import { FICHE_CATEGORY_LABELS, FORMATION_PAGE_CATEGORIES } from '@/lib/constants';
 import { sortFichesByOrder, sortOrderUpdatesForVisibleReorder } from '@/lib/training';
 import { reorderFiches } from '@/lib/trainingRepository';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
+import { groupFichesBySubGroup } from '@/lib/ficheSubGroups';
 import { FinePointerSensor } from '@/lib/dndSensors';
 
 export function FicheOrderList({
@@ -40,8 +41,9 @@ export function FicheOrderList({
 }) {
   const [error, setError] = useState<string | null>(null);
 
-  const applyOrder = async (category: FicheCategory, orderedIds: string[]) => {
-    const visible = sortFichesByOrder(fiches.filter((fiche) => fiche.category === category));
+  // Réordonne au sein d'une sous-catégorie : on réutilise les sort_order existants du groupe.
+  const applyOrder = async (groupIds: string[], orderedIds: string[]) => {
+    const visible = sortFichesByOrder(fiches.filter((fiche) => groupIds.includes(fiche.id)));
     const current = visible.map((fiche) => fiche.id).join('\0');
     if (orderedIds.join('\0') === current) return;
     const updates = sortOrderUpdatesForVisibleReorder(visible, orderedIds);
@@ -73,20 +75,30 @@ export function FicheOrderList({
         const rows = sortFichesByOrder(fiches.filter((fiche) => fiche.category === category));
         if (!rows.length) return null;
         return (
-          <CategoryOrderList
-            key={category}
-            category={category}
-            rows={rows}
-            selectedId={selectedId}
-            onSelect={onSelect}
-            onApply={async (ids) => {
-              try {
-                await applyOrder(category, ids);
-              } catch (err) {
-                setError(err instanceof Error ? err.message : 'Ordre non enregistré');
-              }
-            }}
-          />
+          <div key={category} className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {FICHE_CATEGORY_LABELS[category]}
+            </p>
+            {groupFichesBySubGroup(rows).map((group) => (
+              <CategoryOrderList
+                key={`${category}-${group.value ?? 'general'}`}
+                title={group.label}
+                rows={group.fiches}
+                selectedId={selectedId}
+                onSelect={onSelect}
+                onApply={async (ids) => {
+                  try {
+                    await applyOrder(
+                      group.fiches.map((fiche) => fiche.id),
+                      ids
+                    );
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : 'Ordre non enregistré');
+                  }
+                }}
+              />
+            ))}
+          </div>
         );
       })}
     </div>
@@ -94,13 +106,13 @@ export function FicheOrderList({
 }
 
 function CategoryOrderList({
-  category,
+  title,
   rows,
   selectedId,
   onSelect,
   onApply,
 }: {
-  category: FicheCategory;
+  title: string;
   rows: ProcedureFiche[];
   selectedId: string;
   onSelect: (id: string) => void;
@@ -145,8 +157,8 @@ function CategoryOrderList({
   const onDragCancel = () => setActiveId(null);
 
   return (
-    <div className="space-y-2">
-      <p className="text-xs font-medium text-muted-foreground">{FICHE_CATEGORY_LABELS[category]}</p>
+    <div className="space-y-1.5 pl-2">
+      <p className="pl-1 text-xs font-medium text-muted-foreground">{title}</p>
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}

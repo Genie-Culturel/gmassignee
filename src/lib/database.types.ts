@@ -58,6 +58,8 @@ export interface ProcedureFiche {
   deleted_at?: string | null;
   sort_order?: number;
   scope_kind?: FicheScopeKind;
+  /** Sous-catégorie d'affichage : null = Général, sinon slug de lieu (ou escape_life). */
+  sub_group?: string | null;
   scope_location_ids?: string[];
   scope_game_ids?: string[];
   created_at: string;

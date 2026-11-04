@@ -17,6 +17,7 @@ import {
 import { isMockMode } from '@/lib/supabase';
 import { GameScopeSelect } from '@/components/GameScopeSelect';
 import { FicheOrderList } from '@/components/FicheOrderList';
+import { FICHE_SUB_GROUPS, ficheSubGroup, ficheSubGroupLabel } from '@/lib/ficheSubGroups';
 import { ParcoursAdmin } from '@/components/ParcoursAdmin';
 import {
   ALL_GAMES_VALUE,
@@ -223,6 +224,7 @@ function AdminFicheEditor({
   const [title, setTitle] = useState('');
   const [summary, setSummary] = useState('');
   const [category, setCategory] = useState<FicheCategory>('formation_technique');
+  const [subGroup, setSubGroup] = useState<string>('');
   const [stepsText, setStepsText] = useState('');
   const [required, setRequired] = useState(true);
   const [active, setActive] = useState(true);
@@ -248,6 +250,7 @@ function AdminFicheEditor({
     setTitle(selected.title);
     setSummary(selected.summary || '');
     setCategory(selected.category);
+    setSubGroup(ficheSubGroup(selected) ?? '');
     setStepsText(selected.content_steps.map((step) => step.text).join('\n'));
     setRequired(selected.is_required !== false);
     setActive(selected.is_active);
@@ -299,6 +302,7 @@ function AdminFicheEditor({
           title,
           summary,
           category,
+          sub_group: subGroup || null,
           content_steps: steps,
           is_required: required,
           is_active: active,
@@ -429,6 +433,27 @@ function AdminFicheEditor({
                   </option>
                 ))}
               </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="fiche-subgroup">Sous-catégorie</Label>
+              <select
+                id="fiche-subgroup"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={subGroup}
+                onChange={(e) => setSubGroup(e.target.value)}
+              >
+                {FICHE_SUB_GROUPS.map((group) => (
+                  <option key={group.value ?? 'general'} value={group.value ?? ''}>
+                    {group.value === null ? 'Général (tous les jeux et lieux)' : group.label}
+                  </option>
+                ))}
+                {subGroup && !FICHE_SUB_GROUPS.some((group) => group.value === subGroup) && (
+                  <option value={subGroup}>{ficheSubGroupLabel(subGroup)}</option>
+                )}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Regroupe la fiche dans la liste (Général ou par lieu). N’entraîne pas de revalidation.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="fiche-summary">Résumé</Label>
