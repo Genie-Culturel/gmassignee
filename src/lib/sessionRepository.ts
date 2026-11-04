@@ -367,6 +367,8 @@ async function insertSession(params: {
   const { data, error } = await supabase!
     .from('gh_vr_sessions')
     .insert({
+      // IMPORTANT: gm_id DOIT être auth.users.id (JWT user.id), PAS profiles.gm_id ou game_masters.id
+      // RLS policy: auth.uid() = gm_id
       gm_id: params.gmId,
       gm_name: params.gmName,
       game: params.game,

@@ -86,6 +86,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       loading,
+      // En mode démo, isAdmin est forcé à true (ligne 51).
+      // Les données sont locales (localStorage) et ne touchent pas la vraie base.
       isAdmin,
       displayName: isMockMode ? 'GM Demo' : readDisplayName(user),
       signIn: async (email, password) => {

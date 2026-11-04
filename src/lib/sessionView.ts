@@ -233,6 +233,12 @@ function sessionToRow(session: PersistedSession, hasIncident: boolean, reviewedA
   };
 }
 
+/**
+ * Admin only: list all recorded sessions (last 60).
+ * This function is used exclusively in SessionMediaAdmin (Dashboard),
+ * which is only shown when isAdmin === true.
+ * RLS ensures non-admins cannot read other GMs' sessions.
+ */
 export async function listRecordedSessions(): Promise<RecordedSessionRow[]> {
   if (isMockMode || !supabase) {
     const reviews = readDemoReviews();
