@@ -58,7 +58,7 @@ export function FicheOrderList({
   };
 
   return (
-    <details className="group/order rounded-lg border bg-card">
+    <details open className="group/order rounded-lg border bg-card">
       <summary className="flex cursor-pointer list-none items-start gap-2 p-3 [&::-webkit-details-marker]:hidden">
         <ChevronRight
           className="mt-0.5 h-4 w-4 shrink-0 transition-transform group-open/order:rotate-90"
@@ -67,8 +67,8 @@ export function FicheOrderList({
         <span>
           <span className="block text-sm font-medium">Ordre d’affichage</span>
           <span className="block text-xs text-muted-foreground">
-            Cliquer pour déplier. Glisser une fiche pour la déplacer (sur mobile : rester appuyé puis
-            glisser). Enregistré tout de suite.
+            Ouvrir une catégorie, puis glisser une fiche pour changer sa place.
+            Sur mobile : rester appuyé puis glisser. C’est enregistré tout de suite.
           </span>
         </span>
       </summary>
