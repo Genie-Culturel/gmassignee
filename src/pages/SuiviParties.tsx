@@ -147,6 +147,7 @@ export function SuiviParties() {
   const [bugs, setBugs] = useState<SessionBug[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [assignmentError, setAssignmentError] = useState<string | null>(null);
 
   const [manualGroupName, setManualGroupName] = useState('');
   const [manualGameId, setManualGameId] = useState('');
@@ -183,12 +184,29 @@ export function SuiviParties() {
 
   useEffect(() => {
     let cancelled = false;
-    getAssignedSessions(gmId).then((rows) => {
-      if (!cancelled) setAssigned(rows);
-    });
+    
+    // Load assigned sessions - handle errors properly
+    getAssignedSessions(gmId)
+      .then((rows) => {
+        if (!cancelled) {
+          console.log('[SuiviParties] Loaded', rows.length, 'assigned sessions');
+          setAssigned(rows);
+          setAssignmentError(null);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          const errorMsg = err instanceof Error ? err.message : 'Erreur inconnue';
+          console.error('[SuiviParties] Failed to load assignments:', errorMsg);
+          setAssignmentError(errorMsg);
+          setAssigned([]);
+        }
+      });
+    
     fetchSalesProducts().then((rows) => {
       if (!cancelled) setProducts(rows);
     });
+    
     if (!isMockMode && user) {
       listOpenSessions(user.id).then((rows) => {
         if (!cancelled) setOpenSessions(rows);
@@ -397,6 +415,18 @@ export function SuiviParties() {
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {assignmentError && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Erreur de chargement du planning</AlertTitle>
+            <AlertDescription className="mt-2">
+              <p className="font-medium">Impossible de charger vos activités assignées :</p>
+              <p className="text-sm mt-1 font-mono">{assignmentError}</p>
+              <p className="text-sm mt-2">Vérifiez la console du navigateur pour plus de détails.</p>
+            </AlertDescription>
           </Alert>
         )}
 

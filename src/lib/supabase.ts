@@ -8,7 +8,7 @@ import {
 const supabaseUrl =
   import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
 const supabaseAnonKey =
-  import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
@@ -24,6 +24,12 @@ export const supabase = isSupabaseConfigured
       },
     })
   : null;
+
+// Log mode clearly at startup
+console.log('[Supabase]', isMockMode ? '⚠️ MODE DÉMO' : '✅ MODE PRODUCTION');
+console.log('[Supabase] URL:', supabaseUrl);
+console.log('[Supabase] Configured:', isSupabaseConfigured);
+console.log('[Supabase] Demo flag:', readDemoFlag());
 
 if (isMockMode) {
   console.warn(

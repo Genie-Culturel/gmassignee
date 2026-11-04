@@ -23,9 +23,14 @@ export function useStepFiches(parcoursId: string | undefined) {
         if (isMockMode || !supabase) {
           fiches = loadDemoFiches().filter((fiche) => ids.includes(fiche.id));
         } else if (ids.length) {
-          const { data, error } = await supabase.from('procedure_fiches').select('*').in('id', ids);
-          if (error) throw error;
+          console.log('[useStepFiches] Fetching', ids.length, 'fiches from gh_procedure_fiches');
+          const { data, error } = await supabase.from('gh_procedure_fiches').select('*').in('id', ids);
+          if (error) {
+            console.error('[useStepFiches] Query error:', error);
+            throw error;
+          }
           fiches = (data || []) as ProcedureFiche[];
+          console.log('[useStepFiches] Loaded', fiches.length, 'fiches');
         }
         if (cancelled) return;
         setLinks(nextLinks);

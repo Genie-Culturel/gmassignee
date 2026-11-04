@@ -174,7 +174,7 @@ export function toPublicQuestion(q: QuizQuestionAdmin): QuizQuestionPublic {
 export async function listMyValidations(gmId: string): Promise<FicheValidation[]> {
   if (isMockMode || !supabase) return readLocalValidations(gmId);
   const { data, error } = await supabase
-    .from('fiche_validations')
+    .from('gh_fiche_validations')
     .select('gm_id, fiche_id, version, validated_at')
     .eq('gm_id', gmId);
   if (error) throw new Error(error.message);
@@ -185,7 +185,7 @@ export async function listQuizQuestions(ficheId: string): Promise<QuizQuestionPu
   if (isMockMode || !supabase) {
     return loadDemoQuiz().filter((q) => q.fiche_id === ficheId).map(toPublicQuestion);
   }
-  const { data, error } = await supabase.rpc('get_quiz_questions', { p_fiche_id: ficheId });
+  const { data, error } = await supabase.rpc('gh_get_quiz_questions', { p_fiche_id: ficheId });
   if (error) throw new Error(error.message);
   return (data || []).map((row: Record<string, unknown>) => ({
     id: String(row.id),
@@ -202,7 +202,7 @@ export async function listQuizQuestionsAdmin(ficheId: string): Promise<QuizQuest
     return loadDemoQuiz().filter((q) => q.fiche_id === ficheId).map((q) => ({ ...q }));
   }
   const { data, error } = await supabase
-    .from('quiz_questions')
+    .from('gh_quiz_questions')
     .select('*')
     .eq('fiche_id', ficheId)
     .order('order_index');
@@ -247,7 +247,7 @@ export async function submitFicheValidation(params: {
     return { ok: true, version };
   }
 
-  const { data, error } = await supabase.rpc('submit_fiche_validation', {
+  const { data, error } = await supabase.rpc('gh_submit_fiche_validation', {
     p_fiche_id: params.fiche.id,
     p_confirmed: params.confirmed,
     p_answers: params.answers,
@@ -300,7 +300,7 @@ async function nextSortOrder(category: FicheCategory): Promise<number> {
     return max + 10;
   }
   const { data, error } = await supabase
-    .from('procedure_fiches')
+    .from('gh_procedure_fiches')
     .select('sort_order')
     .eq('category', category)
     .is('deleted_at', null)
@@ -326,7 +326,7 @@ export async function reorderFiches(
   }
   const results = await Promise.all(
     changed.map((update) =>
-      supabase!.from('procedure_fiches').update({ sort_order: update.sort_order }).eq('id', update.id)
+      supabase!.from('gh_procedure_fiches').update({ sort_order: update.sort_order }).eq('id', update.id)
     )
   );
   const failed = results.find((result) => result.error);
@@ -354,19 +354,19 @@ async function replaceFicheScope(
   scope: { kind: FicheScopeKind; locationIds: string[]; gameIds: string[] }
 ) {
   if (!supabase) return;
-  await supabase.from('fiche_scope_locations').delete().eq('fiche_id', ficheId);
-  await supabase.from('fiche_scope_games').delete().eq('fiche_id', ficheId);
+  await supabase.from('gh_fiche_scope_locations').delete().eq('fiche_id', ficheId);
+  await supabase.from('gh_fiche_scope_games').delete().eq('fiche_id', ficheId);
   if (scope.kind === 'locations' && scope.locationIds.length) {
     assertLiveIds(scope.locationIds, 'lieu');
     const { error } = await supabase
-      .from('fiche_scope_locations')
+      .from('gh_fiche_scope_locations')
       .insert(scope.locationIds.map((location_id) => ({ fiche_id: ficheId, location_id })));
     if (error) throw new Error(error.message);
   }
   if (scope.kind === 'games' && scope.gameIds.length) {
     assertLiveIds(scope.gameIds, 'jeu');
     const { error } = await supabase
-      .from('fiche_scope_games')
+      .from('gh_fiche_scope_games')
       .insert(scope.gameIds.map((game_id) => ({ fiche_id: ficheId, game_id })));
     if (error) throw new Error(error.message);
   }
@@ -465,7 +465,7 @@ export async function saveFiche(params: {
   if (params.fiche.id) {
     if (params.fiche.category) {
       const { data: current } = await supabase
-        .from('procedure_fiches')
+        .from('gh_procedure_fiches')
         .select('category')
         .eq('id', params.fiche.id)
         .maybeSingle();
@@ -474,7 +474,7 @@ export async function saveFiche(params: {
       }
     }
     const { data, error } = await supabase
-      .from('procedure_fiches')
+      .from('gh_procedure_fiches')
       .update(body)
       .eq('id', params.fiche.id)
       .select('*')
@@ -484,7 +484,7 @@ export async function saveFiche(params: {
     return attachScopeFields(data as ProcedureFiche, params.scope);
   }
   body.sort_order = await nextSortOrder(params.fiche.category);
-  const { data, error } = await supabase.from('procedure_fiches').insert(body).select('*').single();
+  const { data, error } = await supabase.from('gh_procedure_fiches').insert(body).select('*').single();
   if (error) throw new Error(error.message);
   if (params.scope) await replaceFicheScope(data.id, params.scope);
   return attachScopeFields(data as ProcedureFiche, params.scope);
@@ -523,24 +523,24 @@ export async function saveQuizQuestion(
   };
   if (opts?.skipBump) {
     const { error: skipError } = await supabase
-      .from('procedure_fiches')
+      .from('gh_procedure_fiches')
       .update({ skip_version_bump: true })
       .eq('id', question.fiche_id);
     if (skipError) throw new Error(skipError.message);
   }
   if (question.id && !question.id.startsWith('new-')) {
-    const { error } = await supabase.from('quiz_questions').update(body).eq('id', question.id);
+    const { error } = await supabase.from('gh_quiz_questions').update(body).eq('id', question.id);
     if (error) throw new Error(error.message);
     return;
   }
-  const { error } = await supabase.from('quiz_questions').insert(body);
+  const { error } = await supabase.from('gh_quiz_questions').insert(body);
   if (error) throw new Error(error.message);
 }
 
 export async function clearSkipVersionBump(ficheId: string): Promise<void> {
   if (isMockMode || !supabase) return;
   const { error } = await supabase
-    .from('procedure_fiches')
+    .from('gh_procedure_fiches')
     .update({ skip_version_bump: false })
     .eq('id', ficheId);
   if (error) throw new Error(error.message);
@@ -555,7 +555,7 @@ export async function deleteFiche(ficheId: string): Promise<void> {
     return;
   }
   const { error } = await supabase
-    .from('procedure_fiches')
+    .from('gh_procedure_fiches')
     .update({ deleted_at: now })
     .eq('id', ficheId)
     .is('deleted_at', null);
@@ -569,7 +569,7 @@ export async function deleteQuizQuestion(id: string): Promise<void> {
     if (idx >= 0) list.splice(idx, 1);
     return;
   }
-  const { error } = await supabase.from('quiz_questions').delete().eq('id', id);
+  const { error } = await supabase.from('gh_quiz_questions').delete().eq('id', id);
   if (error) throw new Error(error.message);
 }
 
@@ -586,7 +586,7 @@ export interface GmTrainingRow {
 export async function listAdminValidations(): Promise<FicheValidation[]> {
   if (isMockMode || !supabase) return [];
   const { data, error } = await supabase
-    .from('fiche_validations')
+    .from('gh_fiche_validations')
     .select('gm_id, fiche_id, version, validated_at');
   if (error) throw new Error(error.message);
   return (data || []) as FicheValidation[];
@@ -600,7 +600,7 @@ export async function listGmProfiles(): Promise<{ gm_id: string; display_name: s
       { gm_id: 'gm-aline', display_name: 'Aline', email: 'aline@genie-culturel.ch' },
     ];
   }
-  const { data, error } = await supabase.rpc('list_gm_profiles');
+  const { data, error } = await supabase.rpc('gh_list_gm_profiles');
   if (error) throw new Error(error.message);
   return (data || []) as { gm_id: string; display_name: string; email: string }[];
 }
