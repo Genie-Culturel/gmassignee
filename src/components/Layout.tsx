@@ -37,8 +37,9 @@ export function Layout() {
 
       <div className="container px-4 py-6">
         <Tabs value={currentPath} className="mb-6">
-          <TabsList className="relative flex w-full items-center justify-center gap-1">
-            <div className="flex items-center gap-1">
+          <TabsList className="grid w-full grid-cols-[1fr_auto_1fr] gap-2">
+            <div />
+            <div className="flex items-center gap-3">
               <TabsTrigger value="dashboard" asChild>
                 <Link to="/dashboard" className="flex items-center gap-2" aria-label="Historique des sessions">
                   <LayoutDashboard className="h-4 w-4" />
@@ -58,15 +59,16 @@ export function Layout() {
                 </Link>
               </TabsTrigger>
             </div>
-            <a 
-              href="https://gmassignee.lovable.app/" 
-              target="_self"
-              className="absolute right-1 flex h-10 items-center gap-2 rounded-md px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              aria-label="Retour Dashboard GM"
-            >
-              <ExternalLink className="h-4 w-4" />
-              <span className="hidden sm:inline">Retour Dashboard GM</span>
-            </a>
+            <div className="flex items-center justify-end">
+              <Link
+                to="https://gmassignee.lovable.app/"
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Retour Dashboard GM"
+              >
+                <ExternalLink className="h-4 w-4" />
+                <span className="hidden sm:inline">Retour Dashboard GM</span>
+              </Link>
+            </div>
           </TabsList>
         </Tabs>
 
