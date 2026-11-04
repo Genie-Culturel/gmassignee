@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, PlayCircle, BookOpen, LogOut } from 'lucide-react';
+import { History, PlayCircle, BookOpen, LogOut, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { isMockMode } from '@/lib/supabase';
 import { setDemoFlag } from '@/lib/config';
@@ -37,25 +37,38 @@ export function Layout() {
 
       <div className="container px-4 py-6">
         <Tabs value={currentPath} className="mb-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="dashboard" asChild>
-              <Link to="/dashboard" className="flex items-center gap-2" aria-label="Dashboard">
-                <LayoutDashboard className="h-4 w-4" />
-                <span className="hidden sm:inline">Dashboard</span>
+          <TabsList className="grid w-full grid-cols-[1fr_auto_1fr] gap-2">
+            <div />
+            <div className="flex items-center gap-3">
+              <TabsTrigger value="dashboard" asChild>
+                <Link to="/dashboard" className="flex items-center gap-2" aria-label="Historique des sessions">
+                  <History className="h-4 w-4" />
+                  <span className="hidden sm:inline">Historique des sessions</span>
+                </Link>
+              </TabsTrigger>
+              <TabsTrigger value="suivi-parties" asChild>
+                <Link to="/suivi-parties" className="flex items-center gap-2" aria-label="Suivi parties">
+                  <PlayCircle className="h-4 w-4" />
+                  <span className="hidden sm:inline">Suivi parties</span>
+                </Link>
+              </TabsTrigger>
+              <TabsTrigger value="formation" asChild>
+                <Link to="/formation" className="flex items-center gap-2" aria-label="Formations et procédures">
+                  <BookOpen className="h-4 w-4" />
+                  <span className="hidden sm:inline">Formations et procédures</span>
+                </Link>
+              </TabsTrigger>
+            </div>
+            <div className="flex items-center justify-end">
+              <Link
+                to="https://gmassignee.lovable.app/"
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Retour Dashboard GM"
+              >
+                <ExternalLink className="h-4 w-4" />
+                <span className="hidden sm:inline">Retour Dashboard GM</span>
               </Link>
-            </TabsTrigger>
-            <TabsTrigger value="suivi-parties" asChild>
-              <Link to="/suivi-parties" className="flex items-center gap-2" aria-label="Suivi parties">
-                <PlayCircle className="h-4 w-4" />
-                <span className="hidden sm:inline">Suivi parties</span>
-              </Link>
-            </TabsTrigger>
-            <TabsTrigger value="formation" asChild>
-              <Link to="/formation" className="flex items-center gap-2" aria-label="Formations et procédures">
-                <BookOpen className="h-4 w-4" />
-                <span className="hidden sm:inline">Formations et procédures</span>
-              </Link>
-            </TabsTrigger>
+            </div>
           </TabsList>
         </Tabs>
 
