@@ -8,18 +8,8 @@ import { PinGate } from './pages/PinGate';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { isMockMode } from './lib/supabase';
 
-function ProtectedDashboard() {
-  const { isAdmin } = useAuth();
-  
-  if (!isAdmin) {
-    return <Navigate to="/suivi-parties" replace />;
-  }
-  
-  return <Dashboard />;
-}
-
 function AppRoutes() {
-  const { user, loading, isAdmin } = useAuth();
+  const { user, loading } = useAuth();
 
   if (!isMockMode && loading) {
     return (
@@ -36,8 +26,8 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Layout />}>
-        <Route index element={<Navigate to={isAdmin ? "/dashboard" : "/suivi-parties"} replace />} />
-        <Route path="dashboard" element={<ProtectedDashboard />} />
+        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="dashboard" element={<Dashboard />} />
         <Route path="suivi-parties" element={<SuiviParties />} />
         <Route path="formation" element={<FormationTechnique />} />
       </Route>

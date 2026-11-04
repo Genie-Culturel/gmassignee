@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, Clock, FileText } from 'lucide-react';
@@ -41,9 +41,10 @@ export function Dashboard() {
   return (
     <div className="space-y-6 pb-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Historique des sessions</h1>
         <p className="text-muted-foreground mt-2">
           Vue d'ensemble de tes activités{!isMockMode ? ` · ${displayName}` : ''}
+          {isAdmin && !isMockMode ? ' · Toutes les sessions' : ''}
         </p>
       </div>
 
@@ -122,37 +123,6 @@ export function Dashboard() {
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Bienvenue dans le module Procédures VR</CardTitle>
-          <CardDescription>
-            Ce nouveau module remplace les PDF et te permet de suivre les procédures en temps réel
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <h3 className="font-semibold mb-2">🎯 Suivi des parties</h3>
-            <p className="text-sm text-muted-foreground">
-              Mode Session pour accompagner les clients étape par étape, avec pointage d'arrivée et checklists d'ouverture/fermeture.
-            </p>
-          </div>
-          <div>
-            <h3 className="font-semibold mb-2">📚 Formations & Procédures</h3>
-            <p className="text-sm text-muted-foreground">
-              Bibliothèque de fiches : formation technique, procédure et déroulement, dépannage & bugs.
-              Les fiches marquées 🚧 sont à compléter par Julien.
-            </p>
-          </div>
-          <div>
-            <h3 className="font-semibold mb-2">🔗 Lien entre les deux</h3>
-            <p className="text-sm text-muted-foreground">
-              Clique sur « Voir la procédure » dans chaque étape pour voir les procédures associées.
-              En cas d'incident, la fiche de dépannage s'ouvre automatiquement.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
 
       {isAdmin && <SessionMediaAdmin />}
     </div>

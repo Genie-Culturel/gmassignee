@@ -51,15 +51,13 @@ export function Layout() {
 
       <div className="container px-4 py-6">
         <Tabs value={currentPath} className="mb-6">
-          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-3' : 'grid-cols-2'}`}>
-            {isAdmin && (
-              <TabsTrigger value="dashboard" asChild>
-                <Link to="/dashboard" className="flex items-center gap-2" aria-label="Dashboard">
-                  <LayoutDashboard className="h-4 w-4" />
-                  <span className="hidden sm:inline">Dashboard</span>
-                </Link>
-              </TabsTrigger>
-            )}
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="dashboard" asChild>
+              <Link to="/dashboard" className="flex items-center gap-2" aria-label="Historique des sessions">
+                <LayoutDashboard className="h-4 w-4" />
+                <span className="hidden sm:inline">Historique des sessions</span>
+              </Link>
+            </TabsTrigger>
             <TabsTrigger value="suivi-parties" asChild>
               <Link to="/suivi-parties" className="flex items-center gap-2" aria-label="Suivi parties">
                 <PlayCircle className="h-4 w-4" />
