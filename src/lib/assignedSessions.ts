@@ -245,37 +245,69 @@ export async function getAssignedSessions(gmId: string): Promise<AssignedSession
  *   notes ← notes                 → notes
  *
  * In demo/mock mode, always returns demo data.
+ * In real mode (authenticated), NEVER falls back to mock - shows real data, empty state, or errors.
  */
 export async function fetchFromGmassigneePlanning(gmId: string): Promise<AssignedSession[]> {
   const { isMockMode, supabase } = await import('./supabase');
-  if (isMockMode || !supabase) return getMockAssignedSessions(gmId);
+  
+  // Only use mock data if explicitly in mock mode
+  if (isMockMode || !supabase) {
+    console.log('[Planning] Running in mock mode');
+    return getMockAssignedSessions(gmId);
+  }
+
+  console.log('[Planning] Fetching real assignments from Lovable backend...');
 
   try {
     // Step 1: Get current user's gm_id from profiles
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError) {
+      console.error('[Planning] Auth error:', userError);
+      throw new Error(`Authentification échouée: ${userError.message}`);
+    }
+    
     if (!user) {
-      console.warn('fetchFromGmassigneePlanning: No authenticated user, using mock data.');
-      return getMockAssignedSessions(gmId);
+      console.error('[Planning] No authenticated user');
+      throw new Error('Pas d\'utilisateur connecté. Reconnectez-vous.');
     }
 
+    console.log('[Planning] User authenticated:', user.email);
+
+    // Defensive query: select all columns to avoid column name errors
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('gm_id')
+      .select('*')
       .eq('user_id', user.id)
       .maybeSingle();
 
-    if (profileError || !profile || !profile.gm_id) {
-      console.warn('fetchFromGmassigneePlanning: Could not fetch gm_id from profiles, using mock data.', profileError?.message);
-      return getMockAssignedSessions(gmId);
+    if (profileError) {
+      console.error('[Planning] Profiles query error:', profileError);
+      throw new Error(`Impossible de charger le profil GM: ${profileError.message}`);
     }
 
-    const userGmId = profile.gm_id;
+    if (!profile) {
+      console.error('[Planning] No profile found for user:', user.id);
+      throw new Error('Profil GM introuvable. Contactez l\'administrateur pour créer votre profil.');
+    }
 
-    // Step 2 & 3: Query activities via event_assignments filtered by gm_id
+    console.log('[Planning] Profile found:', profile);
+
+    const userGmId = profile.gm_id;
+    if (!userGmId) {
+      console.error('[Planning] Profile has no gm_id');
+      throw new Error('Votre profil n\'est pas lié à un GM. Contactez l\'administrateur.');
+    }
+
+    console.log('[Planning] GM ID:', userGmId);
+
+    // Step 2 & 3: Query activities via event_assignments - defensive select('*')
     const today = todayIso();
+    console.log('[Planning] Querying assignments for date >=', today);
+
     const { data, error } = await supabase
       .from('event_assignments')
-      .select('activity_id, activities!inner(id, title, date, start_time, end_time, description, notes, status)')
+      .select('*, activities!inner(*)')
       .eq('gm_id', userGmId)
       .gte('activities.date', today)
       .order('activities.date', { ascending: true, foreignTable: 'activities' })
@@ -283,17 +315,31 @@ export async function fetchFromGmassigneePlanning(gmId: string): Promise<Assigne
       .limit(20);
 
     if (error) {
-      console.warn('fetchFromGmassigneePlanning: Could not fetch from Lovable tables, using mock data.', error.message);
-      return getMockAssignedSessions(gmId);
+      console.error('[Planning] Assignments query error:', error);
+      throw new Error(`Impossible de charger les activités assignées: ${error.message}`);
     }
 
-    if (!data || data.length === 0) return [];
+    console.log('[Planning] Query result:', data?.length || 0, 'assignments found');
+    
+    if (data && data.length > 0) {
+      console.log('[Planning] First assignment sample:', data[0]);
+    }
+
+    if (!data || data.length === 0) {
+      console.log('[Planning] No assignments found for GM:', userGmId);
+      return [];
+    }
 
     const sessions: AssignedSession[] = [];
     
     for (const row of data as any[]) {
       const activity = row.activities;
-      if (!activity) continue;
+      if (!activity) {
+        console.warn('[Planning] Assignment without activity:', row);
+        continue;
+      }
+      
+      console.log('[Planning] Processing activity:', activity.id, activity.title);
       
       const title = String(activity.title || '');
       const { game, playerCount } = parseTitleForGameAndPlayers(title);
@@ -315,10 +361,13 @@ export async function fetchFromGmassigneePlanning(gmId: string): Promise<Assigne
       });
     }
 
+    console.log('[Planning] Successfully loaded', sessions.length, 'sessions');
     return sortAssignedSessions(sessions);
+    
   } catch (err) {
-    console.warn('fetchFromGmassigneePlanning: Unexpected error, using mock data.', err);
-    return getMockAssignedSessions(gmId);
+    // In real mode, propagate the error instead of falling back to mock
+    console.error('[Planning] Fatal error fetching assignments:', err);
+    throw err;
   }
 }
 

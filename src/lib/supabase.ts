@@ -25,6 +25,12 @@ export const supabase = isSupabaseConfigured
     })
   : null;
 
+// Log mode clearly at startup
+console.log('[Supabase]', isMockMode ? '⚠️ MODE DÉMO' : '✅ MODE PRODUCTION');
+console.log('[Supabase] URL:', supabaseUrl);
+console.log('[Supabase] Configured:', isSupabaseConfigured);
+console.log('[Supabase] Demo flag:', readDemoFlag());
+
 if (isMockMode) {
   console.warn(
     '⚠️ Mode démo — données locales. Enlève ?demo=1 / le toggle, ou configure VITE_SUPABASE_* pour la vraie base.'
