@@ -26,7 +26,7 @@ export function FicheButton({ fiches, label = 'Voir la procédure' }: FicheButto
         <Button
           variant="outline"
           size="sm"
-          className="h-7 w-44 shrink-0 justify-center gap-1.5 rounded-full border-primary/40 bg-primary/5 px-3 text-xs font-medium text-primary hover:bg-primary/10 hover:text-primary"
+          className="h-7 w-auto min-w-44 shrink-0 justify-center gap-1.5 rounded-full border-primary/40 bg-primary/5 px-3 text-xs font-medium text-primary hover:bg-primary/10 hover:text-primary"
         >
           <BookOpen className="h-3.5 w-3.5" />
           {label}

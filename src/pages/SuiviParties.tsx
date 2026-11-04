@@ -848,7 +848,7 @@ function IncidentAlert({
         )}
         <div className="flex flex-wrap gap-2">
           {relevantFiches.length > 0 && (
-            <FicheButton fiches={relevantFiches} label="Voir la procédure de dépannage" />
+            <FicheButton fiches={relevantFiches} label={relevantFiches.length === 1 ? relevantFiches[0].title.replace('🚧 ', '') : 'Voir la procédure'} />
           )}
         </div>
       </AlertDescription>
