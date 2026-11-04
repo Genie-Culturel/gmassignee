@@ -51,7 +51,7 @@ export function FicheViewer({ fiche, compact = false }: FicheViewerProps) {
             <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium">
               {step.order}
             </div>
-            <div className="flex-1 text-sm">{step.text}</div>
+            <div className="flex-1 text-sm whitespace-pre-line">{step.text}</div>
           </div>
         ))}
       </div>
