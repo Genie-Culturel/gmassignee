@@ -37,7 +37,7 @@ export function Layout() {
 
       <div className="container px-4 py-6">
         <Tabs value={currentPath} className="mb-6">
-          <TabsList className="flex w-full items-center justify-between gap-1">
+          <TabsList className="relative flex w-full items-center justify-center gap-1">
             <div className="flex items-center gap-1">
               <TabsTrigger value="dashboard" asChild>
                 <Link to="/dashboard" className="flex items-center gap-2" aria-label="Historique des sessions">
@@ -61,7 +61,7 @@ export function Layout() {
             <a 
               href="https://gmassignee.lovable.app/" 
               target="_self"
-              className="flex h-10 items-center gap-2 rounded-md px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="absolute right-1 flex h-10 items-center gap-2 rounded-md px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               aria-label="Retour Dashboard GM"
             >
               <ExternalLink className="h-4 w-4" />
