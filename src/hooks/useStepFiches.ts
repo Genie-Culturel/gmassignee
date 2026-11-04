@@ -48,7 +48,8 @@ export function useStepFiches(parcoursId: string | undefined) {
   const byStep = useMemo(() => {
     const result: Record<string, ProcedureFiche[]> = {};
     for (const [step, ids] of Object.entries(links)) {
-      result[step] = ids.map((id) => fichesById.get(id)).filter((fiche): fiche is ProcedureFiche => Boolean(fiche));
+      result[step] = ids.map((id) => fichesById.get(id)).filter((fiche): fiche is ProcedureFiche => Boolean(fiche))
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.title.localeCompare(b.title));
     }
     return result;
   }, [links, fichesById]);
