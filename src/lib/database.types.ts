@@ -330,6 +330,7 @@ export interface Database {
           flag_reviewed_by: string | null;
           is_manual: boolean;
           planned_end_time: string | null;
+          /** Lovable activities.id (text) linking to planning */
           planning_activity_id: string | null;
           created_at: string;
         };
@@ -692,6 +693,104 @@ export interface Database {
           id?: string;
           user_id?: string;
           role?: AppRole;
+          created_at?: string;
+        };
+      };
+      profiles: {
+        Row: {
+          id: string;
+          user_id: string;
+          gm_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          gm_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          gm_id?: string | null;
+          created_at?: string;
+        };
+      };
+      game_masters: {
+        Row: {
+          id: string;
+          name: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          created_at?: string;
+        };
+      };
+      activities: {
+        Row: {
+          id: string;
+          title: string;
+          date: string;
+          start_time: string;
+          end_time: string;
+          description: string | null;
+          notes: string | null;
+          status: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          date: string;
+          start_time: string;
+          end_time: string;
+          description?: string | null;
+          notes?: string | null;
+          status?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          date?: string;
+          start_time?: string;
+          end_time?: string;
+          description?: string | null;
+          notes?: string | null;
+          status?: string | null;
+          created_at?: string;
+        };
+      };
+      event_assignments: {
+        Row: {
+          id: string;
+          activity_id: string;
+          gm_id: string;
+          status: string | null;
+          confirmed_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          activity_id: string;
+          gm_id: string;
+          status?: string | null;
+          confirmed_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          activity_id?: string;
+          gm_id?: string;
+          status?: string | null;
+          confirmed_at?: string | null;
           created_at?: string;
         };
       };

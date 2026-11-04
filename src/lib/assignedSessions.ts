@@ -226,19 +226,24 @@ export async function getAssignedSessions(gmId: string): Promise<AssignedSession
 /**
  * Fetch from the Lovable GMassignee planning (same Supabase project dnxyidnkmtrmkxucqrry).
  *
- * Expected tables (read-only for this app):
- *   - activities: planning slots with id, title, date, start_time, end_time, description, notes, etc.
- *   - event_assignments: links activity_id to gm_id (user.id from Lovable)
+ * Schema:
+ *   - profiles: user_id (auth.uid()) -> gm_id (game_masters.id)
+ *   - game_masters: id, name
+ *   - activities: id (text), title, date, start_time, end_time, description, notes, status
+ *   - event_assignments: activity_id -> activities.id, gm_id -> game_masters.id
+ *
+ * Flow:
+ *   1. Get current user's gm_id from profiles (profiles.user_id = auth.uid())
+ *   2. Query event_assignments filtered by that gm_id
+ *   3. Join with activities to get session details
  *
  * Mapping onto AssignedSession (all carried into gh_vr_sessions on start):
- *   id ← activities.id            → gh_vr_sessions.planning_activity_id (+ assignment_id = id:date)
+ *   id ← activities.id (text)     → gh_vr_sessions.planning_activity_id (text)
  *   game / playerCount ← title    → game, player_count (parsed from "Jeu [N]")
  *   date, startTime, endTime      → session_date, session_time, planned_end_time
- *   groupName ← (team, if any)    → group_name
- *   notes ← notes/description     → notes
- *   clientEmail ← (if any)        → client_email
+ *   groupName ← description       → group_name
+ *   notes ← notes                 → notes
  *
- * If the real Lovable planning tables use different names, update the queries below.
  * In demo/mock mode, always returns demo data.
  */
 export async function fetchFromGmassigneePlanning(gmId: string): Promise<AssignedSession[]> {
@@ -246,17 +251,35 @@ export async function fetchFromGmassigneePlanning(gmId: string): Promise<Assigne
   if (isMockMode || !supabase) return getMockAssignedSessions(gmId);
 
   try {
+    // Step 1: Get current user's gm_id from profiles
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.warn('fetchFromGmassigneePlanning: No authenticated user, using mock data.');
+      return getMockAssignedSessions(gmId);
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('gm_id')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (profileError || !profile || !profile.gm_id) {
+      console.warn('fetchFromGmassigneePlanning: Could not fetch gm_id from profiles, using mock data.', profileError?.message);
+      return getMockAssignedSessions(gmId);
+    }
+
+    const userGmId = profile.gm_id;
+
+    // Step 2 & 3: Query activities via event_assignments filtered by gm_id
     const today = todayIso();
-    // Try to fetch from Lovable planning tables (activities + event_assignments).
-    // Note: This assumes the Lovable DB has these tables. If they don't exist or have different names,
-    // this will fail gracefully and fall back to mock data. Document in the PR which tables/columns are used.
     const { data, error } = await supabase
-      .from('activities')
-      .select('id, title, date, start_time, end_time, description, notes, status, event_assignments!inner(gm_id)')
-      .eq('event_assignments.gm_id', gmId)
-      .gte('date', today)
-      .order('date', { ascending: true })
-      .order('start_time', { ascending: true })
+      .from('event_assignments')
+      .select('activity_id, activities!inner(id, title, date, start_time, end_time, description, notes, status)')
+      .eq('gm_id', userGmId)
+      .gte('activities.date', today)
+      .order('activities.date', { ascending: true, foreignTable: 'activities' })
+      .order('activities.start_time', { ascending: true, foreignTable: 'activities' })
       .limit(20);
 
     if (error) {
@@ -266,25 +289,31 @@ export async function fetchFromGmassigneePlanning(gmId: string): Promise<Assigne
 
     if (!data || data.length === 0) return [];
 
-    const sessions: AssignedSession[] = data.map((row: Record<string, unknown>) => {
-      const title = String(row.title || '');
+    const sessions: AssignedSession[] = [];
+    
+    for (const row of data as any[]) {
+      const activity = row.activities;
+      if (!activity) continue;
+      
+      const title = String(activity.title || '');
       const { game, playerCount } = parseTitleForGameAndPlayers(title);
-      return {
-        id: String(row.id),
-        gmId,
-        gmName: '', // Could be fetched from user profile if needed
+      
+      sessions.push({
+        id: String(activity.id),
+        gmId: userGmId,
+        gmName: '',
         game,
         playerCount,
-        date: String(row.date || '').slice(0, 10),
-        startTime: String(row.start_time || '').slice(0, 5),
-        endTime: String(row.end_time || '').slice(0, 5),
+        date: String(activity.date || '').slice(0, 10),
+        startTime: String(activity.start_time || '').slice(0, 5),
+        endTime: String(activity.end_time || '').slice(0, 5),
         status: 'assigned',
-        groupName: String(row.description || '').slice(0, 100), // description might have group name
-        notes: String(row.notes || ''),
-        clientEmail: undefined, // Not available in current schema
+        groupName: String(activity.description || '').slice(0, 100) || undefined,
+        notes: String(activity.notes || '') || undefined,
+        clientEmail: undefined,
         parcoursId: undefined,
-      };
-    });
+      });
+    }
 
     return sortAssignedSessions(sessions);
   } catch (err) {
