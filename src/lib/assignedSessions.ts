@@ -302,6 +302,7 @@ export async function fetchFromGmassigneePlanning(gmId: string): Promise<Assigne
     console.log('[Planning] GM ID:', userGmId);
 
     // Step 2 & 3: Query activities via event_assignments - defensive select('*')
+    // Note: PostgREST can't order parent by embedded columns, so we sort client-side
     const today = todayIso();
     console.log('[Planning] Querying assignments for date >=', today);
 
@@ -310,9 +311,7 @@ export async function fetchFromGmassigneePlanning(gmId: string): Promise<Assigne
       .select('*, activities!inner(*)')
       .eq('gm_id', userGmId)
       .gte('activities.date', today)
-      .order('activities.date', { ascending: true, foreignTable: 'activities' })
-      .order('activities.start_time', { ascending: true, foreignTable: 'activities' })
-      .limit(20);
+      .limit(100); // Get more, will sort and limit client-side
 
     if (error) {
       console.error('[Planning] Assignments query error:', error);
@@ -362,7 +361,10 @@ export async function fetchFromGmassigneePlanning(gmId: string): Promise<Assigne
     }
 
     console.log('[Planning] Successfully loaded', sessions.length, 'sessions');
-    return sortAssignedSessions(sessions);
+    
+    // Sort client-side by date + start_time, then take first 20
+    const sorted = sortAssignedSessions(sessions);
+    return sorted.slice(0, 20);
     
   } catch (err) {
     // In real mode, propagate the error instead of falling back to mock
