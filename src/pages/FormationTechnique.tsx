@@ -48,7 +48,7 @@ function statusVariant(status: 'todo' | 'done' | 'revalidate') {
 
 export function FormationTechnique() {
   const { user, isAdmin } = useAuth();
-  const { fiches, isLoading, reload } = useProcedureFiches({ includeInactive: isAdmin });
+  const { fiches, isLoading, error, reload } = useProcedureFiches({ includeInactive: isAdmin });
   const { catalog, isLoading: catalogLoading } = useVenueCatalog();
   const gmId = user?.id || DEMO_GM_ID;
   const [searchTerm, setSearchTerm] = useState('');
@@ -98,6 +98,20 @@ export function FormationTechnique() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-muted-foreground">Chargement...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-4 p-4">
+        <h1 className="text-3xl font-bold tracking-tight">Formations & Procédures</h1>
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+          <h3 className="font-semibold text-red-900">Erreur de chargement</h3>
+          <p className="mt-1 text-sm text-red-800">
+            Impossible de charger les fiches de formation : {error.message}
+          </p>
+        </div>
       </div>
     );
   }

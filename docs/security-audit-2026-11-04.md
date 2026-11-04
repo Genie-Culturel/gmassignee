@@ -105,32 +105,32 @@ const gmId = user?.id || DEMO_GM_ID;  // ✅ user.id = auth.users.id (JWT)
 **gh_vr_sessions** (sessions VR)
 - ✅ RLS activé (migration 001, ligne 213)
 - ✅ **GMs** : peuvent gérer leurs propres sessions (`auth.uid() = gm_id`)
-- ✅ **Admins** : peuvent lire toutes les sessions (`public.is_admin()`)
+- ✅ **Admins** : peuvent lire toutes les sessions (`public.has_role(auth.uid(), 'admin')`)
 - ✅ Pas de politique d'écriture admin (les admins ne peuvent pas modifier les sessions d'autres GMs, seulement les consulter)
 - ✅ **Code insert vérifié** : utilise bien `user.id` (auth.users.id)
 
-**session_steps** (étapes de session)
+**gh_session_steps** (étapes de session)
 - ✅ RLS activé (migration 001, ligne 222)
-- ✅ **GMs** : peuvent gérer les étapes de leurs sessions via sous-requête sur `vr_sessions`
+- ✅ **GMs** : peuvent gérer les étapes de leurs sessions via sous-requête sur `gh_vr_sessions`
 - ✅ **Admins** : lecture seule
 
-**session_sales** (ventes)
+**gh_session_sales** (ventes)
 - ✅ RLS activé (migration 005, ligne 61)
 - ✅ **GMs** : gèrent les ventes de leurs sessions
 - ✅ **Admins** : lecture seule
 
-**session_media** (vidéos/photos)
+**gh_session_media** (vidéos/photos)
 - ✅ RLS activé (migration 013, ligne 35)
 - ✅ **GMs** : gèrent les médias de leurs sessions
 - ✅ **Admins** : lecture seule
 - ✅ **Storage policies** (bucket `session-media`) :
-  - SELECT : admin ou GM propriétaire
-  - INSERT/UPDATE/DELETE : admin ou GM propriétaire
+  - SELECT : `has_role(auth.uid(), 'admin')` ou GM propriétaire
+  - INSERT/UPDATE/DELETE : `has_role(auth.uid(), 'admin')` ou GM propriétaire
 
 **gh_bug_sessions** et **gh_bug_entries** (bug reporter)
 - ✅ RLS activé (migration 007, ligne 35-36)
 - ✅ **Policy "sandbox_all"** : lecture et ajout pour tous les utilisateurs authentifiés
-- ✅ **Modification/suppression** : admin uniquement (pas de policy INSERT/UPDATE/DELETE pour non-admins)
+- ✅ **Modification/suppression** : `has_role(auth.uid(), 'admin')` uniquement
 - ✅ **UI vérifiée** : aucune interface de modification/suppression de bugs dans l'app
   - Seul lien : "Ouvrir le Bug reporter" (externe, pas de gestion interne)
   - Pas de bouton "Modifier bug" ou "Supprimer bug" trouvé dans le code
@@ -138,27 +138,28 @@ const gmId = user?.id || DEMO_GM_ID;  // ✅ user.id = auth.users.id (JWT)
 **gh_procedure_fiches** (fiches formation)
 - ✅ RLS activé (migration 001, ligne 157)
 - ✅ **Tous** : lecture des fiches actives
-- ✅ **Admins** : gestion complète (CRUD)
+- ✅ **Admins** : gestion complète (CRUD) via `has_role(auth.uid(), 'admin')`
 
-**gm_checkins** (pointages GM)
+**gh_gm_checkins** (pointages GM)
 - ✅ RLS activé (migration 001, ligne 183)
 - ✅ **GMs** : insertion et lecture de leurs propres pointages
 - ✅ **Admins** : lecture seule
 
-#### Fonction d'administration `public.is_admin()`
+#### Fonction d'administration `public.has_role()`
 ```sql
--- migration 008_fix_admin_rls.sql
-CREATE OR REPLACE FUNCTION public.is_admin()
+-- Base Lovable partagée (dnxyidnkmtrmkxucqrry)
+-- Fonction fournie par l'app Lovable officielle
+CREATE OR REPLACE FUNCTION public.has_role(user_id uuid, role_name text)
 RETURNS boolean
 LANGUAGE sql STABLE AS $$
-  SELECT COALESCE(
-    (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin',
-    false
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_roles
+    WHERE user_id = $1 AND role = $2
   );
 $$;
 ```
-- ✅ Vérifie le JWT `app_metadata.role === 'admin'`
-- ✅ Utilisée dans toutes les policies admin
+- ✅ Vérifie la table `user_roles` (roles : admin, gm, stock_manager, planificateur)
+- ✅ Utilisée dans toutes les policies admin GMassignee
 
 ### 5. Suivi des parties (SuiviParties.tsx)
 
@@ -253,7 +254,7 @@ export async function listOpenSessions(gmId: string): Promise<PersistedSession[]
 
 ### 🟡 Risque MOYEN : Admin peut lire toutes les sessions mais pas les modifier
 
-**Constat** : Les policies RLS actuelles donnent aux admins un accès en **lecture seule** sur `vr_sessions`, `session_steps`, `session_sales`, et `session_media`.
+**Constat** : Les policies RLS actuelles donnent aux admins un accès en **lecture seule** sur `gh_vr_sessions`, `gh_session_steps`, `gh_session_sales`, et `gh_session_media`.
 
 **Impact** :
 - Les admins peuvent consulter toutes les sessions (Dashboard → SessionMediaAdmin)
@@ -287,7 +288,7 @@ const { data, error } = await supabase
 
 **Conclusion** : Pas de fuite de données car :
 1. Protégé côté UI (`isAdmin`)
-2. Protégé côté RLS (policy admin sur `vr_sessions`)
+2. Protégé côté RLS (policy admin sur `gh_vr_sessions`)
 
 **Recommandation** : Aucune correction nécessaire, mais documenter l'intention (fonction admin-only).
 
@@ -358,33 +359,33 @@ To address issues that do not require attention, run:
 ### Option 1 : Donner accès écriture complet aux admins (recommandé)
 
 ```sql
--- vr_sessions : admin peut tout modifier
-DROP POLICY IF EXISTS "Admins can read all sessions" ON public.vr_sessions;
+-- gh_vr_sessions : admin peut tout modifier
+DROP POLICY IF EXISTS "Admins can read all sessions" ON public.gh_vr_sessions;
 CREATE POLICY "Admins can manage all sessions"
-  ON public.vr_sessions FOR ALL
-  USING (public.is_admin())
-  WITH CHECK (public.is_admin());
+  ON public.gh_vr_sessions FOR ALL
+  USING (public.has_role(auth.uid(), 'admin'))
+  WITH CHECK (public.has_role(auth.uid(), 'admin'));
 
--- session_steps : admin peut tout modifier
-DROP POLICY IF EXISTS "Admins can read all session steps" ON public.session_steps;
+-- gh_session_steps : admin peut tout modifier
+DROP POLICY IF EXISTS "Admins can read all session steps" ON public.gh_session_steps;
 CREATE POLICY "Admins can manage all session steps"
-  ON public.session_steps FOR ALL
-  USING (public.is_admin())
-  WITH CHECK (public.is_admin());
+  ON public.gh_session_steps FOR ALL
+  USING (public.has_role(auth.uid(), 'admin'))
+  WITH CHECK (public.has_role(auth.uid(), 'admin'));
 
--- session_sales : admin peut tout modifier
-DROP POLICY IF EXISTS "Admins can read all session sales" ON public.session_sales;
+-- gh_session_sales : admin peut tout modifier
+DROP POLICY IF EXISTS "Admins can read all session sales" ON public.gh_session_sales;
 CREATE POLICY "Admins can manage all session sales"
-  ON public.session_sales FOR ALL
-  USING (public.is_admin())
-  WITH CHECK (public.is_admin());
+  ON public.gh_session_sales FOR ALL
+  USING (public.has_role(auth.uid(), 'admin'))
+  WITH CHECK (public.has_role(auth.uid(), 'admin'));
 
--- session_media : admin peut tout modifier
-DROP POLICY IF EXISTS "Admins read all session media" ON public.session_media;
+-- gh_session_media : admin peut tout modifier
+DROP POLICY IF EXISTS "Admins read all session media" ON public.gh_session_media;
 CREATE POLICY "Admins can manage all session media"
-  ON public.session_media FOR ALL
-  USING (public.is_admin())
-  WITH CHECK (public.is_admin());
+  ON public.gh_session_media FOR ALL
+  USING (public.has_role(auth.uid(), 'admin'))
+  WITH CHECK (public.has_role(auth.uid(), 'admin'));
 ```
 
 **Avantage** : Les admins peuvent corriger les erreurs et gérer les sessions complètement.
@@ -394,13 +395,13 @@ CREATE POLICY "Admins can manage all session media"
 ### Option 2 : Donner accès écriture limité (UPDATE uniquement, pas INSERT/DELETE)
 
 ```sql
--- vr_sessions : admin peut modifier (pas créer/supprimer)
+-- gh_vr_sessions : admin peut modifier (pas créer/supprimer)
 CREATE POLICY "Admins can update all sessions"
-  ON public.vr_sessions FOR UPDATE
-  USING (public.is_admin())
-  WITH CHECK (public.is_admin());
+  ON public.gh_vr_sessions FOR UPDATE
+  USING (public.has_role(auth.uid(), 'admin'))
+  WITH CHECK (public.has_role(auth.uid(), 'admin'));
 
--- Idem pour session_steps, session_sales, session_media
+-- Idem pour gh_session_steps, gh_session_sales, gh_session_media
 -- (à adapter selon les besoins métier)
 ```
 
@@ -412,14 +413,32 @@ CREATE POLICY "Admins can update all sessions"
 
 ## 🔧 Recommandations de corrections
 
-### Correction 1 : Mettre à jour les dépendances npm
+### Correction 1 : Mettre à jour les dépendances npm (nécessite validation)
+
+⚠️ **Les corrections automatiques sont bloquées par des breaking changes** :
 
 ```bash
+# Analyse actuelle
+npm audit
+# 10 vulnerabilities (3 moderate, 7 high)
+
+# Correction automatique (aucune correction appliquée)
 npm audit fix
-npm update
+# 0 vulnerabilities fixed
+
+# Correction forcée (ATTENTION : breaking changes)
+npm audit fix --force
+# Installera vite@8, @typescript-eslint@8, react-router-dom@7
 ```
 
-**Note** : Tester après mise à jour pour vérifier que rien ne casse.
+**Recommandation** :
+1. Créer une branche de test dédiée
+2. Lancer `npm audit fix --force`
+3. Corriger les breaking changes (migration vite 5→8, react-router 6→7)
+4. Tester le build et l'app complète
+5. Si OK, merger ; sinon reporter à une maintenance planifiée
+
+**Note** : Les vulnérabilités concernent principalement les outils de dev (esbuild, minimatch) et react-router (moderate). Risque limité mais à corriger.
 
 ### Correction 2 : Documenter le mode démo
 

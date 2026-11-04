@@ -118,15 +118,32 @@ URL : `https://genie-culturel.github.io/Bug_report_VR/?game=...&date=YYYY-MM-DD&
 
 ## Configuration Supabase
 
-Défaut (commité, clé publishable publique) : projet `gm-vrcenter`.
+**⚠️ MIGRATION : Backend migré vers le projet Lovable Supabase**
 
-Surcharge optionnelle dans `.env.local` :
+L'application utilise désormais le projet Supabase partagé avec l'app GMassignee planning (**dnxyidnkmtrmkxucqrry**). Toutes les tables GMassignee ont maintenant un préfixe `gh_` (ex: `gh_vr_sessions`, `gh_procedure_fiches`). L'authentification utilise Supabase Auth + la table `user_roles` (au lieu de `app_metadata.role`). **Le PIN gate (code 1950) a été supprimé.**
+
+### Nouveau backend (projet Lovable)
+- URL : `https://dnxyidnkmtrmkxucqrry.supabase.co`
+- Tables avec préfixe `gh_` : `gh_vr_sessions`, `gh_procedure_fiches`, `gh_session_steps`, etc.
+- Enums : `gh_checklist_type`, `gh_fiche_category`, `gh_incident_type`, `gh_payment_method`, `gh_session_step`
+- RPCs : `gh_get_quiz_questions`, `gh_submit_fiche_validation`, `gh_list_gm_profiles`, `gh_set_session_flag_reviewed`, `gh_admin_delete_session`
+- Auth : table `user_roles` (enum `app_role`: admin, gm, stock_manager, planificateur)
+- Parties assignées : lecture des tables Lovable `activities` / `event_assignments` (partagé avec l'app planning)
+
+### Configuration requise
+La clé publishable doit être configurée via les variables d'environnement :
 
 ```env
-VITE_SUPABASE_URL=https://vxeprhyswkqugyewpwfm.supabase.co
-VITE_SUPABASE_ANON_KEY=sb_publishable_…
-VITE_FORCE_DEMO=true
+VITE_SUPABASE_URL=https://dnxyidnkmtrmkxucqrry.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=<clé publique du projet Lovable>
+# Optionnel, pour forcer le mode démo :
+# VITE_FORCE_DEMO=true
 ```
+
+Pour GitHub Pages : configurer `VITE_SUPABASE_PUBLISHABLE_KEY` dans **Settings → Secrets and variables → Actions** (secrets ou variables du workflow).
+
+### Ancien backend (référence uniquement)
+L'ancien projet `gm-vrcenter` (vxeprhyswkqugyewpwfm) reste documenté dans `supabase/migrations/` pour référence. **Ces migrations ne doivent PAS être réexécutées** : le backend actif est maintenant le projet Lovable où toutes les tables existent déjà avec le préfixe `gh_`.
 
 ### Migrations
 

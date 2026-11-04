@@ -216,36 +216,171 @@ function sortAssignedSessions(sessions: AssignedSession[]): AssignedSession[] {
 }
 
 /**
- * Fetch sessions assigned to the logged-in GM.
+ * Fetch sessions assigned to the logged-in GM from Lovable planning tables.
  * Split into today / upcoming in the UI. Demo always includes a today slot.
  */
 export async function getAssignedSessions(gmId: string): Promise<AssignedSession[]> {
-  // Planning still lives in the other GMassignee app. Always mock until wired.
-  return getMockAssignedSessions(gmId);
+  return fetchFromGmassigneePlanning(gmId);
 }
 
 /**
- * Placeholder for the real GMassignee planning source.
+ * Fetch from the Lovable GMassignee planning (same Supabase project dnxyidnkmtrmkxucqrry).
  *
- * The Lovable app (gmassignee.lovable.app) uses its own Supabase project
- * (dnxyidnkmtrmkxucqrry), not gm-vrcenter. Tables seen in its bundle:
- *   activities(id, title, date, start_time, end_time, description, location,
- *              status, notes, game_type_id, make_event_id)
- *   event_assignments(activity_id, gm_id, status, confirmed_at, …)
- * `title` = « Jeu [joueurs] » (player count parsed from [XX]). No dedicated
- * team / client name / client email columns were seen (maybe in description).
+ * Schema:
+ *   - profiles: user_id (auth.uid()) -> gm_id (game_masters.id)
+ *   - game_masters: id, name
+ *   - activities: id (text), title, date, start_time, end_time, description, notes, status
+ *   - event_assignments: activity_id -> activities.id, gm_id -> game_masters.id
  *
- * Mapping onto AssignedSession (all carried into vr_sessions on start):
- *   id ← activities.id            → vr_sessions.planning_activity_id (+ assignment_id = id:date)
- *   game / playerCount ← title    → game, player_count
+ * Flow:
+ *   1. Get current user's gm_id from profiles (profiles.user_id = auth.uid())
+ *   2. Query event_assignments filtered by that gm_id
+ *   3. Join with activities to get session details
+ *
+ * Mapping onto AssignedSession (all carried into gh_vr_sessions on start):
+ *   id ← activities.id (text)     → gh_vr_sessions.planning_activity_id (text)
+ *   game / playerCount ← title    → game, player_count (parsed from "Jeu [N]")
  *   date, startTime, endTime      → session_date, session_time, planned_end_time
- *   groupName ← (team, if any)    → group_name
- *   notes ← notes/description     → notes
- *   clientEmail ← (if any)        → client_email
+ *   groupName ← description       → group_name
+ *   notes ← notes                 → notes
+ *
+ * In demo/mock mode, always returns demo data.
+ * In real mode (authenticated), NEVER falls back to mock - shows real data, empty state, or errors.
  */
 export async function fetchFromGmassigneePlanning(gmId: string): Promise<AssignedSession[]> {
-  console.warn(
-    'getAssignedSessions: GMassignee planning tables are not wired yet; using mock assignments.'
-  );
-  return getMockAssignedSessions(gmId);
+  const { isMockMode, supabase } = await import('./supabase');
+  
+  // Only use mock data if explicitly in mock mode
+  if (isMockMode || !supabase) {
+    console.log('[Planning] Running in mock mode');
+    return getMockAssignedSessions(gmId);
+  }
+
+  console.log('[Planning] Fetching real assignments from Lovable backend...');
+
+  try {
+    // Step 1: Get current user's gm_id from profiles
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError) {
+      console.error('[Planning] Auth error:', userError);
+      throw new Error(`Authentification échouée: ${userError.message}`);
+    }
+    
+    if (!user) {
+      console.error('[Planning] No authenticated user');
+      throw new Error('Pas d\'utilisateur connecté. Reconnectez-vous.');
+    }
+
+    console.log('[Planning] User authenticated:', user.email);
+
+    // Defensive query: select all columns to avoid column name errors
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error('[Planning] Profiles query error:', profileError);
+      throw new Error(`Impossible de charger le profil GM: ${profileError.message}`);
+    }
+
+    if (!profile) {
+      console.error('[Planning] No profile found for user:', user.id);
+      throw new Error('Profil GM introuvable. Contactez l\'administrateur pour créer votre profil.');
+    }
+
+    console.log('[Planning] Profile found:', profile);
+
+    const userGmId = profile.gm_id;
+    if (!userGmId) {
+      console.error('[Planning] Profile has no gm_id');
+      throw new Error('Votre profil n\'est pas lié à un GM. Contactez l\'administrateur.');
+    }
+
+    console.log('[Planning] GM ID:', userGmId);
+
+    // Step 2 & 3: Query activities via event_assignments - defensive select('*')
+    // Note: PostgREST can't order parent by embedded columns, so we sort client-side
+    const today = todayIso();
+    console.log('[Planning] Querying assignments for date >=', today);
+
+    const { data, error } = await supabase
+      .from('event_assignments')
+      .select('*, activities!inner(*)')
+      .eq('gm_id', userGmId)
+      .gte('activities.date', today)
+      .limit(100); // Get more, will sort and limit client-side
+
+    if (error) {
+      console.error('[Planning] Assignments query error:', error);
+      throw new Error(`Impossible de charger les activités assignées: ${error.message}`);
+    }
+
+    console.log('[Planning] Query result:', data?.length || 0, 'assignments found');
+    
+    if (data && data.length > 0) {
+      console.log('[Planning] First assignment sample:', data[0]);
+    }
+
+    if (!data || data.length === 0) {
+      console.log('[Planning] No assignments found for GM:', userGmId);
+      return [];
+    }
+
+    const sessions: AssignedSession[] = [];
+    
+    for (const row of data as any[]) {
+      const activity = row.activities;
+      if (!activity) {
+        console.warn('[Planning] Assignment without activity:', row);
+        continue;
+      }
+      
+      console.log('[Planning] Processing activity:', activity.id, activity.title);
+      
+      const title = String(activity.title || '');
+      const { game, playerCount } = parseTitleForGameAndPlayers(title);
+      
+      sessions.push({
+        id: String(activity.id),
+        gmId: userGmId,
+        gmName: '',
+        game,
+        playerCount,
+        date: String(activity.date || '').slice(0, 10),
+        startTime: String(activity.start_time || '').slice(0, 5),
+        endTime: String(activity.end_time || '').slice(0, 5),
+        status: 'assigned',
+        groupName: String(activity.description || '').slice(0, 100) || undefined,
+        notes: String(activity.notes || '') || undefined,
+        clientEmail: undefined,
+        parcoursId: undefined,
+      });
+    }
+
+    console.log('[Planning] Successfully loaded', sessions.length, 'sessions');
+    
+    // Sort client-side by date + start_time, then take first 20
+    const sorted = sortAssignedSessions(sessions);
+    return sorted.slice(0, 20);
+    
+  } catch (err) {
+    // In real mode, propagate the error instead of falling back to mock
+    console.error('[Planning] Fatal error fetching assignments:', err);
+    throw err;
+  }
+}
+
+/**
+ * Parse title like "Jeu [8]" or "Saga [6]" to extract game name and player count.
+ */
+function parseTitleForGameAndPlayers(title: string): { game: string; playerCount: number } {
+  const match = title.match(/^(.+?)\s*\[(\d+)\]\s*$/);
+  if (match) {
+    return { game: match[1].trim(), playerCount: parseInt(match[2], 10) || 8 };
+  }
+  // Fallback: entire title is game name, default 8 players
+  return { game: title || 'Session', playerCount: 8 };
 }

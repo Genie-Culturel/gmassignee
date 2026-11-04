@@ -245,20 +245,20 @@ export async function listRecordedSessions(): Promise<RecordedSessionRow[]> {
     return demoSessions().map((s) => sessionToRow(s, Boolean(s.incidentType), reviews[s.sessionId] || null));
   }
   const { data, error } = await supabase
-    .from('vr_sessions')
+    .from('gh_vr_sessions')
     .select(
-      'id, game, session_date, session_time, group_name, gm_name, client_email, videos_sent_at, has_incident, incident_type, incident_details, notes, sales_comment, flag_reviewed_at, is_manual, assignment_id, total_collected, session_sales(quantity, unit_price, payment_method), session_media(count)'
+      'id, game, session_date, session_time, group_name, gm_name, client_email, videos_sent_at, has_incident, incident_type, incident_details, notes, sales_comment, flag_reviewed_at, is_manual, assignment_id, total_collected, gh_session_sales(quantity, unit_price, payment_method), gh_session_media(count)'
     )
     .order('started_at', { ascending: false })
     .limit(60);
   if (error) throw new Error(error.message);
   return (data || []).map((row) => {
-    const sales = ((row.session_sales || []) as { quantity: number; unit_price: number; payment_method: string }[]).map(
+    const sales = ((row.gh_session_sales || []) as { quantity: number; unit_price: number; payment_method: string }[]).map(
       (sale) => ({ quantity: sale.quantity, unitPrice: Number(sale.unit_price), paymentMethod: sale.payment_method })
     );
     const fromSales = collectedFromSales(sales);
     const collected = Math.max(fromSales.amount, Number(row.total_collected || 0));
-    const mediaAgg = row.session_media as { count: number }[] | null | undefined;
+    const mediaAgg = row.gh_session_media as { count: number }[] | null | undefined;
     return {
     sessionId: row.id,
     game: row.game || 'Session VR',
@@ -307,7 +307,7 @@ export async function setSessionFlagReviewed(sessionId: string, reviewed: boolea
     }
     return at;
   }
-  const { data, error } = await supabase.rpc('set_session_flag_reviewed', {
+  const { data, error } = await supabase.rpc('gh_set_session_flag_reviewed', {
     p_session_id: sessionId,
     p_reviewed: reviewed,
   });
@@ -382,7 +382,7 @@ export async function loadSessionMediaForAdmin(sessionId: string): Promise<Admin
       );
     }
     const { data: tokenRow } = await supabase
-      .from('vr_sessions')
+      .from('gh_vr_sessions')
       .select('videos_download_token')
       .eq('id', sessionId)
       .maybeSingle();
@@ -426,7 +426,7 @@ export async function deleteSessionAsAdmin(sessionId: string): Promise<{ filesRe
   }
   const paths = new Set<string>();
   const { data: mediaRows, error: mediaErr } = await supabase
-    .from('session_media')
+    .from('gh_session_media')
     .select('path')
     .eq('session_id', sessionId);
   if (mediaErr) throw new Error(mediaErr.message);
@@ -438,7 +438,7 @@ export async function deleteSessionAsAdmin(sessionId: string): Promise<{ filesRe
     const { error: removeErr } = await supabase.storage.from(SESSION_MEDIA_BUCKET).remove([...paths]);
     if (removeErr) throw new Error(`Suppression des fichiers impossible : ${removeErr.message}`);
   }
-  const { error } = await supabase.rpc('admin_delete_session', { p_session_id: sessionId });
+  const { error} = await supabase.rpc('gh_admin_delete_session', { p_session_id: sessionId });
   if (error) throw new Error(error.message);
   return { filesRemoved: paths.size };
 }
