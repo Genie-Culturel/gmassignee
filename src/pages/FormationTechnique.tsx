@@ -201,10 +201,10 @@ export function FormationTechnique() {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-6">
                   {groupFichesBySubGroup(categoryFiches).map((group) => (
-                    <section key={group.value ?? 'general'} className="space-y-1.5">
-                      <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <section key={group.value ?? 'general'} className="space-y-2">
+                      <h3 className="border-l-4 border-primary pl-2.5 text-base font-bold leading-tight text-foreground">
                         {group.label}
                       </h3>
                       <ul className="divide-y rounded-lg border bg-card">

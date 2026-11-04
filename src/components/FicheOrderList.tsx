@@ -157,8 +157,8 @@ function CategoryOrderList({
   const onDragCancel = () => setActiveId(null);
 
   return (
-    <div className="space-y-1.5 pl-2">
-      <p className="pl-1 text-xs font-medium text-muted-foreground">{title}</p>
+    <div className="space-y-2 pt-2">
+      <p className="border-l-4 border-primary pl-2 text-sm font-bold leading-tight text-foreground">{title}</p>
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
