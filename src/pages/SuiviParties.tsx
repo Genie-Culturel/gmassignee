@@ -586,7 +586,7 @@ export function SuiviParties() {
               {parcours.isProvisional ? ' (provisoire)' : ''}
             </CardTitle>
             <CardDescription>
-              Coche chaque étape au fur et à mesure. Clique sur &quot;Comment faire ?&quot; pour voir les procédures.
+              Coche chaque étape au fur et à mesure. Clique sur &quot;Voir la procédure&quot; pour voir les procédures.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">

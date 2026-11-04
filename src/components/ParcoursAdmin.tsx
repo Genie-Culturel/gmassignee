@@ -172,7 +172,7 @@ export function ParcoursAdmin({
               {activeCount} étape{activeCount > 1 ? 's' : ''} active{activeCount > 1 ? 's' : ''}. Glisser ⋮⋮ pour
               déplacer une étape (sur mobile, rester appuyé puis glisser). Les modifications
               s’enregistrent tout de suite et valent pour les prochaines parties ; les parties déjà
-              commencées gardent leurs étapes. « + Lier une fiche » ajoute le bouton « Comment faire ? » à
+              commencées gardent leurs étapes. « + Lier une fiche » ajoute le bouton « Voir la procédure » à
               l’étape.
               {missingFiche > 0 && (
                 <span className="mt-1 block font-medium text-amber-700">
@@ -475,7 +475,7 @@ function StepFichePicker({
     <div className="space-y-1.5">
       <div className="flex flex-wrap gap-1.5">
         {linkedIds.length === 0 && (
-          <span className="text-xs text-amber-700">Aucune fiche : pas de bouton « Comment faire ? ».</span>
+          <span className="text-xs text-amber-700">Aucune fiche : pas de bouton « Voir la procédure ».</span>
         )}
         {linkedIds.map((id) => {
           const fiche = ficheById.get(id);

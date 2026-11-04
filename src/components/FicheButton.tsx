@@ -8,7 +8,7 @@ import {
   SheetTrigger,
   SheetClose,
 } from '@/components/ui/sheet';
-import { Info } from 'lucide-react';
+import { BookOpen } from 'lucide-react';
 import { ProcedureFiche } from '@/lib/database.types';
 import { FicheViewer } from './FicheViewer';
 
@@ -17,15 +17,22 @@ interface FicheButtonProps {
   label?: string;
 }
 
-export function FicheButton({ fiches, label = 'Comment faire ?' }: FicheButtonProps) {
+export function FicheButton({ fiches, label = 'Voir la procédure' }: FicheButtonProps) {
   if (fiches.length === 0) return null;
 
   return (
     <Sheet>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-auto py-1 px-2 text-xs">
-          <Info className="h-3 w-3 mr-1" />
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 gap-1.5 rounded-full border-primary/40 bg-primary/5 px-3 text-xs font-medium text-primary hover:bg-primary/10 hover:text-primary"
+        >
+          <BookOpen className="h-3.5 w-3.5" />
           {label}
+          {fiches.length > 1 && (
+            <span className="ml-0.5 rounded-full bg-primary/15 px-1.5 text-[10px] leading-4">{fiches.length}</span>
+          )}
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto pb-0">

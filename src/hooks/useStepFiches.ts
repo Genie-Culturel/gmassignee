@@ -5,7 +5,7 @@ import { isMockMode, supabase } from '@/lib/supabase';
 import { loadDemoFiches } from '@/lib/trainingRepository';
 import { isFicheDeleted } from '@/lib/training';
 
-/** Fiches linked to each step of one parcours (« Comment faire ? »). */
+/** Fiches linked to each step of one parcours (« Voir la procédure »). */
 export function useStepFiches(parcoursId: string | undefined) {
   const [links, setLinks] = useState<StepFicheLinks>({});
   const [fichesById, setFichesById] = useState<Map<string, ProcedureFiche>>(new Map());

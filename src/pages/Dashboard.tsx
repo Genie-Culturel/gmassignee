@@ -147,7 +147,7 @@ export function Dashboard() {
           <div>
             <h3 className="font-semibold mb-2">🔗 Lien entre les deux</h3>
             <p className="text-sm text-muted-foreground">
-              Clique sur « Comment faire ? » dans chaque étape pour voir les procédures associées.
+              Clique sur « Voir la procédure » dans chaque étape pour voir les procédures associées.
               En cas d'incident, la fiche de dépannage s'ouvre automatiquement.
             </p>
           </div>
