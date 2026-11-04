@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, PlayCircle, BookOpen, LogOut } from 'lucide-react';
+import { LayoutDashboard, PlayCircle, BookOpen, LogOut, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { isMockMode } from '@/lib/supabase';
 import { setDemoFlag } from '@/lib/config';
@@ -27,6 +27,20 @@ export function Layout() {
               {isAdmin && !isMockMode ? ' · admin' : ''}
             </p>
           </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            asChild
+          >
+            <a 
+              href="https://gmassignee.lovable.app/" 
+              target="_self"
+              className="flex items-center gap-2"
+            >
+              <ExternalLink className="h-4 w-4" />
+              <span className="hidden sm:inline">Retour Dashboard GM</span>
+            </a>
+          </Button>
           {!isMockMode && (
             <Button variant="ghost" size="sm" onClick={() => signOut()} aria-label="Se déconnecter">
               <LogOut className="h-4 w-4" />
@@ -39,9 +53,9 @@ export function Layout() {
         <Tabs value={currentPath} className="mb-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="dashboard" asChild>
-              <Link to="/dashboard" className="flex items-center gap-2" aria-label="Dashboard">
+              <Link to="/dashboard" className="flex items-center gap-2" aria-label="Historique des sessions">
                 <LayoutDashboard className="h-4 w-4" />
-                <span className="hidden sm:inline">Dashboard</span>
+                <span className="hidden sm:inline">Historique des sessions</span>
               </Link>
             </TabsTrigger>
             <TabsTrigger value="suivi-parties" asChild>
