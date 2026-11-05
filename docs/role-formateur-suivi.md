@@ -16,24 +16,24 @@ Un utilisateur avec le rôle `formateur_suivi` peut :
 
 ### 1. Sessions VR (Dashboard / Historique des sessions)
 - ✅ **Voir toutes les sessions** de tous les GMs (lecture complète de `gh_vr_sessions`)
-- ✅ **Consulter les détails** : étapes, ventes, médias, bugs, notes
-- ✅ **Supprimer des sessions** (via `gh_admin_delete_session()`)
-- ✅ **Marquer comme revu** (via `gh_set_session_flag_reviewed()`)
+- ✅ **Consulter les détails** : étapes (`gh_session_steps`), ventes (`gh_session_sales`), médias (`gh_session_media`), bugs, notes
+- ✅ **Supprimer des sessions** (via RPC `gh_admin_delete_session()`)
+- ✅ **Marquer comme revu** (via RPC `gh_set_session_flag_reviewed()`)
 - ✅ **Accès au Dashboard "Sessions enregistrées"** (composant `SessionMediaAdmin`)
 - ✅ **Sélection et suppression en masse** de sessions
 
 ### 2. Formations & Procédures (Formation technique)
-- ✅ **Éditer toutes les fiches** de formation (`procedure_fiches`)
-- ✅ **Gérer les quiz** (`quiz_questions`) : création, modification, suppression
-- ✅ **Voir toutes les validations** des GMs (`fiche_validations`)
-- ✅ **Gérer les parcours** (`parcours_fiches`, `step_fiches`)
+- ✅ **Éditer toutes les fiches** de formation (`gh_procedure_fiches`)
+- ✅ **Gérer les quiz** (`gh_quiz_questions`) : création, modification, suppression
+- ✅ **Voir toutes les validations** des GMs (`gh_fiche_validations`)
+- ✅ **Gérer les parcours** (`gh_parcours_fiches`, `gh_step_fiches`)
 - ✅ **Accès à l'onglet "Admin"** dans Formations (composant `TrainingAdmin`)
 - ✅ **Voir les fiches inactives** (soft-deleted)
 
 ### 3. Suivi des GMs
 - ✅ **Lister tous les profils GM** (via `gh_list_gm_profiles()`)
-- ✅ **Voir tous les pointages** (`gm_checkins`)
-- ✅ **Voir toutes les complétions** de checklists (`checklist_completions`)
+- ✅ **Voir tous les pointages** (`gh_gm_checkins`)
+- ✅ **Voir toutes les complétions** de checklists (`gh_checklist_completions`)
 - ✅ **Tableau de suivi des formations** (progression par GM)
 
 ---
@@ -107,21 +107,26 @@ const { isFormateur } = useAuth();
 
 ---
 
-## Migration SQL
+## Migrations SQL
 
-Le rôle a été ajouté via la migration **046_formateur_suivi_role.sql** :
+Le rôle a été ajouté via deux migrations :
 
-1. Ajout de la valeur `formateur_suivi` à l'enum `app_role`
-2. Création de la fonction `has_formateur_role(uuid)`
-3. Mise à jour de toutes les policies RLS sur les tables :
-   - `gh_vr_sessions`, `gh_session_steps`, `gh_session_sales`, `gh_session_media`
-   - `gh_procedure_fiches`, `gh_quiz_questions`, `gh_fiche_validations`
-   - `gh_checklist_templates`, `gh_gm_checkins`, `gh_checklist_completions`
-   - `gh_parcours_fiches`, `gh_step_fiches`
-4. Mise à jour des fonctions RPC :
-   - `gh_admin_delete_session()`
-   - `gh_list_gm_profiles()`
-   - `gh_set_session_flag_reviewed()`
+### Migration 046 (initiale, incorrecte)
+- Ajout de la valeur `formateur_suivi` à l'enum `app_role` ✅
+- Création de la fonction `has_formateur_role(uuid)` ✅
+- ❌ Ciblait par erreur les tables **sans préfixe** (Lovable, pas GitHub app)
+
+### Migration 047 (correction)
+- Corrige les policies RLS pour cibler les tables **`gh_*`** (GitHub app) :
+  - `gh_vr_sessions`, `gh_session_steps`, `gh_session_sales`, `gh_session_media`
+  - `gh_procedure_fiches`, `gh_quiz_questions`, `gh_fiche_validations`
+  - `gh_checklist_templates`, `gh_gm_checkins`, `gh_checklist_completions`
+  - `gh_parcours_fiches`, `gh_step_fiches`
+- Corrige les fonctions RPC avec préfixe **`gh_`** :
+  - `gh_admin_delete_session()`
+  - `gh_list_gm_profiles()`
+  - `gh_set_session_flag_reviewed()`
+- Supprime les policies/fonctions incorrectes créées sur les tables sans préfixe
 
 ---
 
