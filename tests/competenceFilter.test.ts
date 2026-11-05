@@ -3,6 +3,8 @@ import { test } from 'node:test';
 import {
   filterCatalogForCompetences,
   filterFichesByCompetences,
+  idsForCompetenceFilter,
+  parseAuthorizedGameIds,
 } from '../src/lib/competenceFilter.ts';
 import { ProcedureFiche } from '../src/lib/database.types.ts';
 import { DEMO_CATALOG, VenueCatalog } from '../src/lib/venues.ts';
@@ -164,4 +166,26 @@ test('catalogue GM : seulement les jeux autorisés', () => {
     ['saga']
   );
   assert.equal(filterCatalogForCompetences(catalog, null).games.length, catalog.games.length);
+});
+
+test('parseAuthorizedGameIds : null / vide / garbage → [] (jamais tout afficher)', () => {
+  assert.deepEqual(parseAuthorizedGameIds(null), []);
+  assert.deepEqual(parseAuthorizedGameIds(undefined), []);
+  assert.deepEqual(parseAuthorizedGameIds({}), []);
+  assert.deepEqual(parseAuthorizedGameIds([]), []);
+  assert.deepEqual(parseAuthorizedGameIds(['game-saga', '', 1, null]), ['game-saga']);
+});
+
+test('idsForCompetenceFilter : GM null → [] (0 fiche), formateur → null', () => {
+  assert.deepEqual(idsForCompetenceFilter(false, null), []);
+  assert.deepEqual(idsForCompetenceFilter(false, undefined), []);
+  assert.deepEqual(idsForCompetenceFilter(false, []), []);
+  assert.equal(idsForCompetenceFilter(true, []), null);
+  assert.equal(idsForCompetenceFilter(true, null), null);
+  const lobbyOnly = filterFichesByCompetences(
+    ALL,
+    idsForCompetenceFilter(false, null),
+    catalog
+  );
+  assert.deepEqual(lobbyOnly, []);
 });

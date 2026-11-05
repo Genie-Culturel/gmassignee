@@ -51,6 +51,27 @@ function locationSlugsForFiche(fiche: ProcedureFiche, catalog: VenueCatalog): st
 }
 
 /**
+ * Normalise la réponse RPC `gh_get_authorized_game_ids`.
+ * Tableau vide, null, ou valeur inattendue → `[]` (0 fiche), jamais « tout afficher ».
+ */
+export function parseAuthorizedGameIds(data: unknown): string[] {
+  if (!Array.isArray(data)) return [];
+  return data.filter((id): id is string => typeof id === 'string' && id.length > 0);
+}
+
+/**
+ * `null` uniquement pour formateur/admin (pas de filtre).
+ * Un GM, y compris si `authorizedGameIds` est encore null, est traité comme `[]`.
+ */
+export function idsForCompetenceFilter(
+  isFormateur: boolean,
+  authorizedGameIds: string[] | null | undefined
+): string[] | null {
+  if (isFormateur) return null;
+  return Array.isArray(authorizedGameIds) ? authorizedGameIds : [];
+}
+
+/**
  * Filtre les fiches selon les compétences RH (jeux).
  *
  * - `authorizedGameIds === null` : pas de filtre (formateur / admin / démo).

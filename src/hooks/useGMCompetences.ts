@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { isMockMode, supabase } from '@/lib/supabase';
+import { parseAuthorizedGameIds } from '@/lib/competenceFilter';
 import { useAuth } from './useAuth';
 
 /**
@@ -14,12 +15,18 @@ import { useAuth } from './useAuth';
  * - `reload`: function to reload the competences
  */
 export function useGMCompetences() {
-  const { user, isFormateur } = useAuth();
-  const [authorizedGameIds, setAuthorizedGameIds] = useState<string[] | null>(null);
+  const { user, isFormateur, loading: authLoading } = useAuth();
+  // Fail closed tant que le RPC n'a pas répondu : un GM ne doit jamais voir le circuit VR par défaut.
+  const [authorizedGameIds, setAuthorizedGameIds] = useState<string[] | null>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
   const reload = useCallback(async () => {
+    if (authLoading) {
+      setIsLoading(true);
+      return;
+    }
+
     if (isMockMode || !supabase || !user) {
       // In mock mode or not logged in, allow all games (no filter)
       setAuthorizedGameIds(null);
@@ -49,8 +56,8 @@ export function useGMCompetences() {
         throw rpcError;
       }
 
-      // null = formateur/admin (pas de filtre). [] = 0 compétence. Ne pas coalescer null → [].
-      const gameIds = data as string[] | null;
+      // GM : null / valeur inattendue → [] (0 fiche). Jamais null (= tout afficher).
+      const gameIds = parseAuthorizedGameIds(data);
       console.log('[useGMCompetences] Authorized gh_games IDs:', gameIds);
       setAuthorizedGameIds(gameIds);
       setError(null);
@@ -62,7 +69,7 @@ export function useGMCompetences() {
     } finally {
       setIsLoading(false);
     }
-  }, [user, isFormateur]);
+  }, [user, isFormateur, authLoading]);
 
   useEffect(() => {
     reload();

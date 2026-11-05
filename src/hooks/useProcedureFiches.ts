@@ -6,7 +6,7 @@ import { isFicheDeleted, sortFichesByOrder } from '@/lib/training';
 import { useGMCompetences } from './useGMCompetences';
 import { useAuth } from './useAuth';
 import { useVenueCatalog } from './useVenueCatalog';
-import { filterFichesByCompetences } from '@/lib/competenceFilter';
+import { filterFichesByCompetences, idsForCompetenceFilter } from '@/lib/competenceFilter';
 
 export function useProcedureFiches(opts?: { includeInactive?: boolean }) {
   const { isFormateur } = useAuth();
@@ -70,8 +70,8 @@ export function useProcedureFiches(opts?: { includeInactive?: boolean }) {
           });
         });
 
-        // null = formateur/admin (pas de filtre). [] = 0 compétence → 0 fiche.
-        const idsForFilter = isFormateur ? null : authorizedGameIds;
+        // Formateur → null (tout). GM → tableau, [] si 0 compétence ou RPC vide/null.
+        const idsForFilter = idsForCompetenceFilter(isFormateur, authorizedGameIds);
         const filtered = filterFichesByCompetences(allFiches, idsForFilter, catalog);
         console.log('[useProcedureFiches] Filtered to', filtered.length, 'fiches based on competences');
 
@@ -86,7 +86,13 @@ export function useProcedureFiches(opts?: { includeInactive?: boolean }) {
     fetchFiches();
   }, [tick, includeInactive, authorizedGameIds, competencesLoading, catalogLoading, catalog, isFormateur]);
 
-  return { fiches, isLoading, error, reload, authorizedGameIds: isFormateur ? null : authorizedGameIds };
+  return {
+    fiches,
+    isLoading,
+    error,
+    reload,
+    authorizedGameIds: idsForCompetenceFilter(isFormateur, authorizedGameIds),
+  };
 }
 
 export function useFichesByIncidentType(incidentType: string) {

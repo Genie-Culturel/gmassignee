@@ -7,7 +7,7 @@ import { isFicheDeleted } from '@/lib/training';
 import { useGMCompetences } from './useGMCompetences';
 import { useAuth } from './useAuth';
 import { useVenueCatalog } from './useVenueCatalog';
-import { filterFichesByCompetences } from '@/lib/competenceFilter';
+import { filterFichesByCompetences, idsForCompetenceFilter } from '@/lib/competenceFilter';
 
 /** Fiches linked to each step of one parcours (« Voir la procédure »). */
 export function useStepFiches(parcoursId: string | undefined) {
@@ -55,7 +55,7 @@ export function useStepFiches(parcoursId: string | undefined) {
         }
 
         const active = fiches.filter((fiche) => fiche.is_active && !isFicheDeleted(fiche));
-        const idsForFilter = isFormateur ? null : authorizedGameIds;
+        const idsForFilter = idsForCompetenceFilter(isFormateur, authorizedGameIds);
         const filtered = filterFichesByCompetences(active, idsForFilter, catalog);
         console.log('[useStepFiches] Filtered to', filtered.length, 'fiches based on competences');
 
