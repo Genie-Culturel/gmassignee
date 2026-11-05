@@ -18,6 +18,7 @@ import { useVenueCatalog } from '@/hooks/useVenueCatalog';
 import { FicheViewer } from '@/components/FicheViewer';
 import { FicheValidationPanel } from '@/components/FicheValidationPanel';
 import { TrainingAdmin } from '@/components/TrainingAdmin';
+import { FicheScopeBadges } from '@/components/FicheScopeEditor';
 import { GameScopeSelect } from '@/components/GameScopeSelect';
 import { FicheValidation, ProcedureFiche, FicheCategory } from '@/lib/database.types';
 import { FICHE_CATEGORY_LABELS, FORMATION_PAGE_CATEGORIES } from '@/lib/constants';
@@ -31,7 +32,6 @@ import { cn } from '@/lib/utils';
 import { filterCatalogForCompetences } from '@/lib/competenceFilter';
 import {
   ALL_GAMES_VALUE,
-  ficheScopeBadgeLabel,
   filterFichesForGame,
   readStoredGameId,
   writeStoredGameId,
@@ -258,11 +258,7 @@ export function FormationTechnique() {
                               >
                                 <span className="min-w-0">
                                   <span className="block font-medium leading-snug">{fiche.title}</span>
-                                  <span className="mt-1 inline-flex">
-                                    <Badge variant="outline" className="text-[10px] font-normal">
-                                      {ficheScopeBadgeLabel(fiche, selectableCatalog)}
-                                    </Badge>
-                                  </span>
+                                  <FicheScopeBadges fiche={fiche} catalog={selectableCatalog} className="mt-1" />
                                   {fiche.summary && (
                                     <span className="mt-0.5 block text-xs text-muted-foreground line-clamp-2">
                                       {fiche.summary}

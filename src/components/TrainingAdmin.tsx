@@ -20,13 +20,13 @@ import { GameScopeSelect } from '@/components/GameScopeSelect';
 import { FicheOrderList } from '@/components/FicheOrderList';
 import { FICHE_SUB_GROUPS, ficheSubGroup, ficheSubGroupLabel } from '@/lib/ficheSubGroups';
 import { ParcoursAdmin } from '@/components/ParcoursAdmin';
+import { FicheScopeEditor } from '@/components/FicheScopeEditor';
+import { deriveScopeKind } from '@/lib/ficheScope';
 import {
   ALL_GAMES_VALUE,
-  FicheScopeKind,
   VenueCatalog,
   defaultScopeForNewFiche,
   filterFichesForGame,
-  gamesGroupedByLocation,
 } from '@/lib/venues';
 import { GmOptionsAdmin } from '@/components/GmOptionsAdmin';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -238,7 +238,6 @@ function AdminFicheEditor({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [scopeKind, setScopeKind] = useState<FicheScopeKind>('locations');
   const [scopeLocationIds, setScopeLocationIds] = useState<string[]>([]);
   const [scopeGameIds, setScopeGameIds] = useState<string[]>([]);
 
@@ -262,7 +261,6 @@ function AdminFicheEditor({
     setMessage(null);
     setError(null);
     setConfirmDelete(false);
-    setScopeKind(selected.scope_kind || 'all');
     setScopeLocationIds(selected.scope_location_ids || []);
     setScopeGameIds(selected.scope_game_ids || []);
     listQuizQuestionsAdmin(selected.id).then(setQuestions).catch(() => setQuestions([]));
@@ -296,12 +294,7 @@ function AdminFicheEditor({
       if (cleanedQuestions.some((q) => !q.prompt || q.choices.length < 2 || q.correct_choice_ids.length < 1)) {
         throw new Error('Chaque question doit avoir un intitulé, au moins 2 réponses et une bonne réponse.');
       }
-      if (scopeKind === 'locations' && scopeLocationIds.length === 0) {
-        throw new Error('Choisis au moins un lieu, ou passe la portée à « Tous les lieux ».');
-      }
-      if (scopeKind === 'games' && scopeGameIds.length === 0) {
-        throw new Error('Choisis au moins un jeu, ou passe la portée à « Tous les lieux ».');
-      }
+      const scopeKind = deriveScopeKind(scopeLocationIds, scopeGameIds);
       await saveFiche({
         fiche: {
           ...selected,
@@ -371,6 +364,7 @@ function AdminFicheEditor({
     <div className="space-y-4">
       <FicheOrderList
         fiches={fiches}
+        catalog={catalog}
         selectedId={selectedId}
         onSelect={setSelectedId}
         onReordered={onFichesChanged}
@@ -469,57 +463,16 @@ function AdminFicheEditor({
               <Label>Étapes</Label>
               <FicheStepsEditor ficheId={selected.id} steps={steps} onChange={setSteps} disabled={busy} />
             </div>
-            <div className="space-y-2 rounded-md border p-3">
-              <p className="text-sm font-medium">Portée</p>
-              <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={scopeKind}
-                onChange={(e) => setScopeKind(e.target.value as FicheScopeKind)}
-              >
-                <option value="all">Tous les lieux</option>
-                <option value="locations">Un ou plusieurs lieux</option>
-                <option value="games">Un ou plusieurs jeux</option>
-              </select>
-              {scopeKind === 'locations' && (
-                <div className="space-y-2">
-                  {catalog.locations.map((location) => (
-                    <label key={location.id} className="flex items-center gap-2 text-sm">
-                      <Checkbox
-                        checked={scopeLocationIds.includes(location.id)}
-                        onCheckedChange={(v) => {
-                          setScopeLocationIds((ids) =>
-                            v === true ? [...ids, location.id] : ids.filter((id) => id !== location.id)
-                          );
-                        }}
-                      />
-                      {location.name}
-                    </label>
-                  ))}
-                </div>
-              )}
-              {scopeKind === 'games' && (
-                <div className="space-y-3">
-                  {gamesGroupedByLocation(catalog).map((group) => (
-                    <div key={group.location.id} className="space-y-1.5">
-                      <p className="text-xs font-medium text-muted-foreground">{group.location.name}</p>
-                      {group.games.map((game) => (
-                        <label key={game.id} className="flex items-center gap-2 text-sm">
-                          <Checkbox
-                            checked={scopeGameIds.includes(game.id)}
-                            onCheckedChange={(v) => {
-                              setScopeGameIds((ids) =>
-                                v === true ? [...ids, game.id] : ids.filter((id) => id !== game.id)
-                              );
-                            }}
-                          />
-                          {game.name}
-                        </label>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <FicheScopeEditor
+              catalog={catalog}
+              locationIds={scopeLocationIds}
+              gameIds={scopeGameIds}
+              filterGameId={filterGameId}
+              onChange={({ locationIds, gameIds }) => {
+                setScopeLocationIds(locationIds);
+                setScopeGameIds(gameIds);
+              }}
+            />
             <label className="flex items-center gap-2 text-sm">
               <Checkbox checked={required} onCheckedChange={(v) => setRequired(v === true)} />
               Fiche requise (le GM doit la valider)

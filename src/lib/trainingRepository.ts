@@ -358,14 +358,14 @@ async function replaceFicheScope(
   if (deleteLocError) throw new Error(deleteLocError.message);
   const { error: deleteGamesError } = await supabase.from('gh_fiche_scope_games').delete().eq('fiche_id', ficheId);
   if (deleteGamesError) throw new Error(deleteGamesError.message);
-  if (scope.kind === 'locations' && scope.locationIds.length) {
+  if (scope.locationIds.length) {
     assertLiveIds(scope.locationIds, 'lieu');
     const { error } = await supabase
       .from('gh_fiche_scope_locations')
       .insert(scope.locationIds.map((location_id) => ({ fiche_id: ficheId, location_id })));
     if (error) throw new Error(error.message);
   }
-  if (scope.kind === 'games' && scope.gameIds.length) {
+  if (scope.gameIds.length) {
     assertLiveIds(scope.gameIds, 'jeu');
     const { error } = await supabase
       .from('gh_fiche_scope_games')
@@ -382,8 +382,8 @@ function attachScopeFields(
   return {
     ...fiche,
     scope_kind: scope.kind,
-    scope_location_ids: scope.kind === 'locations' ? scope.locationIds : [],
-    scope_game_ids: scope.kind === 'games' ? scope.gameIds : [],
+    scope_location_ids: scope.locationIds,
+    scope_game_ids: scope.gameIds,
   };
 }
 
