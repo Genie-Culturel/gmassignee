@@ -34,7 +34,7 @@ Deno.serve(async (req: Request) => {
   const admin = createClient(supabaseUrl, serviceKey);
 
   const { data: expired, error } = await admin
-    .from("session_media")
+    .from("gh_session_media")
     .select("id, path")
     .lt("expires_at", new Date().toISOString());
   if (error) return json({ ok: false, error: error.message }, 500);
@@ -49,7 +49,7 @@ Deno.serve(async (req: Request) => {
   if (rpcErr) {
     const ids = (expired || []).map((row) => row.id);
     if (ids.length) {
-      await admin.from("session_media").delete().in("id", ids);
+      await admin.from("gh_session_media").delete().in("id", ids);
     }
     return json({
       ok: true,

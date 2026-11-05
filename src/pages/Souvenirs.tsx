@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, Download, FileIcon, Image as ImageIcon, Loader2, Star, Video } from 'lucide-react';
-import { DEFAULT_SUPABASE_URL } from '@/lib/config';
+import { DEFAULT_SUPABASE_URL, EDGE_FUNCTION_SESSION_MEDIA_DOWNLOAD } from '@/lib/config';
 import './souvenirs.css';
 
 /**
@@ -158,7 +158,7 @@ export function SouvenirsPage() {
       return;
     }
     const base = import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
-    fetch(`${base}/functions/v1/session-media-download?format=json&token=${encodeURIComponent(token)}`, {
+    fetch(`${base}/functions/v1/${EDGE_FUNCTION_SESSION_MEDIA_DOWNLOAD}?format=json&token=${encodeURIComponent(token)}`, {
       headers: { Accept: 'application/json' },
     })
       .then(async (res) => {

@@ -67,7 +67,7 @@ Deno.serve(async (req: Request) => {
   );
 
   const { data: session, error } = await admin
-    .from("vr_sessions")
+    .from("gh_vr_sessions")
     .select("id, game, parcours_id")
     .eq("videos_download_token", token)
     .maybeSingle();
@@ -77,7 +77,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const { data: media } = await admin
-    .from("session_media")
+    .from("gh_session_media")
     .select("path, original_name, expires_at, size, mime")
     .eq("session_id", session.id)
     .gt("expires_at", new Date().toISOString())
