@@ -57,7 +57,8 @@ CREATE POLICY "Admins read all session media"
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.session_media TO authenticated;
 
--- Private bucket, 50 MiB/file (free plan). Raise file_size_limit when moving to Pro.
+-- Private bucket. Server-side file_size_limit (52428800 = 50 MiB) to be raised separately in Supabase console.
+-- Client-side limit (SESSION_MEDIA_MAX_BYTES) is now 300 Mo (314572800 bytes).
 INSERT INTO storage.buckets (id, name, public, file_size_limit)
 VALUES ('session-media', 'session-media', false, 52428800)
 ON CONFLICT (id) DO UPDATE SET file_size_limit = EXCLUDED.file_size_limit, public = false;
