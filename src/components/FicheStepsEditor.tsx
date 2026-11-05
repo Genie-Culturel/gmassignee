@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useMemo } from 'react';
 import { FicheStep } from '@/lib/database.types';
 import { uploadFicheImage } from '@/lib/ficheImages';
+import { useFicheImageUrls } from '@/hooks/useFicheImageUrls';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowDown, ArrowUp, ImagePlus, Loader2, Plus, Trash2, X } from 'lucide-react';
@@ -17,6 +18,8 @@ export function FicheStepsEditor({ ficheId, steps, onChange, disabled }: Props) 
   const [uploading, setUploading] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inputs = useRef<Record<number, HTMLInputElement | null>>({});
+  const allPaths = useMemo(() => steps.flatMap((s) => s.images || []), [steps]);
+  const imageUrls = useFicheImageUrls(allPaths);
 
   const update = (index: number, patch: Partial<FicheStep>) =>
     onChange(steps.map((step, i) => (i === index ? { ...step, ...patch } : step)));
@@ -44,7 +47,7 @@ export function FicheStepsEditor({ ficheId, steps, onChange, disabled }: Props) 
       const current = steps[index]?.images ?? [];
       update(index, { images: [...current, ...urls] });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Envoi de l’image impossible');
+      setError(err instanceof Error ? err.message : "Envoi de l'image impossible");
     } finally {
       setUploading(null);
       const input = inputs.current[index];
@@ -70,20 +73,23 @@ export function FicheStepsEditor({ ficheId, steps, onChange, disabled }: Props) 
           </div>
           {step.images && step.images.length > 0 && (
             <div className="flex flex-wrap gap-2 pl-8">
-              {step.images.map((src, i) => (
-                <div key={src + i} className="relative">
-                  <img src={src} alt="" loading="lazy" className="h-20 w-auto max-w-[140px] rounded border object-cover" />
-                  <button
-                    type="button"
-                    aria-label="Retirer l’image"
-                    disabled={disabled}
-                    onClick={() => update(index, { images: step.images!.filter((_, j) => j !== i) })}
-                    className="absolute -top-2 -right-2 rounded-full bg-destructive text-destructive-foreground p-0.5"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
+              {step.images.map((path, i) => {
+                const url = imageUrls[path] || path;
+                return (
+                  <div key={path + i} className="relative">
+                    <img src={url} alt="" loading="lazy" className="h-20 w-auto max-w-[140px] rounded border object-cover" />
+                    <button
+                      type="button"
+                      aria-label="Retirer l'image"
+                      disabled={disabled}
+                      onClick={() => update(index, { images: step.images!.filter((_, j) => j !== i) })}
+                      className="absolute -top-2 -right-2 rounded-full bg-destructive text-destructive-foreground p-0.5"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
           <div className="flex flex-wrap gap-1 pl-8">
@@ -117,7 +123,7 @@ export function FicheStepsEditor({ ficheId, steps, onChange, disabled }: Props) 
       </Button>
       {error && <p className="text-sm text-destructive">{error}</p>}
       <p className="text-xs text-muted-foreground">
-        Images optionnelles : sur mobile, « Photo / capture » propose l’appareil photo ou la galerie. Les photos sont réduites automatiquement. Pense à enregistrer la fiche.
+        Images optionnelles : sur mobile, « Photo / capture » propose l'appareil photo ou la galerie. Les photos sont réduites automatiquement. Pense à enregistrer la fiche.
       </p>
     </div>
   );

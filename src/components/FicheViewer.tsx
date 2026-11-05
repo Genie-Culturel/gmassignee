@@ -3,8 +3,9 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { FICHE_CATEGORY_LABELS } from '@/lib/constants';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { useFicheImageUrls } from '@/hooks/useFicheImageUrls';
 
 interface FicheViewerProps {
   fiche: ProcedureFiche;
@@ -13,6 +14,11 @@ interface FicheViewerProps {
 
 export function FicheViewer({ fiche, compact = false }: FicheViewerProps) {
   const [zoom, setZoom] = useState<string | null>(null);
+  const allPaths = useMemo(
+    () => fiche.content_steps.flatMap((s) => s.images || []),
+    [fiche.content_steps]
+  );
+  const imageUrls = useFicheImageUrls(allPaths);
   return (
     <div className="space-y-4">
       {!compact && (
@@ -58,21 +64,24 @@ export function FicheViewer({ fiche, compact = false }: FicheViewerProps) {
               <div className="text-sm whitespace-pre-line">{step.text}</div>
               {step.images && step.images.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {step.images.map((src, i) => (
-                    <button
-                      key={src + i}
-                      type="button"
-                      onClick={() => setZoom(src)}
-                      className="block overflow-hidden rounded-md border border-border"
-                    >
-                      <img
-                        src={src}
-                        alt={`Point ${step.order} – image ${i + 1}`}
-                        loading="lazy"
-                        className="h-28 max-w-[220px] w-auto object-cover"
-                      />
-                    </button>
-                  ))}
+                  {step.images.map((path, i) => {
+                    const url = imageUrls[path] || path;
+                    return (
+                      <button
+                        key={path + i}
+                        type="button"
+                        onClick={() => setZoom(url)}
+                        className="block overflow-hidden rounded-md border border-border"
+                      >
+                        <img
+                          src={url}
+                          alt={`Point ${step.order} – image ${i + 1}`}
+                          loading="lazy"
+                          className="h-28 max-w-[220px] w-auto object-cover"
+                        />
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
