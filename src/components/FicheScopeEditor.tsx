@@ -8,15 +8,10 @@ import {
   dominantGameId,
   everyoneShortcutScope,
   ficheScopeBadgeItems,
-  gameOnlyShortcutScope,
-  gamePlusVrCenterShortcutScope,
-  nettoyageGame,
-  nettoyageShortcutScope,
   toggleId,
-  vrCenterLocationId,
 } from '@/lib/ficheScope';
-import { isVrCircuitGame } from '@/lib/competenceFilter';
-import { VenueCatalog, gamesGroupedByLocation } from '@/lib/venues';
+import { circuitIdForGame } from '@/lib/competenceFilter';
+import { VenueCatalog, findGame, gamesGroupedByLocation } from '@/lib/venues';
 import { cn } from '@/lib/utils';
 
 export function FicheScopeEditor({
@@ -32,82 +27,41 @@ export function FicheScopeEditor({
   filterGameId?: string;
   onChange: (next: { locationIds: string[]; gameIds: string[] }) => void;
 }) {
-  const vrId = vrCenterLocationId(catalog);
-  const nettoyage = nettoyageGame(catalog);
   const dominantId = dominantGameId(catalog, filterGameId, gameIds);
-  const dominant = dominantId ? catalog.games.find((game) => game.id === dominantId) : undefined;
-  const circuitPreset = circuitShortcutScope(catalog);
-  const nettoyagePreset = nettoyageShortcutScope(catalog);
+  const dominant = dominantId ? findGame(catalog, dominantId) : undefined;
+  const dominantCircuitId = dominant ? circuitIdForGame(dominant, catalog) : undefined;
+  const circuitPreset = circuitShortcutScope(catalog, dominantCircuitId);
   const everyone = locationIds.length === 0 && gameIds.length === 0;
   const circuitActive =
-    Boolean(vrId) && arraysEqualAsSets(locationIds, circuitPreset.locationIds) && gameIds.length === 0;
-  const gameOnlyActive =
-    Boolean(dominantId) && arraysEqualAsSets(gameIds, dominantId ? [dominantId] : []) && locationIds.length === 0;
-  const gamePlusVrPreset = dominantId ? gamePlusVrCenterShortcutScope(catalog, dominantId) : null;
-  const gamePlusVrActive =
-    Boolean(dominant && isVrCircuitGame(dominant, catalog) && gamePlusVrPreset) &&
-    arraysEqualAsSets(locationIds, gamePlusVrPreset!.locationIds) &&
-    arraysEqualAsSets(gameIds, gamePlusVrPreset!.gameIds);
-  const nettoyageActive =
-    Boolean(nettoyage) &&
-    arraysEqualAsSets(gameIds, nettoyagePreset.gameIds) &&
-    locationIds.length === 0;
+    circuitPreset.locationIds.length > 0 &&
+    arraysEqualAsSets(locationIds, circuitPreset.locationIds) &&
+    gameIds.length === 0;
 
   const setScope = (next: { locationIds: string[]; gameIds: string[] }) => onChange(next);
+  const circuitLabel =
+    (dominantCircuitId && catalog.locations.find((location) => location.id === dominantCircuitId)?.short_name) ||
+    'Ce circuit';
 
   return (
     <div className="space-y-3 rounded-md border p-3" data-testid="fiche-scope-editor">
       <div>
         <p className="text-sm font-medium">Qui voit cette fiche ?</p>
         <p className="text-xs text-muted-foreground">
-          Lieux et jeux se cochent ensemble. Un jeu coché limite aux GM de ce jeu (le lieu VR Center
-          est un tag, il n’ouvre pas le circuit aux autres). Un lieu seul ouvre le parcours / circuit.
+          Une compétence RH sur un jeu ouvre tout le circuit (lieu) de ce jeu, plus les fiches « Tout
+          le monde ». Taguer un jeu ou son lieu revient au même pour la visibilité.
         </p>
       </div>
 
       <div className="flex flex-wrap gap-1.5">
-        <Button
-          type="button"
-          size="sm"
-          variant={circuitActive ? 'default' : 'outline'}
-          className="h-8 text-xs"
-          disabled={!vrId}
-          onClick={() => setScope(circuitPreset)}
-        >
-          Circuit VR Center
-        </Button>
-        {dominant && (
+        {circuitPreset.locationIds.length > 0 && (
           <Button
             type="button"
             size="sm"
-            variant={gameOnlyActive ? 'default' : 'outline'}
+            variant={circuitActive ? 'default' : 'outline'}
             className="h-8 text-xs"
-            onClick={() => setScope(gameOnlyShortcutScope(dominant.id))}
+            onClick={() => setScope(circuitPreset)}
           >
-            Ce jeu seulement
-            <span className="ml-1 font-normal opacity-80">({dominant.name})</span>
-          </Button>
-        )}
-        {dominant && isVrCircuitGame(dominant, catalog) && gamePlusVrPreset && (
-          <Button
-            type="button"
-            size="sm"
-            variant={gamePlusVrActive ? 'default' : 'outline'}
-            className="h-8 text-xs"
-            onClick={() => setScope(gamePlusVrPreset)}
-          >
-            Ce jeu + VR Center
-          </Button>
-        )}
-        {nettoyage && (
-          <Button
-            type="button"
-            size="sm"
-            variant={nettoyageActive ? 'default' : 'outline'}
-            className="h-8 text-xs"
-            onClick={() => setScope(nettoyagePreset)}
-          >
-            Nettoyage
+            Circuit {circuitLabel}
           </Button>
         )}
         <Button
@@ -122,7 +76,7 @@ export function FicheScopeEditor({
       </div>
 
       <div className="space-y-1.5">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Lieux</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Circuits</p>
         <div className="flex flex-wrap gap-1.5">
           {catalog.locations.map((location) => (
             <ScopeChip
@@ -138,7 +92,9 @@ export function FicheScopeEditor({
       </div>
 
       <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Jeux</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Jeux (libellé — le circuit entier reste ouvert)
+        </p>
         {gamesGroupedByLocation(catalog).map((group) => (
           <div key={group.location.id} className="space-y-1.5">
             <p className="text-[11px] text-muted-foreground">{group.location.name}</p>

@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  circuitShortcutScope,
   deriveScopeKind,
   describeFicheVisibility,
   ficheScopeBadgeItems,
-  gamePlusVrCenterShortcutScope,
 } from '../src/lib/ficheScope.ts';
 import { ProcedureFiche } from '../src/lib/database.types.ts';
 import { DEMO_CATALOG } from '../src/lib/venues.ts';
@@ -12,7 +12,7 @@ import { DEMO_CATALOG } from '../src/lib/venues.ts';
 const catalog = DEMO_CATALOG;
 
 function pitch(): ProcedureFiche {
-  const now = '2026-11-05T00:00:00.000Z';
+  const now = '2026-11-06T00:00:00.000Z';
   return {
     id: 'planta-pitch',
     category: 'procedure_deroulement',
@@ -26,7 +26,7 @@ function pitch(): ProcedureFiche {
     version: 1,
     deleted_at: null,
     scope_kind: 'games',
-    scope_location_ids: ['loc-vr_center'],
+    scope_location_ids: [],
     scope_game_ids: ['game-planta'],
     created_at: now,
     updated_at: now,
@@ -40,26 +40,20 @@ test('deriveScopeKind : jeux (+ lieu) → games, lieux seuls → locations, vide
   assert.equal(deriveScopeKind(['loc-vr_center'], ['game-planta']), 'games');
 });
 
-test('Pitch Planta double tag : badges VR Center + Bataille de la Planta', () => {
+test('Pitch Planta : badge circuit VR Center inféré + nom du jeu', () => {
   const labels = ficheScopeBadgeItems(pitch(), catalog).map((item) => item.label);
   assert.deepEqual(labels, ['VR Center', 'Bataille de la Planta']);
 });
 
-test('Pitch Planta sans lieu en base : badge VR Center inféré (jeu circuit)', () => {
-  const row = pitch();
-  row.scope_location_ids = [];
-  const labels = ficheScopeBadgeItems(row, catalog).map((item) => item.label);
-  assert.deepEqual(labels, ['VR Center', 'Bataille de la Planta']);
-});
-
-test('aperçu Pitch Planta + VR Center : compétence Planta, pas tout le circuit', () => {
-  const text = describeFicheVisibility(catalog, ['loc-vr_center'], ['game-planta']);
+test('aperçu Pitch Planta : tout le circuit VR, pas seulement Planta', () => {
+  const text = describeFicheVisibility(catalog, [], ['game-planta']);
+  assert.match(text, /circuit VR Center/);
   assert.match(text, /Bataille de la Planta/);
-  assert.match(text, /tag VR Center/);
-  assert.equal(/Serviteur|Saga|Schoolcrafter/.test(text), false);
+  assert.match(text, /Saga/);
+  assert.match(text, /Magi Room/);
 });
 
-test('aperçu circuit VR seul : jeux VR Centre', () => {
+test('aperçu circuit VR seul : jeux du lieu', () => {
   const text = describeFicheVisibility(catalog, ['loc-vr_center'], []);
   assert.match(text, /circuit VR Center/);
   assert.match(text, /Planta/);
@@ -72,9 +66,9 @@ test('aperçu 0 chip : GM avec compétence, pas les GM sans', () => {
   assert.match(text, /sans compétence/);
 });
 
-test('raccourci Ce jeu + VR Center', () => {
-  assert.deepEqual(gamePlusVrCenterShortcutScope(catalog, 'game-planta'), {
+test('raccourci circuit du jeu dominant', () => {
+  assert.deepEqual(circuitShortcutScope(catalog, 'loc-vr_center'), {
     locationIds: ['loc-vr_center'],
-    gameIds: ['game-planta'],
+    gameIds: [],
   });
 });

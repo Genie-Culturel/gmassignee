@@ -7,9 +7,10 @@ import { useAuth } from './useAuth';
  * Hook to load the authorized gh_games IDs for the current GM based on LIVE Lovable RH compétences.
  * 
  * Flow: auth.uid() → profiles.gm_id → gm_game_competencies → games → gh_game_rh_map → gh_games.id[]
- * 
+ * Le filtre Formations élargit ces IDs au circuit (lieu) du jeu + fiches générales.
+ *
  * Returns:
- * - `authorizedGameIds`: gh_games.id[] autorisés, `null` si formateur/admin (pas de filtre), `[]` si 0 compétence
+ * - `authorizedGameIds`: gh_games.id[] mappés (le client élargit au circuit), `null` si formateur/admin, `[]` si 0 compétence
  * - `isLoading`: loading state
  * - `error`: error if any
  * - `reload`: function to reload the competences

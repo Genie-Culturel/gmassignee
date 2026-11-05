@@ -2,62 +2,67 @@ import { ProcedureFiche } from './database.types';
 import { VenueCatalog, VenueGame } from './venues';
 
 /**
- * Jeux VR du Centre qui ouvrent le circuit générique (lobby, pop-corn, salle, boissons…).
- * Archeogame et nettoyage sont au même lieu mais n'ouvrent PAS le circuit.
+ * Circuits canoniques (Julien, 2026-11-06). Circuit = lieu du jeu.
+ * Une compétence RH sur un jeu ouvre TOUTES les fiches de ce circuit + les générales.
  */
-export const VR_CIRCUIT_SLUGS = ['planta', 'serviteur', 'saga', 'schoolcrafter'] as const;
+export const CIRCUIT_SLUGS = {
+  vr_center: 'vr_center',
+  escape_sion: 'escape_sion',
+  escape_sierre: 'escape_sierre',
+  archeo_sion: 'archeo_sion',
+  nettoyage_center: 'nettoyage_center',
+  event: 'event',
+  chandoline: 'chandoline',
+} as const;
 
-/** Jeux situés au VR Center qui n'ouvrent pas le circuit. */
-export const VR_CIRCUIT_EXCLUDED_SLUGS = ['archeogame', 'nettoyage'] as const;
+/** Slugs de jeux qui ont leur propre circuit, même s'ils sont encore rangés sous vr_center en base. */
+const SLUG_CIRCUIT_OVERRIDE: Record<string, string> = {
+  archeogame: CIRCUIT_SLUGS.archeo_sion,
+  nettoyage: CIRCUIT_SLUGS.nettoyage_center,
+  event_outdoor: CIRCUIT_SLUGS.event,
+};
 
-/** Compétence RH « Nettoyage centre VR » : fiches nettoyage seulement. */
-export const NETTOYAGE_SLUGS = ['nettoyage'] as const;
-
-export function isVrCircuitGame(
-  game: Pick<VenueGame, 'slug' | 'location_id'>,
-  catalog: VenueCatalog
-): boolean {
-  const slug = (game.slug || '').toLowerCase();
-  if ((VR_CIRCUIT_EXCLUDED_SLUGS as readonly string[]).includes(slug)) return false;
-  if ((VR_CIRCUIT_SLUGS as readonly string[]).includes(slug)) return true;
-  const location = catalog.locations.find((row) => row.id === game.location_id);
-  return location?.slug === 'vr_center';
-}
-
-export function isNettoyageGame(game: Pick<VenueGame, 'slug'>): boolean {
-  return (NETTOYAGE_SLUGS as readonly string[]).includes(game.slug);
-}
-
-function tagsOf(fiche: ProcedureFiche): string[] {
-  return (fiche.tags || []).map((tag) => tag.toLowerCase());
-}
-
-/** Fiches ménage hebdomadaire : visibles seulement avec la compétence nettoyage. */
-export function isWeeklyCleaningFiche(fiche: ProcedureFiche): boolean {
-  const tags = tagsOf(fiche);
-  if (
-    tags.includes('semaine') ||
-    tags.includes('hebdomadaire') ||
-    tags.includes('rh_nettoyage_semaine')
-  ) {
-    return true;
-  }
-  const title = (fiche.title || '').toLowerCase();
-  return /nettoyage|ménage/.test(title) && /semaine|hebdo|hebdomadaire/.test(title);
-}
-
-/** Fiches de nettoyage (session ou semaine), identifiées par tag ou titre. */
-export function isNettoyageFiche(fiche: ProcedureFiche): boolean {
-  if (isWeeklyCleaningFiche(fiche)) return true;
-  const tags = tagsOf(fiche);
-  if (tags.includes('rh_nettoyage') || tags.includes('nettoyage')) return true;
-  return /nettoyage/i.test(fiche.title || '');
+export function locationIdBySlug(catalog: VenueCatalog, slug: string): string | undefined {
+  return catalog.locations.find((location) => location.slug === slug)?.id;
 }
 
 /**
- * Normalise la réponse RPC `gh_get_authorized_game_ids`.
- * Tableau vide, null, ou valeur inattendue → `[]` (0 fiche), jamais « tout afficher ».
+ * Identifiant de circuit d'un jeu : son lieu, sauf overrides (Archeogame, Nettoyage, Event).
  */
+export function circuitIdForGame(
+  game: Pick<VenueGame, 'slug' | 'location_id'>,
+  catalog: VenueCatalog
+): string {
+  const overrideSlug = SLUG_CIRCUIT_OVERRIDE[(game.slug || '').toLowerCase()];
+  if (overrideSlug) {
+    return locationIdBySlug(catalog, overrideSlug) || `circuit:${overrideSlug}`;
+  }
+  return game.location_id;
+}
+
+export function circuitIdsForAuthorizedGames(
+  authorizedGameIds: string[],
+  catalog: VenueCatalog
+): Set<string> {
+  const authorized = new Set(authorizedGameIds);
+  const circuits = new Set<string>();
+  for (const game of catalog.games) {
+    if (authorized.has(game.id)) circuits.add(circuitIdForGame(game, catalog));
+  }
+  return circuits;
+}
+
+/** Tous les jeux des circuits autorisés (Planta → aussi Saga, Magi Room, …). */
+export function expandAuthorizedGamesToCircuit(
+  authorizedGameIds: string[] | null,
+  catalog: VenueCatalog
+): string[] | null {
+  if (authorizedGameIds === null) return null;
+  if (authorizedGameIds.length === 0) return [];
+  const circuits = circuitIdsForAuthorizedGames(authorizedGameIds, catalog);
+  return catalog.games.filter((game) => circuits.has(circuitIdForGame(game, catalog))).map((game) => game.id);
+}
+
 export function parseAuthorizedGameIds(data: unknown): string[] {
   if (!Array.isArray(data)) return [];
   return data.filter((id): id is string => typeof id === 'string' && id.length > 0);
@@ -75,20 +80,35 @@ export function idsForCompetenceFilter(
   return Array.isArray(authorizedGameIds) ? authorizedGameIds : [];
 }
 
+function ficheCircuitIds(fiche: ProcedureFiche, catalog: VenueCatalog): string[] {
+  const ids = new Set<string>();
+  for (const locId of fiche.scope_location_ids || []) ids.add(locId);
+  for (const gameId of fiche.scope_game_ids || []) {
+    const game = catalog.games.find((row) => row.id === gameId);
+    if (game) ids.add(circuitIdForGame(game, catalog));
+  }
+  return [...ids];
+}
+
+function isGeneralFiche(fiche: ProcedureFiche): boolean {
+  const gameIds = fiche.scope_game_ids || [];
+  const locIds = fiche.scope_location_ids || [];
+  return gameIds.length === 0 && locIds.length === 0;
+}
+
 /**
- * Filtre les fiches selon les compétences RH (jeux).
+ * Filtre les fiches selon les compétences RH.
  *
  * - `authorizedGameIds === null` : pas de filtre (formateur / admin / démo).
- * - `[]` : aucune fiche (0 compétence RH).
- * - Planta / Serviteur / Saga / Schoolcrafter (ou autre jeu VR Center hors exclusions) :
- *   circuit VR Center + fiches du jeu.
- * - Archeogame : fiches Archeogame seulement (pas le circuit VR).
- * - Nettoyage : fiches nettoyage seulement.
- * - Da Vinci / Chandoline / etc. : fiches du jeu + fiches lieu du parcours, pas le circuit VR.
- * - Jeux cochés (même avec un lieu en plus) : visible si compétence sur l'un de ces jeux.
- *   Le lieu VR Center est un tag d'affichage, il n'ouvre pas le circuit aux autres GM.
- * - Lieux seuls : circuit VR / lieu du parcours.
- * - Portée vide (`all`) : tout GM avec ≥1 compétence (0 compétence → 0 fiche).
+ * - `[]` : 0 compétence → 0 fiche.
+ * - sinon : toutes les fiches des circuits (lieux) des jeux autorisés + générales (« Tout le monde »).
+ *
+ * Exemples :
+ *   Feu Sacré → Escape Life Sierre + générales
+ *   Planta → tout VR Center (parcours partagé ET fiches des autres jeux du circuit) + générales
+ *   Da Vinci + Planta → Escape Life Sion + VR Center + générales
+ *   Archeogame → ARCHEO SION + générales (pas VR Center)
+ *   Nettoyage → NETTOYAGE CENTER + générales (pas la boucle VR)
  */
 export function filterFichesByCompetences(
   fiches: ProcedureFiche[],
@@ -98,69 +118,38 @@ export function filterFichesByCompetences(
   if (authorizedGameIds === null) return fiches;
   if (authorizedGameIds.length === 0) return [];
 
-  const authorized = new Set(authorizedGameIds);
-  const authorizedGames = catalog.games.filter((game) => authorized.has(game.id));
-  const hasVrCircuit = authorizedGames.some((game) => isVrCircuitGame(game, catalog));
-  const hasNettoyage = authorizedGames.some(isNettoyageGame);
-  const authorizedLocationIds = new Set(authorizedGames.map((game) => game.location_id));
+  const circuits = circuitIdsForAuthorizedGames(authorizedGameIds, catalog);
 
   return fiches.filter((fiche) => {
-    // Ménage hebdomadaire : jamais via le circuit VR, uniquement compétence nettoyage.
-    if (isWeeklyCleaningFiche(fiche)) {
-      return hasNettoyage;
-    }
-
-    // Fiches nettoyage de session : visibles pour la compétence nettoyage,
-    // et aussi via le circuit VR (Planta / Saga / …) plus bas.
-    if (hasNettoyage && isNettoyageFiche(fiche)) {
-      return true;
-    }
-
-    const gameIds = fiche.scope_game_ids || [];
-    const locIds = fiche.scope_location_ids || [];
-    const gameMatch = gameIds.some((gameId) => authorized.has(gameId));
-    const locMatch = locIds.length > 0 && locationScopeMatches(fiche, catalog, hasVrCircuit, authorizedLocationIds);
-
-    // Double tag jeu + lieu : le jeu décide (Pitch Planta + VR Center ≠ visible Saga).
-    if (gameIds.length > 0) return gameMatch;
-    if (locMatch) return true;
-
-    // Portée vide / all : tout GM avec ≥1 compétence. 0 compétence déjà exclu plus haut.
-    if (locIds.length === 0) {
-      return (fiche.scope_kind || 'all') === 'all';
-    }
-
-    return false;
+    if (isGeneralFiche(fiche)) return true;
+    return ficheCircuitIds(fiche, catalog).some((circuitId) => circuits.has(circuitId));
   });
 }
 
-function locationScopeMatches(
-  fiche: ProcedureFiche,
-  catalog: VenueCatalog,
-  hasVrCircuit: boolean,
-  authorizedLocationIds: Set<string>
-): boolean {
-  const locIds = fiche.scope_location_ids || [];
-  for (const locId of locIds) {
-    const slug = catalog.locations.find((location) => location.id === locId)?.slug;
-    if (slug === 'vr_center') {
-      if (hasVrCircuit) return true;
-      continue;
-    }
-    if (authorizedLocationIds.has(locId)) return true;
-  }
-  return false;
-}
-
-/** Restreint le sélecteur de jeux aux compétences du GM. Formateur/admin : catalogue intact. */
+/** Sélecteur de jeux : tous les jeux des circuits autorisés. Formateur/admin : catalogue intact. */
 export function filterCatalogForCompetences(
   catalog: VenueCatalog,
   authorizedGameIds: string[] | null
 ): VenueCatalog {
   if (authorizedGameIds === null) return catalog;
-  const allowed = new Set(authorizedGameIds);
+  if (authorizedGameIds.length === 0) {
+    return { ...catalog, locations: [], games: [] };
+  }
+  const circuits = circuitIdsForAuthorizedGames(authorizedGameIds, catalog);
+  const games = catalog.games
+    .filter((game) => circuits.has(circuitIdForGame(game, catalog)))
+    .map((game) => {
+      const circuitId = circuitIdForGame(game, catalog);
+      if (circuitId.startsWith('circuit:') || circuitId === game.location_id) return game;
+      return { ...game, location_id: circuitId };
+    });
+  const locationIds = new Set<string>();
+  for (const circuitId of circuits) {
+    if (!circuitId.startsWith('circuit:')) locationIds.add(circuitId);
+  }
   return {
     ...catalog,
-    games: catalog.games.filter((game) => allowed.has(game.id)),
+    locations: catalog.locations.filter((location) => locationIds.has(location.id)),
+    games,
   };
 }
