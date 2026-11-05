@@ -1,6 +1,11 @@
 import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { isMockMode, supabase } from '@/lib/supabase';
+import {
+  parseAuthHandoff,
+  shouldKeepHandoffSession,
+  stripAuthHandoffFromWindow,
+} from '@/lib/authHandoff';
 
 interface AuthContextValue {
   user: User | null;
@@ -8,6 +13,7 @@ interface AuthContextValue {
   isAdmin: boolean;
   isFormateur: boolean;
   displayName: string;
+  handoffEmail: string;
   signIn: (email: string, password: string) => Promise<string | null>;
   signUp: (email: string, password: string, displayName: string) => Promise<string | null>;
   signOut: () => Promise<void>;
@@ -61,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(!isMockMode);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isFormateur, setIsFormateur] = useState(false);
+  const [handoffEmail] = useState(() => parseAuthHandoff().email);
 
   useEffect(() => {
     if (isMockMode || !supabase) {
@@ -71,32 +78,98 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     let cancelled = false;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!cancelled) {
-        const sessionUser = data.session?.user ?? null;
-        setUser(sessionUser);
-        if (sessionUser) {
-          checkIsAdmin(sessionUser).then((admin) => {
-            if (!cancelled) setIsAdmin(admin);
-          });
-          checkIsFormateur(sessionUser).then((formateur) => {
-            if (!cancelled) setIsFormateur(formateur);
-          });
-        }
-        setLoading(false);
-      }
-    });
+    const client = supabase;
+    const initialHandoff = parseAuthHandoff();
+    let pendingHandoff = initialHandoff.active;
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      const sessionUser = session?.user ?? null;
-      setUser(sessionUser);
+    const applyRoles = (sessionUser: User | null) => {
       if (sessionUser) {
-        checkIsAdmin(sessionUser).then(setIsAdmin);
-        checkIsFormateur(sessionUser).then(setIsFormateur);
+        checkIsAdmin(sessionUser).then((admin) => {
+          if (!cancelled) setIsAdmin(admin);
+        });
+        checkIsFormateur(sessionUser).then((formateur) => {
+          if (!cancelled) setIsFormateur(formateur);
+        });
       } else {
         setIsAdmin(false);
         setIsFormateur(false);
       }
+    };
+
+    const acceptSession = (sessionUser: User | null) => {
+      if (cancelled) return;
+      setUser(sessionUser);
+      applyRoles(sessionUser);
+    };
+
+    const finishHandoff = (sessionUser: User | null) => {
+      pendingHandoff = false;
+      stripAuthHandoffFromWindow();
+      acceptSession(sessionUser);
+    };
+
+    /**
+     * Lovable and Pages share Supabase but not origin/localStorage.
+     * `handoff=1` means: do not silently keep whoever last logged in on Pages.
+     * Same e-mail as the hint → keep. Other/missing session → local sign-out + login.
+     * Explicit SIGNED_IN (the GM typed a password) always wins, then params are stripped.
+     */
+    const resolveHandoff = async (
+      sessionUser: User | null,
+      event: string | null
+    ): Promise<void> => {
+      if (!pendingHandoff) {
+        acceptSession(sessionUser);
+        return;
+      }
+
+      if (event === 'SIGNED_IN' && sessionUser) {
+        finishHandoff(sessionUser);
+        return;
+      }
+
+      if (shouldKeepHandoffSession(sessionUser?.email, initialHandoff.email)) {
+        finishHandoff(sessionUser);
+        return;
+      }
+
+      if (sessionUser) {
+        try {
+          await client.auth.signOut({ scope: 'local' });
+        } catch {
+          // Never keep account B even if local sign-out errors.
+        }
+      }
+      if (!cancelled) acceptSession(null);
+    };
+
+    let sawAuthChange = false;
+    let queue: Promise<void> = Promise.resolve();
+    const enqueue = (sessionUser: User | null, event: string | null) => {
+      queue = queue.then(
+        () => resolveHandoff(sessionUser, event),
+        () => resolveHandoff(sessionUser, event)
+      );
+      return queue;
+    };
+
+    client.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
+      // onAuthStateChange already applied the restored session (avoids a stale getSession).
+      if (sawAuthChange) {
+        setLoading(false);
+        return;
+      }
+      void enqueue(data.session?.user ?? null, 'INITIAL_SESSION').finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    });
+
+    const { data: sub } = client.auth.onAuthStateChange((event, session) => {
+      sawAuthChange = true;
+      void enqueue(session?.user ?? null, event).then(() => {
+        if (!cancelled) setLoading(false);
+      });
     });
 
     return () => {
@@ -114,6 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin,
       isFormateur,
       displayName: isMockMode ? 'GM Demo' : readDisplayName(user),
+      handoffEmail,
       signIn: async (email, password) => {
         if (!supabase) return 'Supabase non configuré';
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -136,7 +210,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await supabase?.auth.signOut();
       },
     }),
-    [user, loading, isAdmin, isFormateur]
+    [user, loading, isAdmin, isFormateur, handoffEmail]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
