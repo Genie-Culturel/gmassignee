@@ -54,9 +54,9 @@ type ParcoursRow = {
 export async function fetchParcoursList(): Promise<ParcoursDefinition[]> {
   if (isMockMode || !supabase) return readDemo();
   const { data, error } = await supabase
-    .from('gh_parcours')
+    .from('parcours')
     .select(
-      'id, name, description, is_provisional, gh_locations!location_slug(slug), gh_parcours_steps(id, parcours_id, step_key, label, hint, note, sort_order, is_active, deleted_at)'
+      'id, name, description, is_provisional, locations!location_id(slug), parcours_steps(id, parcours_id, step_key, label, hint, note, sort_order, is_active, deleted_at)'
     );
   if (error || !data?.length) {
     if (error) console.warn('Parcours: lecture impossible, parcours intégrés utilisés.', error.message);
@@ -97,7 +97,7 @@ export async function updateParcoursStep(
     return;
   }
   const { error } = await supabase
-    .from('gh_parcours_steps')
+    .from('parcours_steps')
     .update({ ...patch, updated_at: new Date().toISOString() })
     .eq('id', id);
   if (error) throw new Error(`Étape : ${error.message}`);
@@ -120,7 +120,7 @@ export async function addParcoursStep(parcoursId: string, label: string, sortOrd
     writeDemo(list);
     return;
   }
-  const { error } = await supabase.from('gh_parcours_steps').insert({
+  const { error } = await supabase.from('parcours_steps').insert({
     parcours_id: parcoursId,
     step_key: key,
     label,
@@ -136,7 +136,7 @@ export async function deleteParcoursStep(id: string) {
     return;
   }
   const { error } = await supabase
-    .from('gh_parcours_steps')
+    .from('parcours_steps')
     .update({ deleted_at: new Date().toISOString(), is_active: false })
     .eq('id', id);
   if (error) throw new Error(`Suppression : ${error.message}`);
@@ -160,7 +160,7 @@ export async function reorderParcoursSteps(updates: { id: string; sort_order: nu
   }
   for (const update of updates) {
     const { error } = await supabase
-      .from('gh_parcours_steps')
+      .from('parcours_steps')
       .update({ sort_order: update.sort_order })
       .eq('id', update.id);
     if (error) throw new Error(`Ordre : ${error.message}`);
@@ -206,7 +206,7 @@ export async function listStepFicheLinks(parcoursId: string): Promise<StepFicheL
     return result;
   }
   const { data, error } = await supabase
-    .from('gh_session_step_fiches')
+    .from('session_step_fiches')
     .select('step, fiche_id')
     .eq('parcours_id', parcoursId);
   if (error) throw new Error(`Fiches des étapes : ${error.message}`);
@@ -226,7 +226,7 @@ export async function linkStepFiche(parcoursId: string, stepKey: string, ficheId
     return;
   }
   const { error } = await supabase
-    .from('gh_session_step_fiches')
+    .from('session_step_fiches')
     .upsert(
       { parcours_id: parcoursId, step: stepKey, fiche_id: ficheId },
       { onConflict: 'parcours_id,step,fiche_id', ignoreDuplicates: true }
@@ -243,7 +243,7 @@ export async function unlinkStepFiche(parcoursId: string, stepKey: string, fiche
     return;
   }
   const { error } = await supabase
-    .from('gh_session_step_fiches')
+    .from('session_step_fiches')
     .delete()
     .eq('parcours_id', parcoursId)
     .eq('step', stepKey)
