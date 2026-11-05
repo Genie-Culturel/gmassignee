@@ -2,10 +2,11 @@ import { ProcedureFiche } from './database.types';
 import { VenueCatalog, VenueGame } from './venues';
 
 /**
- * Jeux VR Center qui ouvrent le circuit générique (lobby, pop-corn, salle, boissons…).
- * Archeogame et nettoyage sont volontairement exclus.
+ * Seule la compétence Saga ouvre le circuit VR Center générique
+ * (lobby, pop-corn, salle, boissons…). Planta / Serviteur / Schoolcrafter /
+ * Archeogame : fiches du jeu seulement.
  */
-export const VR_CIRCUIT_SLUGS = ['planta', 'serviteur', 'saga', 'schoolcrafter'] as const;
+export const VR_CIRCUIT_SLUGS = ['saga'] as const;
 
 /** Compétence RH « Nettoyage centre VR » : fiches nettoyage seulement. */
 export const NETTOYAGE_SLUGS = ['nettoyage'] as const;
@@ -76,8 +77,9 @@ export function idsForCompetenceFilter(
  *
  * - `authorizedGameIds === null` : pas de filtre (formateur / admin / démo).
  * - `[]` : aucune fiche (0 compétence RH).
- * - Saga / Serviteur / Planta / Schoolcrafter : circuit VR Center + fiches du jeu.
- * - Archeogame : fiches Archeogame seulement (pas le circuit VR).
+ * - Saga : circuit VR Center + fiches Saga.
+ * - Planta / Serviteur / Schoolcrafter / Da Vinci / Archeogame : fiches du jeu
+ *   (+ fiches lieu du parcours, hors circuit VR Center).
  * - Nettoyage : fiches nettoyage seulement.
  */
 export function filterFichesByCompetences(

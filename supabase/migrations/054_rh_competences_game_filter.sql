@@ -5,7 +5,8 @@
 -- Règles Julien :
 --   0 compétence RH            → 0 fiche (plus de circuit VR Center par défaut)
 --   Archeogame seulement       → fiches Archeogame (pas le circuit VR)
---   Saga / Serviteur / Planta / Schoolcrafter → circuit VR Center + fiches du jeu
+--   Saga seulement             → circuit VR Center + fiches Saga
+--   Planta / Da Vinci / Serviteur / Schoolcrafter → fiches du jeu (+ lieu du parcours), PAS le circuit VR
 --   Nettoyage centre VR        → fiches nettoyage seulement
 --   admin / formateur_suivi    → tout (inchangé, via has_formateur_role)
 --
@@ -31,6 +32,24 @@ ON CONFLICT (slug) DO UPDATE SET
 -- ============================================================================
 -- 2. Mapping RH public.games → gh_games (gaps 050)
 -- ============================================================================
+
+-- Planta (RH « La Bataille de la Planta - L'assaut ») → planta, SANS circuit VR
+INSERT INTO public.gh_game_rh_map (games_id, gh_games_id, notes)
+SELECT g.id, ghg.id, 'Planta → planta (fiches du jeu seulement, pas le circuit VR Center)'
+FROM public.games g
+CROSS JOIN public.gh_games ghg
+WHERE g.name ILIKE '%Planta%'
+  AND ghg.slug = 'planta'
+ON CONFLICT (games_id, gh_games_id) DO NOTHING;
+
+-- Da Vinci Code / Kids / Vinum → davinci (Escape Life Sion), SANS circuit VR
+INSERT INTO public.gh_game_rh_map (games_id, gh_games_id, notes)
+SELECT g.id, ghg.id, 'Da Vinci → davinci (fiches / lieu Escape Life Sion, pas le circuit VR Center)'
+FROM public.games g
+CROSS JOIN public.gh_games ghg
+WHERE g.name ILIKE '%Da%Vinci%'
+  AND ghg.slug = 'davinci'
+ON CONFLICT (games_id, gh_games_id) DO NOTHING;
 
 -- ARcheo Game - Sion (catégorie ARcheoGame) → archeogame, SANS circuit VR
 INSERT INTO public.gh_game_rh_map (games_id, gh_games_id, notes)
@@ -104,8 +123,8 @@ WHERE skip_version_bump IS TRUE;
 
 COMMENT ON TABLE public.gh_game_rh_map IS
   'Maps Lovable RH games to gh_games.
-   Circuit VR (filtre client, slugs planta/serviteur/saga/schoolcrafter) : lobby + pop-corn + salle + boissons.
-   archeogame : pas de circuit VR.
+   Circuit VR (filtre client, slug saga UNIQUEMENT) : lobby + pop-corn + salle + boissons.
+   Planta / Da Vinci / Serviteur / Schoolcrafter / archeogame : fiches du jeu, pas le circuit VR.
    nettoyage : fiches nettoyage seulement.
    Gaps restants : RAVE, Magi Room, Evenement outdoor n''ont pas de fiches training.
    Chandoline/Novasphère : aucune ligne RH games à ce jour ; le INSERT ci-dessus matchera si le nom est ajouté.';
@@ -119,7 +138,7 @@ COMMENT ON TABLE public.gh_game_rh_map IS
 -- JOIN public.gh_games ghg ON ghg.id = m.gh_games_id
 -- ORDER BY g.name;
 --
--- -- TEST TEST-1 (0 compétence) → tableau vide
+-- -- TEST TEST-1 (Planta + Da Vinci Code) → [planta.id, davinci.id]
 -- SELECT public.gh_get_authorized_game_ids('f813a743-3d17-4977-85bb-35771754fd7b'::uuid);
 --
 -- SELECT slug, name FROM public.gh_games ORDER BY sort_index, slug;

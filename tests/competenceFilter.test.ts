@@ -132,6 +132,45 @@ test('Saga : circuit VR Center + fiches Saga, sans Planta / Archeogame / Chandol
   assert.deepEqual(ids, ['drinks', 'helmets', 'lobby', 'popcorn', 'room', 'saga-pitch']);
 });
 
+test('Planta seul : fiches Planta seulement, PAS le circuit VR Center', () => {
+  const ids = titles(filterFichesByCompetences(ALL, ['game-planta'], catalog));
+  assert.deepEqual(ids, ['planta-pitch']);
+});
+
+test('Planta + Da Vinci : union des fiches jeu/lieu, PAS le circuit VR Center', () => {
+  const briefing = fiche({
+    id: 'davinci',
+    title: 'Briefing Davinci',
+    scope_kind: 'games',
+    scope_location_ids: [],
+    scope_game_ids: ['game-davinci'],
+  });
+  const sion = fiche({
+    id: 'sion-accueil',
+    title: 'Accueil Escape Life Sion',
+    scope_kind: 'locations',
+    scope_location_ids: ['loc-escape_sion'],
+    scope_game_ids: [],
+  });
+  const ids = titles(
+    filterFichesByCompetences([...ALL, briefing, sion], ['game-planta', 'game-davinci'], catalog)
+  );
+  assert.deepEqual(ids, ['davinci', 'planta-pitch', 'sion-accueil']);
+  assert.equal(ids.includes('lobby'), false);
+});
+
+test('Serviteur seul : pas le circuit VR (réservé à Saga)', () => {
+  const launch = fiche({
+    id: 'serv-launch',
+    title: 'Lancement du Serviteur',
+    scope_kind: 'games',
+    scope_location_ids: [],
+    scope_game_ids: ['game-serviteur'],
+  });
+  const ids = titles(filterFichesByCompetences([...ALL, launch], ['game-serviteur'], catalog));
+  assert.deepEqual(ids, ['serv-launch']);
+});
+
 test('Archeogame : seulement fiches Archeogame, pas le circuit VR', () => {
   const ids = titles(filterFichesByCompetences(ALL, ['game-archeogame'], catalog));
   assert.deepEqual(ids, ['archeo']);
