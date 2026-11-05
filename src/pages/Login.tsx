@@ -8,14 +8,15 @@ import { useAuth } from '@/hooks/useAuth';
 import { setDemoFlag } from '@/lib/config';
 
 export function Login() {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, handoffEmail } = useAuth();
   const [mode, setMode] = useState<'in' | 'up'>('in');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(handoffEmail);
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const fromLovable = Boolean(handoffEmail);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -49,12 +50,22 @@ export function Login() {
         <CardHeader>
           <CardTitle>GMassignee</CardTitle>
           <CardDescription>
-            {mode === 'in'
-              ? 'Connecte-toi pour suivre tes parties VR Center'
-              : 'Crée un compte GM (e-mail + mot de passe)'}
+            {fromLovable
+              ? 'Pour ouvrir Formations / Suivi avec le même compte que le tableau de bord GM, reconnecte-toi.'
+              : mode === 'in'
+                ? 'Connecte-toi pour suivre tes parties VR Center'
+                : 'Crée un compte GM (e-mail + mot de passe)'}
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {fromLovable && (
+            <Alert className="mb-4">
+              <AlertDescription>
+                La session GitHub Pages n'est pas partagée avec Lovable. Connecte-toi
+                {handoffEmail ? ` avec ${handoffEmail}` : ''}.
+              </AlertDescription>
+            </Alert>
+          )}
           <form onSubmit={onSubmit} className="space-y-4">
             {mode === 'up' && (
               <div className="space-y-2">
@@ -78,6 +89,7 @@ export function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="gm@genie-culturel.ch"
                 autoComplete="email"
+                autoFocus={!handoffEmail}
               />
             </div>
             <div className="space-y-2">
@@ -90,6 +102,7 @@ export function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete={mode === 'in' ? 'current-password' : 'new-password'}
+                autoFocus={Boolean(handoffEmail) && mode === 'in'}
               />
             </div>
             {error && (
