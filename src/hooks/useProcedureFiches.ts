@@ -46,14 +46,14 @@ export function useProcedureFiches(opts?: { includeInactive?: boolean }) {
           sortFichesByOrder(
             (data || []).map((row) => {
               const record = row as ProcedureFiche & {
-                fiche_scope_locations?: { location_id: string }[];
-                fiche_scope_games?: { game_id: string }[];
+                gh_fiche_scope_locations?: { location_id: string }[];
+                gh_fiche_scope_games?: { game_id: string }[];
               };
               return hydrateTrainingFiche({
                 ...record,
                 scope_kind: record.scope_kind || 'all',
-                scope_location_ids: (record.fiche_scope_locations || []).map((item) => item.location_id),
-                scope_game_ids: (record.fiche_scope_games || []).map((item) => item.game_id),
+                scope_location_ids: (record.gh_fiche_scope_locations || []).map((item) => item.location_id),
+                scope_game_ids: (record.gh_fiche_scope_games || []).map((item) => item.game_id),
               });
             })
           )
