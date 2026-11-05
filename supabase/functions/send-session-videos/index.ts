@@ -58,7 +58,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const { data: session, error: sessionErr } = await admin
-      .from("vr_sessions")
+      .from("gh_vr_sessions")
       .select("id, gm_id, client_email, videos_download_token, game, group_name")
       .eq("id", sessionId)
       .maybeSingle();
@@ -69,7 +69,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const { data: media, error: mediaErr } = await admin
-      .from("session_media")
+      .from("gh_session_media")
       .select("id, path, original_name, expires_at")
       .eq("session_id", sessionId);
     if (mediaErr) return json({ ok: false, error: mediaErr.message }, 500);
@@ -85,7 +85,7 @@ Deno.serve(async (req: Request) => {
 
     const linkPatch: Record<string, unknown> = { videos_download_token: token };
     if (clientEmail) linkPatch.client_email = clientEmail;
-    const { error: updErr } = await admin.from("vr_sessions").update(linkPatch).eq("id", sessionId);
+    const { error: updErr } = await admin.from("gh_vr_sessions").update(linkPatch).eq("id", sessionId);
     if (updErr) return json({ ok: false, error: updErr.message }, 500);
 
     const resendKey = Deno.env.get("RESEND_API_KEY") || "";
@@ -138,8 +138,8 @@ Deno.serve(async (req: Request) => {
 
     if (emailed) {
       // Envoi réel au client : on marque « vidéos envoyées » + l'étape du parcours.
-      await admin.from("vr_sessions").update({ videos_sent_at: sentAt }).eq("id", sessionId);
-      await admin.from("session_steps").upsert(
+      await admin.from("gh_vr_sessions").update({ videos_sent_at: sentAt }).eq("id", sessionId);
+      await admin.from("gh_session_steps").upsert(
         { session_id: sessionId, step: "videos_sent", completed_at: sentAt },
         { onConflict: "session_id,step" },
       );
