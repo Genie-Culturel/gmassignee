@@ -252,6 +252,44 @@ export async function listRecordedSessions(): Promise<RecordedSessionRow[]> {
     .order('started_at', { ascending: false })
     .limit(60);
   if (error) throw new Error(error.message);
+  
+  const sessionIds = (data || []).map((row) => row.id);
+  
+  // Batch check for bug entries: sessions with bug reports should show incident flag
+  const sessionsWithBugs = new Set<string>();
+  if (sessionIds.length > 0) {
+    try {
+      // Check gh_bug_sessions for sessions linked by vr_session_id or ref
+      const { data: bugSessions } = await supabase
+        .from('gh_bug_sessions')
+        .select('id, vr_session_id, ref')
+        .or(`vr_session_id.in.(${sessionIds.join(',')}),ref.in.(${sessionIds.join(',')})`);
+      
+      if (bugSessions && bugSessions.length > 0) {
+        const bugSessionIds = bugSessions.map((bs) => bs.id);
+        
+        // Check if any of these bug sessions have bug entries
+        const { data: bugEntries } = await supabase
+          .from('gh_bug_entries')
+          .select('bug_session_id')
+          .in('bug_session_id', bugSessionIds);
+        
+        if (bugEntries && bugEntries.length > 0) {
+          // Map back to session IDs
+          const bugSessionIdsWithEntries = new Set(bugEntries.map((be) => be.bug_session_id));
+          for (const bs of bugSessions) {
+            if (bugSessionIdsWithEntries.has(bs.id)) {
+              if (bs.vr_session_id) sessionsWithBugs.add(bs.vr_session_id);
+              if (bs.ref) sessionsWithBugs.add(bs.ref);
+            }
+          }
+        }
+      }
+    } catch {
+      // Best effort: if bug checking fails, continue with regular flags
+    }
+  }
+  
   return (data || []).map((row) => {
     const sales = ((row.gh_session_sales || []) as { quantity: number; unit_price: number; payment_method: string }[]).map(
       (sale) => ({ quantity: sale.quantity, unitPrice: Number(sale.unit_price), paymentMethod: sale.payment_method })
@@ -259,6 +297,12 @@ export async function listRecordedSessions(): Promise<RecordedSessionRow[]> {
     const fromSales = collectedFromSales(sales);
     const collected = Math.max(fromSales.amount, Number(row.total_collected || 0));
     const mediaAgg = row.gh_session_media as { count: number }[] | null | undefined;
+    
+    // If session has bug entries but no incident type set, treat as bug incident
+    const hasBugEntries = sessionsWithBugs.has(row.id);
+    const effectiveIncidentType = row.incident_type || (hasBugEntries ? 'bug' : null);
+    const effectiveHasIncident = Boolean(row.has_incident) || hasBugEntries;
+    
     return {
     sessionId: row.id,
     game: row.game || 'Session VR',
@@ -269,10 +313,10 @@ export async function listRecordedSessions(): Promise<RecordedSessionRow[]> {
     clientEmail: row.client_email,
     videosSentAt: row.videos_sent_at,
     isManual: typeof row.is_manual === 'boolean' ? row.is_manual : !row.assignment_id,
-    incidentType: row.incident_type,
+    incidentType: effectiveIncidentType,
     flags: computeSessionFlags({
-      hasIncident: Boolean(row.has_incident),
-      incidentType: row.incident_type,
+      hasIncident: effectiveHasIncident,
+      incidentType: effectiveIncidentType,
       incidentDetails: row.incident_details || '',
       notes: row.notes || '',
       salesComment: row.sales_comment || '',

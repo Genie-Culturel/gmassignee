@@ -364,6 +364,21 @@ export function SuiviParties() {
     }
   };
 
+  const handleOpenBugReporter = async () => {
+    if (!activeSession) return;
+    openBugReporter(activeSession, incidentDetails);
+    // Persist incidentType: 'bug' when opening Bug reporter
+    try {
+      await updateSessionFields(activeSession.sessionId, {
+        incidentType: 'bug',
+        incidentDetails: incidentDetails || '',
+      });
+      setIncidentType('bug');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Incident non enregistré');
+    }
+  };
+
   const onNotesChange = (notes: string) => {
     if (!activeSession) return;
     setActiveSession({ ...activeSession, notes });
@@ -671,7 +686,7 @@ export function SuiviParties() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => openBugReporter(activeSession, incidentDetails)}
+              onClick={() => void handleOpenBugReporter()}
               className="w-full"
             >
               <ExternalLink className="h-4 w-4 mr-2" />
@@ -705,7 +720,7 @@ export function SuiviParties() {
                   variant="outline"
                   size="sm"
                   className="w-full"
-                  onClick={() => openBugReporter(activeSession, incidentDetails)}
+                  onClick={() => void handleOpenBugReporter()}
                 >
                   <ExternalLink className="h-4 w-4 mr-2" />
                   Rouvrir le Bug reporter
