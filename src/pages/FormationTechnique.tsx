@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -36,6 +37,7 @@ import {
   readStoredGameId,
   writeStoredGameId,
 } from '@/lib/venues';
+import { FORMATION_EDITOR_TAB, formationTabFromSearch } from '@/lib/formationNav';
 
 const SHORT_CATEGORY_LABELS: Partial<Record<FicheCategory, string>> = {
   procedure_deroulement: 'Procédure',
@@ -51,6 +53,11 @@ function statusVariant(status: 'todo' | 'done' | 'revalidate') {
 export function FormationTechnique() {
   const { user, isFormateur } = useAuth();
   const { options } = useGmOptions();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const categories: FicheCategory[] = FORMATION_PAGE_CATEGORIES;
+  const tabFromUrl = formationTabFromSearch(location.search, isFormateur);
+  const [activeTab, setActiveTab] = useState(tabFromUrl || categories[0]);
   const { fiches, isLoading, error, reload, authorizedGameIds } = useProcedureFiches({
     includeInactive: isFormateur,
   });
@@ -83,7 +90,18 @@ export function FormationTechnique() {
     loadValidations();
   }, [loadValidations]);
 
-  const categories: FicheCategory[] = FORMATION_PAGE_CATEGORIES;
+  useEffect(() => {
+    if (tabFromUrl) setActiveTab(tabFromUrl);
+  }, [tabFromUrl]);
+
+  const onTabChange = (next: string) => {
+    setActiveTab(next);
+    const params = new URLSearchParams(location.search);
+    if (next === FORMATION_EDITOR_TAB) params.set('tab', FORMATION_EDITOR_TAB);
+    else params.delete('tab');
+    const search = params.toString();
+    navigate({ pathname: location.pathname, search: search ? `?${search}` : '' }, { replace: true });
+  };
   const scopedFiches = useMemo(
     () => filterFichesForGame(fiches, selectableCatalog, gameId),
     [fiches, selectableCatalog, gameId]
@@ -114,7 +132,7 @@ export function FormationTechnique() {
     );
   }
 
-  if (error) {
+  if (error && !isFormateur) {
     return (
       <div className="space-y-4 p-4">
         <h1 className="text-3xl font-bold tracking-tight">Formations & Procédures</h1>
@@ -134,7 +152,15 @@ export function FormationTechnique() {
   return (
     <div className="space-y-5 pb-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Formations & Procédures</h1>
+        <h1 className="flex flex-wrap items-center gap-2 text-3xl font-bold tracking-tight">
+          Formations & Procédures
+          {isFormateur && <Badge variant="secondary">Éditeur</Badge>}
+        </h1>
+        {error && isFormateur && (
+          <p className="mt-2 text-sm text-red-700">
+            Impossible de charger les fiches : {error.message}. L&apos;éditeur reste disponible.
+          </p>
+        )}
         {hasNoCompetences ? (
           <p className="mt-2 text-sm text-muted-foreground">
             Aucune compétence RH enregistrée : aucune fiche à remplir (progression 0/0).
@@ -161,7 +187,7 @@ export function FormationTechnique() {
 
       <GameScopeSelect catalog={selectableCatalog} value={gameId} onChange={onGameChange} />
 
-      <Tabs defaultValue={categories[0]} className="w-full">
+      <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
         <TabsList className="flex h-auto w-full flex-wrap gap-1">
           {categories.map((cat) => {
             const stats = progressFor(scopedFiches, validations, cat);

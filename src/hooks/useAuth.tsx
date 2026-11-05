@@ -6,6 +6,7 @@ import {
   shouldKeepHandoffSession,
   stripAuthHandoffFromWindow,
 } from '@/lib/authHandoff';
+import { staffFlagsFromRoles } from '@/lib/roles';
 
 interface AuthContextValue {
   user: User | null;
@@ -21,34 +22,22 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-async function checkIsAdmin(user: User | null): Promise<boolean> {
-  if (!user || !supabase) return false;
-  try {
-    const { data } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .eq('role', 'admin')
-      .maybeSingle();
-    return Boolean(data);
-  } catch {
-    return false;
-  }
-}
+async function fetchRoleFlags(user: User | null): Promise<{ isAdmin: boolean; isFormateur: boolean }> {
+  if (!user || !supabase) return { isAdmin: false, isFormateur: false };
 
-async function checkIsFormateur(user: User | null): Promise<boolean> {
-  if (!user || !supabase) return false;
-  try {
-    const { data } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .in('role', ['admin', 'formateur_suivi'])
-      .maybeSingle();
-    return Boolean(data);
-  } catch {
-    return false;
+  const { data, error } = await supabase.from('user_roles').select('role').eq('user_id', user.id);
+  if (!error) {
+    return staffFlagsFromRoles((data || []).map((row) => row.role));
   }
+
+  console.warn('[Auth] user_roles query failed, falling back to has_formateur_role:', error.message);
+  const { data: isStaff, error: rpcError } = await supabase.rpc('has_formateur_role');
+  if (rpcError) {
+    console.warn('[Auth] has_formateur_role RPC failed:', rpcError.message);
+    return { isAdmin: false, isFormateur: false };
+  }
+  // RPC does not distinguish admin vs formateur_suivi; both get Éditeur.
+  return { isAdmin: isStaff === true, isFormateur: isStaff === true };
 }
 
 function readDisplayName(user: User | null): string {
@@ -65,8 +54,8 @@ function readDisplayName(user: User | null): string {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(!isMockMode);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isFormateur, setIsFormateur] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(isMockMode);
+  const [isFormateur, setIsFormateur] = useState(isMockMode);
   const [handoffEmail] = useState(() => parseAuthHandoff().email);
 
   useEffect(() => {
@@ -82,30 +71,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const initialHandoff = parseAuthHandoff();
     let pendingHandoff = initialHandoff.active;
 
-    const applyRoles = (sessionUser: User | null) => {
-      if (sessionUser) {
-        checkIsAdmin(sessionUser).then((admin) => {
-          if (!cancelled) setIsAdmin(admin);
-        });
-        checkIsFormateur(sessionUser).then((formateur) => {
-          if (!cancelled) setIsFormateur(formateur);
-        });
-      } else {
-        setIsAdmin(false);
-        setIsFormateur(false);
+    const applyRoles = async (sessionUser: User | null) => {
+      if (!sessionUser) {
+        if (!cancelled) {
+          setIsAdmin(false);
+          setIsFormateur(false);
+        }
+        return;
+      }
+      const flags = await fetchRoleFlags(sessionUser);
+      if (!cancelled) {
+        setIsAdmin(flags.isAdmin);
+        setIsFormateur(flags.isFormateur);
       }
     };
 
-    const acceptSession = (sessionUser: User | null) => {
+    const acceptSession = async (sessionUser: User | null) => {
       if (cancelled) return;
       setUser(sessionUser);
-      applyRoles(sessionUser);
+      await applyRoles(sessionUser);
     };
 
-    const finishHandoff = (sessionUser: User | null) => {
+    const finishHandoff = async (sessionUser: User | null) => {
       pendingHandoff = false;
       stripAuthHandoffFromWindow();
-      acceptSession(sessionUser);
+      await acceptSession(sessionUser);
     };
 
     /**
@@ -119,17 +109,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       event: string | null
     ): Promise<void> => {
       if (!pendingHandoff) {
-        acceptSession(sessionUser);
+        await acceptSession(sessionUser);
         return;
       }
 
       if (event === 'SIGNED_IN' && sessionUser) {
-        finishHandoff(sessionUser);
+        await finishHandoff(sessionUser);
         return;
       }
 
       if (shouldKeepHandoffSession(sessionUser?.email, initialHandoff.email)) {
-        finishHandoff(sessionUser);
+        await finishHandoff(sessionUser);
         return;
       }
 
@@ -140,7 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Never keep account B even if local sign-out errors.
         }
       }
-      if (!cancelled) acceptSession(null);
+      if (!cancelled) await acceptSession(null);
     };
 
     let sawAuthChange = false;
