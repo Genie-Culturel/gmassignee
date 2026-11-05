@@ -54,12 +54,6 @@ export function isNettoyageFiche(fiche: ProcedureFiche): boolean {
   return /nettoyage/i.test(fiche.title || '');
 }
 
-function locationSlugsForFiche(fiche: ProcedureFiche, catalog: VenueCatalog): string[] {
-  return (fiche.scope_location_ids || [])
-    .map((id) => catalog.locations.find((location) => location.id === id)?.slug)
-    .filter((slug): slug is string => Boolean(slug));
-}
-
 /**
  * Normalise la réponse RPC `gh_get_authorized_game_ids`.
  * Tableau vide, null, ou valeur inattendue → `[]` (0 fiche), jamais « tout afficher ».
@@ -91,6 +85,10 @@ export function idsForCompetenceFilter(
  * - Archeogame : fiches Archeogame seulement (pas le circuit VR).
  * - Nettoyage : fiches nettoyage seulement.
  * - Da Vinci / Chandoline / etc. : fiches du jeu + fiches lieu du parcours, pas le circuit VR.
+ * - Jeux cochés (même avec un lieu en plus) : visible si compétence sur l'un de ces jeux.
+ *   Le lieu VR Center est un tag d'affichage, il n'ouvre pas le circuit aux autres GM.
+ * - Lieux seuls : circuit VR / lieu du parcours.
+ * - Portée vide (`all`) : tout GM avec ≥1 compétence (0 compétence → 0 fiche).
  */
 export function filterFichesByCompetences(
   fiches: ProcedureFiche[],
@@ -107,12 +105,6 @@ export function filterFichesByCompetences(
   const authorizedLocationIds = new Set(authorizedGames.map((game) => game.location_id));
 
   return fiches.filter((fiche) => {
-    const kind = fiche.scope_kind || 'all';
-
-    if (kind === 'games') {
-      return (fiche.scope_game_ids || []).some((gameId) => authorized.has(gameId));
-    }
-
     // Ménage hebdomadaire : jamais via le circuit VR, uniquement compétence nettoyage.
     if (isWeeklyCleaningFiche(fiche)) {
       return hasNettoyage;
@@ -124,18 +116,40 @@ export function filterFichesByCompetences(
       return true;
     }
 
-    if (kind === 'locations') {
-      const locSlugs = locationSlugsForFiche(fiche, catalog);
-      const locIds = fiche.scope_location_ids || [];
-      if (locSlugs.includes('vr_center')) {
-        return hasVrCircuit;
-      }
-      return locIds.some((locationId) => authorizedLocationIds.has(locationId));
+    const gameIds = fiche.scope_game_ids || [];
+    const locIds = fiche.scope_location_ids || [];
+    const gameMatch = gameIds.some((gameId) => authorized.has(gameId));
+    const locMatch = locIds.length > 0 && locationScopeMatches(fiche, catalog, hasVrCircuit, authorizedLocationIds);
+
+    // Double tag jeu + lieu : le jeu décide (Pitch Planta + VR Center ≠ visible Saga).
+    if (gameIds.length > 0) return gameMatch;
+    if (locMatch) return true;
+
+    // Portée vide / all : tout GM avec ≥1 compétence. 0 compétence déjà exclu plus haut.
+    if (locIds.length === 0) {
+      return (fiche.scope_kind || 'all') === 'all';
     }
 
-    // scope_kind = all : pas de visibilité automatique pour un GM (0 compétence → 0 fiche).
     return false;
   });
+}
+
+function locationScopeMatches(
+  fiche: ProcedureFiche,
+  catalog: VenueCatalog,
+  hasVrCircuit: boolean,
+  authorizedLocationIds: Set<string>
+): boolean {
+  const locIds = fiche.scope_location_ids || [];
+  for (const locId of locIds) {
+    const slug = catalog.locations.find((location) => location.id === locId)?.slug;
+    if (slug === 'vr_center') {
+      if (hasVrCircuit) return true;
+      continue;
+    }
+    if (authorizedLocationIds.has(locId)) return true;
+  }
+  return false;
 }
 
 /** Restreint le sélecteur de jeux aux compétences du GM. Formateur/admin : catalogue intact. */

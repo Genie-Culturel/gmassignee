@@ -39,6 +39,8 @@ export const DEMO_GAMES: VenueGame[] = [
   { id: 'game-serviteur', location_id: 'loc-vr_center', slug: 'serviteur', name: 'Le Serviteur 1 & 2', sort_index: 2 },
   { id: 'game-saga', location_id: 'loc-vr_center', slug: 'saga', name: 'La Saga', sort_index: 3 },
   { id: 'game-schoolcrafter', location_id: 'loc-vr_center', slug: 'schoolcrafter', name: 'Schoolcrafter', sort_index: 4 },
+  { id: 'game-archeogame', location_id: 'loc-vr_center', slug: 'archeogame', name: 'ARcheo Game', sort_index: 5 },
+  { id: 'game-nettoyage', location_id: 'loc-vr_center', slug: 'nettoyage', name: 'Nettoyage centre VR', sort_index: 6 },
   { id: 'game-usine_chandoline', location_id: 'loc-chandoline', slug: 'usine_chandoline', name: 'Novasphère', sort_index: 1 },
   { id: 'game-davinci', location_id: 'loc-escape_sion', slug: 'davinci', name: 'Da Vinci Code', sort_index: 1 },
   { id: 'game-feux_sacres', location_id: 'loc-escape_sierre', slug: 'feux_sacres', name: 'Le Feu sacré', sort_index: 1 },
@@ -198,11 +200,11 @@ export function ficheAppliesToGame(
   if (!gameId || gameId === ALL_GAMES_VALUE) return true;
   const game = findGame(catalog, gameId);
   if (!game) return true;
-  const kind = fiche.scope_kind || 'all';
-  if (kind === 'all') return true;
-  if (kind === 'locations') return (fiche.scope_location_ids || []).includes(game.location_id);
-  if (kind === 'games') return (fiche.scope_game_ids || []).includes(game.id);
-  return true;
+  const locationIds = fiche.scope_location_ids || [];
+  const gameIds = fiche.scope_game_ids || [];
+  if (locationIds.length === 0 && gameIds.length === 0) return true;
+  if (gameIds.length > 0) return gameIds.includes(game.id);
+  return locationIds.includes(game.location_id);
 }
 
 export function filterFichesForGame(
@@ -214,20 +216,19 @@ export function filterFichesForGame(
 }
 
 export function ficheScopeBadgeLabel(fiche: ProcedureFiche, catalog: VenueCatalog): string {
-  const kind = fiche.scope_kind || 'all';
-  if (kind === 'all') return 'Tous les lieux';
-  if (kind === 'locations') {
-    const names = (fiche.scope_location_ids || [])
-      .map((id) => findLocation(catalog, id)?.short_name)
-      .filter(Boolean) as string[];
-    if (!names.length) return 'Lieux';
-    if (names.length === 1) return names[0];
-    return names.slice(0, 2).join(', ') + (names.length > 2 ? ` +${names.length - 2}` : '');
+  const locationIds = fiche.scope_location_ids || [];
+  const gameIds = fiche.scope_game_ids || [];
+  if ((fiche.scope_kind || 'all') === 'all' && locationIds.length === 0 && gameIds.length === 0) {
+    return 'Tout le monde';
   }
-  const names = (fiche.scope_game_ids || [])
+  const locNames = locationIds
+    .map((id) => findLocation(catalog, id)?.short_name)
+    .filter(Boolean) as string[];
+  const gameNames = gameIds
     .map((id) => catalog.games.find((game) => game.id === id)?.name)
     .filter(Boolean) as string[];
-  if (!names.length) return 'Jeux';
+  const names = [...locNames, ...gameNames];
+  if (!names.length) return locationIds.length ? 'Lieux' : 'Jeux';
   if (names.length === 1) return names[0];
   return names.slice(0, 2).join(', ') + (names.length > 2 ? ` +${names.length - 2}` : '');
 }

@@ -59,10 +59,10 @@ function candidateFiches(fiches: ProcedureFiche[], catalog: VenueCatalog, locati
   return fiches
     .filter((fiche) => fiche.is_active && !isFicheDeleted(fiche))
     .filter((fiche) => {
-      const kind = fiche.scope_kind || 'all';
-      if (kind === 'all' || !location) return true;
-      if (kind === 'locations') return (fiche.scope_location_ids || []).includes(location.id);
-      return (fiche.scope_game_ids || []).some((id) => gameIds.has(id));
+      const locationIds = fiche.scope_location_ids || [];
+      const scopedGameIds = fiche.scope_game_ids || [];
+      if (!location || (locationIds.length === 0 && scopedGameIds.length === 0)) return true;
+      return locationIds.includes(location.id) || scopedGameIds.some((id) => gameIds.has(id));
     })
     .sort((a, b) => a.title.localeCompare(b.title, 'fr'));
 }

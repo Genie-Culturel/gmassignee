@@ -9,26 +9,7 @@ import {
 import { ProcedureFiche } from '../src/lib/database.types.ts';
 import { DEMO_CATALOG, VenueCatalog } from '../src/lib/venues.ts';
 
-const catalog: VenueCatalog = {
-  ...DEMO_CATALOG,
-  games: [
-    ...DEMO_CATALOG.games,
-    {
-      id: 'game-archeogame',
-      location_id: 'loc-vr_center',
-      slug: 'archeogame',
-      name: 'ARcheo Game',
-      sort_index: 5,
-    },
-    {
-      id: 'game-nettoyage',
-      location_id: 'loc-vr_center',
-      slug: 'nettoyage',
-      name: 'Nettoyage centre VR',
-      sort_index: 6,
-    },
-  ],
-};
+const catalog: VenueCatalog = DEMO_CATALOG;
 
 function fiche(partial: Partial<ProcedureFiche> & Pick<ProcedureFiche, 'id' | 'title'>): ProcedureFiche {
   const now = '2026-11-05T00:00:00.000Z';
@@ -76,7 +57,14 @@ const plantaPitch = fiche({
   id: 'planta-pitch',
   title: 'Présentation : Bataille de la Planta',
   scope_kind: 'games',
-  scope_location_ids: [],
+  scope_location_ids: ['loc-vr_center'],
+  scope_game_ids: ['game-planta'],
+});
+const plantaStart = fiche({
+  id: 'planta-start',
+  title: 'Pitch start : Bataille de la Planta',
+  scope_kind: 'games',
+  scope_location_ids: ['loc-vr_center'],
   scope_game_ids: ['game-planta'],
 });
 const archeo = fiche({
@@ -110,6 +98,7 @@ const ALL = [
   weekly,
   sagaPitch,
   plantaPitch,
+  plantaStart,
   archeo,
   chandoline,
   novasphere,
@@ -142,9 +131,20 @@ test('Saga : circuit VR Center + fiches Saga, sans Planta / Archeogame / Chandol
 
 test('Planta : circuit VR Center + fiches Planta (pas Archeogame / Chandoline / semaine)', () => {
   const ids = titles(filterFichesByCompetences(ALL, ['game-planta'], catalog));
-  expectIds(ids, ['planta-pitch']);
+  expectIds(ids, ['planta-pitch', 'planta-start']);
   assert.equal(ids.includes('archeo'), false);
   assert.equal(ids.includes('weekly'), false);
+});
+
+test('double tag Pitch/Présentation Planta : visible Planta, pas Saga (le lieu VR n’élargit pas)', () => {
+  const plantaIds = titles(filterFichesByCompetences(ALL, ['game-planta'], catalog));
+  const sagaIds = titles(filterFichesByCompetences(ALL, ['game-saga'], catalog));
+  assert.equal(plantaIds.includes('planta-pitch'), true);
+  assert.equal(plantaIds.includes('planta-start'), true);
+  assert.equal(plantaIds.includes('lobby'), true);
+  assert.equal(sagaIds.includes('planta-pitch'), false);
+  assert.equal(sagaIds.includes('planta-start'), false);
+  assert.equal(sagaIds.includes('lobby'), true);
 });
 
 test('Planta + Da Vinci : circuit VR + Planta + fiches Da Vinci / lieu Sion', () => {
@@ -165,7 +165,7 @@ test('Planta + Da Vinci : circuit VR + Planta + fiches Da Vinci / lieu Sion', ()
   const ids = titles(
     filterFichesByCompetences([...ALL, briefing, sion], ['game-planta', 'game-davinci'], catalog)
   );
-  expectIds(ids, ['davinci', 'planta-pitch', 'sion-accueil']);
+  expectIds(ids, ['davinci', 'planta-pitch', 'planta-start', 'sion-accueil']);
 });
 
 test('Serviteur : circuit VR Center + fiches Serviteur', () => {

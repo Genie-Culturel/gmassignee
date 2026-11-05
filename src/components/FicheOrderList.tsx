@@ -24,17 +24,21 @@ import { FICHE_CATEGORY_LABELS, FORMATION_PAGE_CATEGORIES } from '@/lib/constant
 import { sortFichesByOrder, sortOrderUpdatesForVisibleReorder } from '@/lib/training';
 import { reorderFiches } from '@/lib/trainingRepository';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { FicheScopeBadges } from '@/components/FicheScopeEditor';
 import { cn } from '@/lib/utils';
 import { groupFichesBySubGroup } from '@/lib/ficheSubGroups';
 import { FinePointerSensor } from '@/lib/dndSensors';
+import { VenueCatalog } from '@/lib/venues';
 
 export function FicheOrderList({
   fiches,
+  catalog,
   selectedId,
   onSelect,
   onReordered,
 }: {
   fiches: ProcedureFiche[];
+  catalog: VenueCatalog;
   selectedId: string;
   onSelect: (id: string) => void;
   onReordered: () => void;
@@ -93,6 +97,7 @@ export function FicheOrderList({
                 key={`${category}-${group.value ?? 'general'}`}
                 title={group.label}
                 rows={group.fiches}
+                catalog={catalog}
                 selectedId={selectedId}
                 onSelect={onSelect}
                 onApply={async (ids) => {
@@ -119,12 +124,14 @@ export function FicheOrderList({
 function CategoryOrderList({
   title,
   rows,
+  catalog,
   selectedId,
   onSelect,
   onApply,
 }: {
   title: string;
   rows: ProcedureFiche[];
+  catalog: VenueCatalog;
   selectedId: string;
   onSelect: (id: string) => void;
   onApply: (orderedIds: string[]) => Promise<void>;
@@ -190,6 +197,7 @@ function CategoryOrderList({
                 <SortableFicheRow
                   key={id}
                   fiche={fiche}
+                  catalog={catalog}
                   selected={selectedId === id}
                   onSelect={() => {
                     if (skipClickRef.current) {
@@ -204,7 +212,7 @@ function CategoryOrderList({
           </ul>
         </SortableContext>
         <DragOverlay>
-          {activeFiche ? <FicheRowPreview fiche={activeFiche} /> : null}
+          {activeFiche ? <FicheRowPreview fiche={activeFiche} catalog={catalog} /> : null}
         </DragOverlay>
       </DndContext>
       </div>
@@ -214,10 +222,12 @@ function CategoryOrderList({
 
 function SortableFicheRow({
   fiche,
+  catalog,
   selected,
   onSelect,
 }: {
   fiche: ProcedureFiche;
+  catalog: VenueCatalog;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -258,12 +268,15 @@ function SortableFicheRow({
         title={fiche.is_active ? 'Actif' : 'Inactif'}
         aria-label={fiche.is_active ? 'Actif' : 'Inactif'}
       />
-      <span className="min-w-0 flex-1 text-left text-sm font-medium leading-snug">{fiche.title}</span>
+      <span className="min-w-0 flex-1 text-left">
+        <span className="block text-sm font-medium leading-snug">{fiche.title}</span>
+        <FicheScopeBadges fiche={fiche} catalog={catalog} className="mt-1" />
+      </span>
     </li>
   );
 }
 
-function FicheRowPreview({ fiche }: { fiche: ProcedureFiche }) {
+function FicheRowPreview({ fiche, catalog }: { fiche: ProcedureFiche; catalog: VenueCatalog }) {
   return (
     <div className="flex items-start gap-2 rounded-md border bg-card px-2 py-2.5 shadow-md">
       <GripVertical className="mt-0.5 h-3.5 w-3.5 text-muted-foreground/60" aria-hidden />
@@ -274,7 +287,10 @@ function FicheRowPreview({ fiche }: { fiche: ProcedureFiche }) {
         )}
         aria-hidden
       />
-      <span className="text-sm font-medium leading-snug">{fiche.title}</span>
+      <span className="min-w-0">
+        <span className="block text-sm font-medium leading-snug">{fiche.title}</span>
+        <FicheScopeBadges fiche={fiche} catalog={catalog} className="mt-1" />
+      </span>
     </div>
   );
 }
