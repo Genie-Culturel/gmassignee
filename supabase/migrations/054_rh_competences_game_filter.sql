@@ -4,10 +4,13 @@
 --
 -- Règles Julien :
 --   0 compétence RH            → 0 fiche (plus de circuit VR Center par défaut)
+--   Jeu VR Centre (Planta, Serviteur, Saga, SchoolCrafter, ou autre jeu
+--     clairement VR Centre déjà mappé, hors Archeogame / nettoyage)
+--                          → circuit VR Center (lieu vr_center / parcours vr_centre_client)
+--                            + fiches du jeu
 --   Archeogame seulement       → fiches Archeogame (pas le circuit VR)
---   Saga seulement             → circuit VR Center + fiches Saga
---   Planta / Da Vinci / Serviteur / Schoolcrafter → fiches du jeu (+ lieu du parcours), PAS le circuit VR
 --   Nettoyage centre VR        → fiches nettoyage seulement
+--   Da Vinci / Chandoline      → fiches du jeu + lieu du parcours, PAS le circuit VR
 --   admin / formateur_suivi    → tout (inchangé, via has_formateur_role)
 --
 -- Le filtre client (src/lib/competenceFilter.ts) applique ces règles.
@@ -33,16 +36,47 @@ ON CONFLICT (slug) DO UPDATE SET
 -- 2. Mapping RH public.games → gh_games (gaps 050)
 -- ============================================================================
 
--- Planta (RH « La Bataille de la Planta - L'assaut ») → planta, SANS circuit VR
+-- Planta (RH « La Bataille de la Planta - L'assaut ») → planta + circuit VR
 INSERT INTO public.gh_game_rh_map (games_id, gh_games_id, notes)
-SELECT g.id, ghg.id, 'Planta → planta (fiches du jeu seulement, pas le circuit VR Center)'
+SELECT g.id, ghg.id, 'Planta → planta (ouvre le circuit VR Center)'
 FROM public.games g
 CROSS JOIN public.gh_games ghg
 WHERE g.name ILIKE '%Planta%'
   AND ghg.slug = 'planta'
 ON CONFLICT (games_id, gh_games_id) DO NOTHING;
 
--- Da Vinci Code / Kids / Vinum → davinci (Escape Life Sion), SANS circuit VR
+-- Serviteur I / II → serviteur + circuit VR
+INSERT INTO public.gh_game_rh_map (games_id, gh_games_id, notes)
+SELECT g.id, ghg.id, 'Serviteur → serviteur (ouvre le circuit VR Center)'
+FROM public.games g
+CROSS JOIN public.gh_games ghg
+WHERE g.name ILIKE '%Serviteur%'
+  AND ghg.slug = 'serviteur'
+ON CONFLICT (games_id, gh_games_id) DO NOTHING;
+
+-- SAGA → saga + circuit VR
+INSERT INTO public.gh_game_rh_map (games_id, gh_games_id, notes)
+SELECT g.id, ghg.id, 'SAGA → saga (ouvre le circuit VR Center)'
+FROM public.games g
+CROSS JOIN public.gh_games ghg
+WHERE (g.name ILIKE '%SAGA%' OR g.name ILIKE '%SR I%II%')
+  AND ghg.slug = 'saga'
+ON CONFLICT (games_id, gh_games_id) DO NOTHING;
+
+-- SchoolCrafter / Schoolcrafter / ShoolCrafter → schoolcrafter + circuit VR
+INSERT INTO public.gh_game_rh_map (games_id, gh_games_id, notes)
+SELECT g.id, ghg.id, 'SchoolCrafter → schoolcrafter (ouvre le circuit VR Center)'
+FROM public.games g
+CROSS JOIN public.gh_games ghg
+WHERE (
+    g.name ILIKE '%choolcraft%'
+    OR g.name ILIKE '%shoolcraft%'
+    OR g.name ILIKE '%schoolcraft%'
+  )
+  AND ghg.slug = 'schoolcrafter'
+ON CONFLICT (games_id, gh_games_id) DO NOTHING;
+
+-- Da Vinci Code / Kids / Vinum → davinci (Escape Life Sion), PAS le circuit VR
 INSERT INTO public.gh_game_rh_map (games_id, gh_games_id, notes)
 SELECT g.id, ghg.id, 'Da Vinci → davinci (fiches / lieu Escape Life Sion, pas le circuit VR Center)'
 FROM public.games g
@@ -123,8 +157,9 @@ WHERE skip_version_bump IS TRUE;
 
 COMMENT ON TABLE public.gh_game_rh_map IS
   'Maps Lovable RH games to gh_games.
-   Circuit VR (filtre client, slug saga UNIQUEMENT) : lobby + pop-corn + salle + boissons.
-   Planta / Da Vinci / Serviteur / Schoolcrafter / archeogame : fiches du jeu, pas le circuit VR.
+   Circuit VR (filtre client) : slugs planta, serviteur, saga, schoolcrafter
+   — plus tout autre jeu gh_games situé au lieu vr_center, hors archeogame / nettoyage.
+   archeogame : pas de circuit VR.
    nettoyage : fiches nettoyage seulement.
    Gaps restants : RAVE, Magi Room, Evenement outdoor n''ont pas de fiches training.
    Chandoline/Novasphère : aucune ligne RH games à ce jour ; le INSERT ci-dessus matchera si le nom est ajouté.';
