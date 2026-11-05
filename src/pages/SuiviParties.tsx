@@ -45,6 +45,7 @@ import { useVenueCatalog } from '@/hooks/useVenueCatalog';
 import { useParcoursList } from '@/hooks/useParcoursList';
 import { isMockMode } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
+import { useGmOptions } from '@/hooks/useGmOptions';
 import { buildSessionSteps } from '@/lib/sessionView';
 import {
   PersistedSession,
@@ -133,6 +134,7 @@ function openBugReporter(session: ActiveSession, remarks?: string) {
 
 export function SuiviParties() {
   const { user, displayName } = useAuth();
+  const { options } = useGmOptions();
   const gmId = user?.id || DEMO_GM_ID;
 
   const [assigned, setAssigned] = useState<AssignedSession[]>([]);
@@ -349,7 +351,7 @@ export function SuiviParties() {
 
   const reportIncident = async (type: IncidentType) => {
     setIncidentType(type);
-    if (type === 'bug' && activeSession) {
+    if (type === 'bug' && options.bugReporter && activeSession) {
       openBugReporter(activeSession, incidentDetails);
     }
     if (activeSession) {
@@ -683,15 +685,17 @@ export function SuiviParties() {
               />
             )}
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void handleOpenBugReporter()}
-              className="w-full"
-            >
-              <ExternalLink className="h-4 w-4 mr-2" />
-              Ouvrir le Bug reporter
-            </Button>
+            {options.bugReporter && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void handleOpenBugReporter()}
+                className="w-full"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Ouvrir le Bug reporter
+              </Button>
+            )}
 
             {bugs.length > 0 && (
               <div className="space-y-2 pt-2 border-t">
@@ -716,21 +720,23 @@ export function SuiviParties() {
                     </li>
                   ))}
                 </ul>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                  onClick={() => void handleOpenBugReporter()}
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Rouvrir le Bug reporter
-                </Button>
+                {options.bugReporter && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => void handleOpenBugReporter()}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Rouvrir le Bug reporter
+                  </Button>
+                )}
               </div>
             )}
           </CardContent>
         </Card>
 
-        {showVideos && (
+        {showVideos && options.uploadVideosClients && (
           <SessionVideos
             key={`${activeSession.sessionId}-videos`}
             sessionId={activeSession.sessionId}
@@ -755,22 +761,24 @@ export function SuiviParties() {
           />
         )}
 
-        <SessionSales
-          key={activeSession.sessionId}
-          products={products}
-          groupName={activeSession.groupName}
-          playerCount={activeSession.playerCount}
-          game={activeSession.game}
-          initialItems={salesItems}
-          initialComment={salesComment}
-          onSalesChange={(items, comment) => {
-            setSalesItems(items);
-            setSalesComment(comment);
-            replaceSales(activeSession.sessionId, items, comment, products).catch((err) =>
-              setError(err instanceof Error ? err.message : 'Ventes non enregistrées')
-            );
-          }}
-        />
+        {options.encaissement && (
+          <SessionSales
+            key={activeSession.sessionId}
+            products={products}
+            groupName={activeSession.groupName}
+            playerCount={activeSession.playerCount}
+            game={activeSession.game}
+            initialItems={salesItems}
+            initialComment={salesComment}
+            onSalesChange={(items, comment) => {
+              setSalesItems(items);
+              setSalesComment(comment);
+              replaceSales(activeSession.sessionId, items, comment, products).catch((err) =>
+                setError(err instanceof Error ? err.message : 'Ventes non enregistrées')
+              );
+            }}
+          />
+        )}
 
         <Card>
           <CardHeader>

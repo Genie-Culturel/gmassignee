@@ -147,6 +147,19 @@ export interface BugSession {
   updated_at: string;
 }
 
+export interface GmOptionsRow {
+  id: string;
+  show_suivi_parties: boolean;
+  show_formations: boolean;
+  formations_obligatoires: boolean;
+  notifications: boolean;
+  upload_videos_clients: boolean;
+  bug_reporter: boolean;
+  encaissement: boolean;
+  updated_at: string;
+  updated_by: string | null;
+}
+
 export interface BugEntry {
   id: string;
   bug_session_id: string;
@@ -163,6 +176,11 @@ export interface BugEntry {
 export interface Database {
   public: {
     Tables: {
+      gh_gm_options: {
+        Row: GmOptionsRow;
+        Insert: Partial<GmOptionsRow> & { id?: string };
+        Update: Partial<Omit<GmOptionsRow, 'id'>>;
+      };
       gh_procedure_fiches: {
         Row: ProcedureFiche;
         Insert: Omit<ProcedureFiche, 'id' | 'created_at' | 'updated_at'> & {

@@ -28,6 +28,7 @@ import {
   filterFichesForGame,
   gamesGroupedByLocation,
 } from '@/lib/venues';
+import { GmOptionsAdmin } from '@/components/GmOptionsAdmin';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -58,6 +59,7 @@ export function TrainingAdmin({ fiches, catalog, gmId, myValidations, onFichesCh
   const visible = filterFichesForGame(fiches, catalog, filterGameId);
   return (
     <div className="space-y-4">
+      <GmOptionsAdmin />
       <GameScopeSelect
         id="admin-game-filter"
         label="Filtrer par jeu"

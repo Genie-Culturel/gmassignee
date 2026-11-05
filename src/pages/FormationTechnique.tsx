@@ -25,6 +25,7 @@ import { groupFichesBySubGroup } from '@/lib/ficheSubGroups';
 import { listMyValidations } from '@/lib/trainingRepository';
 import { ficheStatus, progressFor, sortFichesByOrder, TRAINING_STATUS_LABELS } from '@/lib/training';
 import { useAuth } from '@/hooks/useAuth';
+import { useGmOptions } from '@/hooks/useGmOptions';
 import { DEMO_GM_ID } from '@/lib/assignedSessions';
 import { cn } from '@/lib/utils';
 import {
@@ -48,6 +49,7 @@ function statusVariant(status: 'todo' | 'done' | 'revalidate') {
 
 export function FormationTechnique() {
   const { user, isFormateur } = useAuth();
+  const { options } = useGmOptions();
   const { fiches, isLoading, error, reload } = useProcedureFiches({ includeInactive: isFormateur });
   const { catalog, isLoading: catalogLoading } = useVenueCatalog();
   const gmId = user?.id || DEMO_GM_ID;
@@ -123,18 +125,24 @@ export function FormationTechnique() {
     <div className="space-y-5 pb-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Formations & Procédures</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Progression globale{' '}
-          <span
-            className={cn(
-              'font-semibold',
-              global.total > 0 && global.done === global.total ? 'text-emerald-700' : 'text-red-600'
-            )}
-          >
-            {global.done}/{global.total}
-          </span>
-          {global.revalidate > 0 ? ` · ${global.revalidate} à revalider` : ''}
-        </p>
+        {options.formationsObligatoires ? (
+          <p className="mt-2 text-sm text-muted-foreground">
+            Progression globale{' '}
+            <span
+              className={cn(
+                'font-semibold',
+                global.total > 0 && global.done === global.total ? 'text-emerald-700' : 'text-red-600'
+              )}
+            >
+              {global.done}/{global.total}
+            </span>
+            {global.revalidate > 0 ? ` · ${global.revalidate} à revalider` : ''}
+          </p>
+        ) : (
+          <p className="mt-2 text-sm text-muted-foreground">
+            Validation des fiches requises désactivée (Options GM).
+          </p>
+        )}
       </div>
 
       <GameScopeSelect catalog={catalog} value={gameId} onChange={onGameChange} />
@@ -166,7 +174,7 @@ export function FormationTechnique() {
                     FICHE_CATEGORY_LABELS[cat]
                   )}
                 </span>
-                {stats.total > 0 && (
+                {options.formationsObligatoires && stats.total > 0 && (
                   <span
                     className={cn(
                       'rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums sm:text-xs',
@@ -223,7 +231,7 @@ export function FormationTechnique() {
                       </h3>
                       <ul className="divide-y rounded-lg border bg-card">
                         {group.fiches.map((fiche) => {
-                          const required = fiche.is_required !== false;
+                          const required = options.formationsObligatoires && fiche.is_required !== false;
                           const status = ficheStatus(fiche, validationFor(fiche));
                           return (
                             <li key={fiche.id}>
@@ -305,7 +313,7 @@ export function FormationTechnique() {
               </SheetHeader>
               <div className="mt-6 space-y-4">
                 <FicheViewer fiche={selectedFiche} compact />
-                {selectedFiche.is_required !== false && (
+                {options.formationsObligatoires && selectedFiche.is_required !== false && (
                   <FicheValidationPanel
                     fiche={selectedFiche}
                     gmId={gmId}
