@@ -47,8 +47,8 @@ function statusVariant(status: 'todo' | 'done' | 'revalidate') {
 }
 
 export function FormationTechnique() {
-  const { user, isAdmin } = useAuth();
-  const { fiches, isLoading, error, reload } = useProcedureFiches({ includeInactive: isAdmin });
+  const { user, isFormateur } = useAuth();
+  const { fiches, isLoading, error, reload } = useProcedureFiches({ includeInactive: isFormateur });
   const { catalog, isLoading: catalogLoading } = useVenueCatalog();
   const gmId = user?.id || DEMO_GM_ID;
   const [searchTerm, setSearchTerm] = useState('');
@@ -179,7 +179,7 @@ export function FormationTechnique() {
               </TabsTrigger>
             );
           })}
-          {isAdmin && (
+          {isFormateur && (
             <TabsTrigger
               value="admin"
               className="h-auto min-h-11 min-w-[calc(50%-0.25rem)] flex-1 whitespace-normal px-1.5 py-2 text-[11px] sm:min-w-0 sm:text-sm"
@@ -277,7 +277,7 @@ export function FormationTechnique() {
           );
         })}
 
-        {isAdmin && (
+        {isFormateur && (
           <TabsContent value="admin" className="mt-4">
             <TrainingAdmin
               fiches={fiches}

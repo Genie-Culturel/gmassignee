@@ -9,7 +9,7 @@ import { setDemoFlag } from '@/lib/config';
 export function Layout() {
   const location = useLocation();
   const currentPath = location.pathname.split('/')[1] || 'dashboard';
-  const { displayName, isAdmin, signOut } = useAuth();
+  const { displayName, isAdmin, isFormateur, signOut } = useAuth();
 
   const toggleDemo = () => {
     setDemoFlag(!isMockMode);
@@ -24,7 +24,8 @@ export function Layout() {
             <h1 className="text-xl font-bold">GMassignee</h1>
             <p className="text-xs text-muted-foreground truncate">
               {isMockMode ? 'Mode démo' : displayName}
-              {isAdmin && !isMockMode ? ' · admin' : ''}
+              {!isMockMode && isAdmin ? ' · admin' : ''}
+              {!isMockMode && !isAdmin && isFormateur ? ' · formateur' : ''}
             </p>
           </div>
           {!isMockMode && (
