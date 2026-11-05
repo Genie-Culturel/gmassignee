@@ -3,7 +3,10 @@ import { isMockMode, supabase } from '@/lib/supabase';
 import { useAuth } from './useAuth';
 
 /**
- * Hook to load the authorized game IDs for the current GM based on RH Compétences.
+ * Hook to load the authorized gh_games IDs for the current GM based on LIVE Lovable RH compétences.
+ * 
+ * Flow: auth.uid() → profiles.gm_id → gm_game_competencies → games → gh_game_rh_map → gh_games.id[]
+ * 
  * Returns:
  * - `authorizedGameIds`: array of gh_games.id the GM is authorized for, or null if formateur/admin (no filter)
  * - `isLoading`: loading state
@@ -33,11 +36,12 @@ export function useGMCompetences() {
 
     try {
       setIsLoading(true);
-      console.log('[useGMCompetences] Loading authorized games for user', user.id);
+      console.log('[useGMCompetences] Loading authorized games for auth user', user.id);
       
       // Call the helper function to get authorized game IDs
+      // Pass auth.users.id (user.id); function resolves to profiles.gm_id internally
       const { data, error: rpcError } = await supabase.rpc('gh_get_authorized_game_ids', {
-        p_gm_id: user.id,
+        p_user_id: user.id,
       });
 
       if (rpcError) {
@@ -47,7 +51,7 @@ export function useGMCompetences() {
 
       // data is uuid[] or null
       const gameIds = data as string[] | null;
-      console.log('[useGMCompetences] Authorized game IDs:', gameIds);
+      console.log('[useGMCompetences] Authorized gh_games IDs:', gameIds);
       setAuthorizedGameIds(gameIds);
       setError(null);
     } catch (err) {

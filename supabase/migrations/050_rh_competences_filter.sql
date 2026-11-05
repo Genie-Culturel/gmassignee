@@ -1,186 +1,215 @@
 -- Migration 050: RH Compétences Filter
--- Filter formations/suivi fiches based on GM's RH Compétences from Lovable
+-- Filter formations/suivi fiches based on LIVE Lovable RH compétences (gm_game_competencies).
 -- Only show fiches for games where the GM has at least one compétence.
 -- Formateurs and admins see everything (no filter).
 
 -- ============================================================================
--- 1. RH Tables (may already exist in Lovable; create if not exists)
+-- LIVE RH TABLES (already exist in Lovable Supabase dnxyidnkmtrmkxucqrry)
+-- ============================================================================
+-- DO NOT CREATE — these already exist:
+--   - public.games: RH jeux (Lovable)
+--   - public.game_masters: RH GMs
+--   - public.gm_game_competencies: gm_id → games.id, competency_level 1-6
+--   - public.profiles: user_id (auth.users) → gm_id (game_masters.id)
+--   - public.gh_games: training/GitHub jeux (different naming/granularity)
+--
+-- Identity bridge: auth.uid() → profiles.gm_id → gm_game_competencies
+-- No FK between games and gh_games (names differ: e.g. Serviteur I/II vs serviteur)
+--
+-- Arsenii example (test case):
+--   - auth user_id: 21cf641a-32f9-440c-9188-143cd823865b
+--   - game_masters gm_id: e9401281-1167-4f61-8cb6-6eb53d0d98e3
+--   - Compétences: RAVE 1, Serviteur I 4, Serviteur II 4, SAGA 4
+--   - Should see: Serviteur + SAGA fiches (+ all/locations), NOT Feu Sacré/Da Vinci
+
+-- ============================================================================
+-- 1. Mapping table: Lovable RH games → gh_games (training fiches)
 -- ============================================================================
 
--- Table: games (RH reference, may be non-prefixed in Lovable)
--- This table lists all games/experiences for which GMs can have compétences.
-CREATE TABLE IF NOT EXISTS public.games_rh (
+CREATE TABLE IF NOT EXISTS public.gh_game_rh_map (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name text NOT NULL UNIQUE,
-  slug text NOT NULL UNIQUE,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
-
-COMMENT ON TABLE public.games_rh IS 
-  'RH: Référentiel des jeux/expériences pour les compétences GM (Lovable RH tab).';
-
--- Table: competences (RH assignments)
--- Each row assigns a GM a compétence for a specific game at a given level.
-CREATE TABLE IF NOT EXISTS public.competences (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  gm_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  game_id uuid NOT NULL REFERENCES public.games_rh(id) ON DELETE CASCADE,
-  niveau integer NOT NULL CHECK (niveau >= 1 AND niveau <= 6),
-  date_formation timestamptz,
+  games_id uuid NOT NULL REFERENCES public.games(id) ON DELETE CASCADE,
+  gh_games_id uuid NOT NULL REFERENCES public.gh_games(id) ON DELETE CASCADE,
   notes text,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE(gm_id, game_id)
+  UNIQUE(games_id, gh_games_id)
 );
 
-COMMENT ON TABLE public.competences IS
-  'RH: Compétences GM par jeu. Un GM ne voit que les fiches des jeux pour lesquels il a une compétence.';
+COMMENT ON TABLE public.gh_game_rh_map IS
+  'Maps Lovable RH games to gh_games for compétence filtering. Many-to-many: e.g. Serviteur I + II (2 games rows) → serviteur (1 gh_games row).';
 
-CREATE INDEX IF NOT EXISTS idx_competences_gm_id ON public.competences (gm_id);
-CREATE INDEX IF NOT EXISTS idx_competences_game_id ON public.competences (game_id);
+CREATE INDEX IF NOT EXISTS idx_gh_game_rh_map_games_id ON public.gh_game_rh_map (games_id);
+CREATE INDEX IF NOT EXISTS idx_gh_game_rh_map_gh_games_id ON public.gh_game_rh_map (gh_games_id);
 
--- Enable RLS
-ALTER TABLE public.games_rh ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.competences ENABLE ROW LEVEL SECURITY;
+-- RLS: readable by authenticated
+ALTER TABLE public.gh_game_rh_map ENABLE ROW LEVEL SECURITY;
 
--- Policies: authenticated users can read games_rh
-DROP POLICY IF EXISTS "Authenticated read games_rh" ON public.games_rh;
-CREATE POLICY "Authenticated read games_rh"
-  ON public.games_rh FOR SELECT TO authenticated
+DROP POLICY IF EXISTS "Authenticated read gh_game_rh_map" ON public.gh_game_rh_map;
+CREATE POLICY "Authenticated read gh_game_rh_map"
+  ON public.gh_game_rh_map FOR SELECT TO authenticated
   USING (true);
 
--- Policies: GMs can read their own competences, formateurs/admins can read all
-DROP POLICY IF EXISTS "GMs read own competences" ON public.competences;
-CREATE POLICY "GMs read own competences"
-  ON public.competences FOR SELECT TO authenticated
-  USING (gm_id = auth.uid() OR public.has_formateur_role());
-
--- Policies: only formateurs/admins can manage competences
-DROP POLICY IF EXISTS "Formateurs manage competences" ON public.competences;
-CREATE POLICY "Formateurs manage competences"
-  ON public.competences FOR ALL TO authenticated
+DROP POLICY IF EXISTS "Formateurs manage gh_game_rh_map" ON public.gh_game_rh_map;
+CREATE POLICY "Formateurs manage gh_game_rh_map"
+  ON public.gh_game_rh_map FOR ALL TO authenticated
   USING (public.has_formateur_role())
   WITH CHECK (public.has_formateur_role());
 
-DROP POLICY IF EXISTS "Formateurs manage games_rh" ON public.games_rh;
-CREATE POLICY "Formateurs manage games_rh"
-  ON public.games_rh FOR ALL TO authenticated
-  USING (public.has_formateur_role())
-  WITH CHECK (public.has_formateur_role());
-
-GRANT SELECT ON public.games_rh, public.competences TO authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.games_rh, public.competences TO authenticated;
+GRANT SELECT ON public.gh_game_rh_map TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.gh_game_rh_map TO authenticated;
 
 -- ============================================================================
--- 2. Mapping RH games to gh_games
+-- 2. Seed mapping: known RH games → gh_games
 -- ============================================================================
 
--- Add a mapping column to gh_games to link to RH games
--- This allows flexible name matching even if RH and gh_games use different names
-ALTER TABLE public.gh_games
-  ADD COLUMN IF NOT EXISTS rh_game_id uuid REFERENCES public.games_rh(id) ON DELETE SET NULL;
+-- Resolve by matching game names/slugs (names differ; must document gaps)
+-- Serviteur: RH has separate I and II; gh_games has one "serviteur"
+INSERT INTO public.gh_game_rh_map (games_id, gh_games_id, notes)
+SELECT g.id, ghg.id, 'Serviteur I → serviteur (Le Serviteur 1 & 2)'
+FROM public.games g
+CROSS JOIN public.gh_games ghg
+WHERE g.name ILIKE '%Serviteur%Rédemption%I%'
+  AND ghg.slug = 'serviteur'
+ON CONFLICT (games_id, gh_games_id) DO NOTHING;
 
-CREATE INDEX IF NOT EXISTS idx_gh_games_rh_game_id ON public.gh_games (rh_game_id);
+INSERT INTO public.gh_game_rh_map (games_id, gh_games_id, notes)
+SELECT g.id, ghg.id, 'Serviteur II → serviteur (Le Serviteur 1 & 2)'
+FROM public.games g
+CROSS JOIN public.gh_games ghg
+WHERE g.name ILIKE '%Serviteur%Rédemption%II%'
+  AND ghg.slug = 'serviteur'
+ON CONFLICT (games_id, gh_games_id) DO NOTHING;
 
-COMMENT ON COLUMN public.gh_games.rh_game_id IS
-  'Link to RH games table for compétence filtering. When set, fiches scoped to this game require the GM to have a compétence for the linked RH game.';
+-- SAGA: likely matches exactly
+INSERT INTO public.gh_game_rh_map (games_id, gh_games_id, notes)
+SELECT g.id, ghg.id, 'SAGA → saga'
+FROM public.games g
+CROSS JOIN public.gh_games ghg
+WHERE (g.name ILIKE '%SAGA%' OR g.name ILIKE '%SR I%II%')
+  AND ghg.slug = 'saga'
+ON CONFLICT (games_id, gh_games_id) DO NOTHING;
+
+-- Planta
+INSERT INTO public.gh_game_rh_map (games_id, gh_games_id, notes)
+SELECT g.id, ghg.id, 'Planta → planta'
+FROM public.games g
+CROSS JOIN public.gh_games ghg
+WHERE g.name ILIKE '%Planta%'
+  AND ghg.slug = 'planta'
+ON CONFLICT (games_id, gh_games_id) DO NOTHING;
+
+-- Schoolcrafter
+INSERT INTO public.gh_game_rh_map (games_id, gh_games_id, notes)
+SELECT g.id, ghg.id, 'Schoolcrafter → schoolcrafter'
+FROM public.games g
+CROSS JOIN public.gh_games ghg
+WHERE g.name ILIKE '%Schoolcrafter%'
+  AND ghg.slug = 'schoolcrafter'
+ON CONFLICT (games_id, gh_games_id) DO NOTHING;
+
+-- Usine de Chandoline
+INSERT INTO public.gh_game_rh_map (games_id, gh_games_id, notes)
+SELECT g.id, ghg.id, 'Usine Chandoline → usine_chandoline'
+FROM public.games g
+CROSS JOIN public.gh_games ghg
+WHERE g.name ILIKE '%Chandoline%'
+  AND ghg.slug = 'usine_chandoline'
+ON CONFLICT (games_id, gh_games_id) DO NOTHING;
+
+-- Da Vinci (Escape Life Sion)
+INSERT INTO public.gh_game_rh_map (games_id, gh_games_id, notes)
+SELECT g.id, ghg.id, 'Da Vinci → davinci'
+FROM public.games g
+CROSS JOIN public.gh_games ghg
+WHERE g.name ILIKE '%Da%Vinci%'
+  AND ghg.slug = 'davinci'
+ON CONFLICT (games_id, gh_games_id) DO NOTHING;
+
+-- Le Feu Sacré (Escape Life Sierre)
+INSERT INTO public.gh_game_rh_map (games_id, gh_games_id, notes)
+SELECT g.id, ghg.id, 'Feu Sacré → feux_sacres'
+FROM public.games g
+CROSS JOIN public.gh_games ghg
+WHERE (g.name ILIKE '%Feu%Sacré%' OR g.name ILIKE '%Feux%sacré%')
+  AND ghg.slug = 'feux_sacres'
+ON CONFLICT (games_id, gh_games_id) DO NOTHING;
+
+-- RAVE: exists in public.games but NOT in gh_games → no mapping (expected gap)
+-- Document: GMs with only RAVE compétence will see no game-scoped fiches (only all/locations)
+
+COMMENT ON TABLE public.gh_game_rh_map IS
+  'Known gaps: RAVE has no gh_games entry (no training fiches for RAVE exist yet).
+   Serviteur I + II (2 RH rows) both map to serviteur (1 gh_games row).';
 
 -- ============================================================================
--- 3. Seed RH games (match existing gh_games structure)
+-- 3. Helper function: Get authorized gh_games IDs for the current user
 -- ============================================================================
 
--- Insert RH games matching the structure in migration 015
-INSERT INTO public.games_rh (slug, name) VALUES
-  ('rave', 'RAVE'),
-  ('serviteur_redemption_1', 'Serviteur de la Rédemption I'),
-  ('serviteur_redemption_2', 'Serviteur de la Rédemption II'),
-  ('saga', 'SAGA - SR I & II'),
-  ('planta', 'Planta'),
-  ('le_feu_sacre', 'Le Feu Sacré (Escape Life)'),
-  ('davinci', 'Da Vinci'),
-  ('usine_chandoline', 'Usine de Chandoline'),
-  ('schoolcrafter', 'Schoolcrafter')
-ON CONFLICT (slug) DO UPDATE SET
-  name = EXCLUDED.name;
-
--- Link gh_games to RH games by matching slugs/names
--- This creates a robust mapping between the two systems
-
--- VR Center games
-UPDATE public.gh_games SET rh_game_id = (SELECT id FROM public.games_rh WHERE slug = 'planta')
-WHERE slug = 'planta';
-
-UPDATE public.gh_games SET rh_game_id = (SELECT id FROM public.games_rh WHERE slug = 'serviteur_redemption_1')
-WHERE slug = 'serviteur' AND name ILIKE '%Serviteur%';
-
-UPDATE public.gh_games SET rh_game_id = (SELECT id FROM public.games_rh WHERE slug = 'saga')
-WHERE slug = 'saga';
-
-UPDATE public.gh_games SET rh_game_id = (SELECT id FROM public.games_rh WHERE slug = 'schoolcrafter')
-WHERE slug = 'schoolcrafter';
-
--- Chandoline
-UPDATE public.gh_games SET rh_game_id = (SELECT id FROM public.games_rh WHERE slug = 'usine_chandoline')
-WHERE slug = 'usine_chandoline';
-
--- Escape Life games
-UPDATE public.gh_games SET rh_game_id = (SELECT id FROM public.games_rh WHERE slug = 'davinci')
-WHERE slug = 'davinci';
-
-UPDATE public.gh_games SET rh_game_id = (SELECT id FROM public.games_rh WHERE slug = 'le_feu_sacre')
-WHERE slug = 'feux_sacres';
-
--- ============================================================================
--- 4. Helper function: Get authorized game IDs for a GM
--- ============================================================================
-
-CREATE OR REPLACE FUNCTION public.gh_get_authorized_game_ids(p_gm_id uuid DEFAULT auth.uid())
+CREATE OR REPLACE FUNCTION public.gh_get_authorized_game_ids(p_user_id uuid DEFAULT auth.uid())
 RETURNS uuid[]
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  -- Return all gh_games.id where the GM has a compétence for the linked RH game
-  -- If the GM is a formateur/admin, return NULL (meaning no filter)
-  SELECT CASE
-    WHEN public.has_formateur_role(p_gm_id) THEN NULL
-    ELSE ARRAY(
-      SELECT DISTINCT g.id
-      FROM public.gh_games g
-      INNER JOIN public.competences c ON c.game_id = g.rh_game_id
-      WHERE c.gm_id = p_gm_id
-    )
-  END;
+DECLARE
+  v_gm_id uuid;
+  v_game_ids uuid[];
+BEGIN
+  -- Formateurs/admins see everything → return NULL (no filter)
+  IF public.has_formateur_role(p_user_id) THEN
+    RETURN NULL;
+  END IF;
+
+  -- Resolve auth user → game_masters.id via profiles
+  SELECT p.gm_id INTO v_gm_id
+  FROM public.profiles p
+  WHERE p.user_id = p_user_id;
+
+  IF v_gm_id IS NULL THEN
+    -- No GM profile → no competences → return empty array (hide all game-scoped fiches)
+    RETURN ARRAY[]::uuid[];
+  END IF;
+
+  -- Get gh_games.id via: gm_game_competencies → games → gh_game_rh_map → gh_games
+  SELECT ARRAY_AGG(DISTINCT m.gh_games_id)
+  INTO v_game_ids
+  FROM public.gm_game_competencies c
+  INNER JOIN public.gh_game_rh_map m ON m.games_id = c.game_id
+  WHERE c.gm_id = v_gm_id;
+
+  -- If no competences or no mapped games, return empty array
+  RETURN COALESCE(v_game_ids, ARRAY[]::uuid[]);
+END;
 $$;
 
 COMMENT ON FUNCTION public.gh_get_authorized_game_ids(uuid) IS
-  'Returns array of gh_games.id for which the GM has a compétence, or NULL for formateurs/admins (no filter).';
+  'Returns gh_games.id array for which the GM (via profiles.gm_id → gm_game_competencies → gh_game_rh_map) has a compétence.
+   Returns NULL for formateurs/admins (no filter). Returns [] if no competences or unmapped games.
+   
+   Test case (Arsenii):
+     user_id 21cf641a-32f9-440c-9188-143cd823865b → gm_id e9401281-... → compétences Serviteur I/II + SAGA
+     Expected: [serviteur.id, saga.id] (from gh_games)';
 
 GRANT EXECUTE ON FUNCTION public.gh_get_authorized_game_ids(uuid) TO authenticated;
 
 -- ============================================================================
--- 5. Documentation
+-- 4. Documentation
 -- ============================================================================
 
-COMMENT ON COLUMN public.competences.niveau IS '1-6: niveau de compétence du GM pour ce jeu';
-COMMENT ON COLUMN public.competences.date_formation IS 'Date de la formation initiale';
+-- Verify the mapping worked (run after migration):
+-- SELECT g.name AS rh_game, ghg.name AS training_game, m.notes
+-- FROM public.gh_game_rh_map m
+-- INNER JOIN public.games g ON g.id = m.games_id
+-- INNER JOIN public.gh_games ghg ON ghg.id = m.gh_games_id
+-- ORDER BY g.name;
 
--- ============================================================================
--- 6. Example data for testing (optional, can be removed in production)
--- ============================================================================
+-- Test Arsenii's authorized games (expects serviteur + saga):
+-- SELECT public.gh_get_authorized_game_ids('21cf641a-32f9-440c-9188-143cd823865b'::uuid);
 
--- Example: Assign some compétences for testing
--- Uncomment and customize with real GM user IDs after migration
-
--- INSERT INTO public.competences (gm_id, game_id, niveau, date_formation) VALUES
---   ((SELECT id FROM auth.users WHERE email = 'arsenii.nedorezov@gmail.com'), 
---    (SELECT id FROM public.games_rh WHERE slug = 'serviteur_redemption_1'), 
---    4, 
---    '2026-01-15'),
---   ((SELECT id FROM auth.users WHERE email = 'arsenii.nedorezov@gmail.com'), 
---    (SELECT id FROM public.games_rh WHERE slug = 'saga'), 
---    4, 
---    '2026-02-20')
--- ON CONFLICT (gm_id, game_id) DO NOTHING;
+-- Arsenii's competences (should return 4 rows: RAVE 1, Serviteur I 4, Serviteur II 4, SAGA 4):
+-- SELECT g.name, c.competency_level
+-- FROM public.gm_game_competencies c
+-- INNER JOIN public.games g ON g.id = c.game_id
+-- WHERE c.gm_id = 'e9401281-1167-4f61-8cb6-6eb53d0d98e3'
+-- ORDER BY g.name;

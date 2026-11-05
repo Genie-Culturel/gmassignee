@@ -818,7 +818,7 @@ export interface Database {
         Returns: void;
       };
       gh_get_authorized_game_ids: {
-        Args: { p_gm_id?: string };
+        Args: { p_user_id?: string };
         Returns: string[] | null;
       };
       has_role: {
