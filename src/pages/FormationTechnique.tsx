@@ -28,6 +28,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useGmOptions } from '@/hooks/useGmOptions';
 import { DEMO_GM_ID } from '@/lib/assignedSessions';
 import { cn } from '@/lib/utils';
+import { filterCatalogForCompetences } from '@/lib/competenceFilter';
 import {
   ALL_GAMES_VALUE,
   ficheScopeBadgeLabel,
@@ -50,8 +51,15 @@ function statusVariant(status: 'todo' | 'done' | 'revalidate') {
 export function FormationTechnique() {
   const { user, isFormateur } = useAuth();
   const { options } = useGmOptions();
-  const { fiches, isLoading, error, reload } = useProcedureFiches({ includeInactive: isFormateur });
+  const { fiches, isLoading, error, reload, authorizedGameIds } = useProcedureFiches({
+    includeInactive: isFormateur,
+  });
   const { catalog, isLoading: catalogLoading } = useVenueCatalog();
+  const selectableCatalog = useMemo(
+    () => filterCatalogForCompetences(catalog, isFormateur ? null : authorizedGameIds),
+    [catalog, isFormateur, authorizedGameIds]
+  );
+  const hasNoCompetences = !isFormateur && Array.isArray(authorizedGameIds) && authorizedGameIds.length === 0;
   const gmId = user?.id || DEMO_GM_ID;
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFiche, setSelectedFiche] = useState<ProcedureFiche | null>(null);
@@ -60,10 +68,12 @@ export function FormationTechnique() {
 
   useEffect(() => {
     const stored = readStoredGameId();
-    if (stored === ALL_GAMES_VALUE || catalog.games.some((game) => game.id === stored)) {
+    if (stored === ALL_GAMES_VALUE || selectableCatalog.games.some((game) => game.id === stored)) {
       setGameId(stored);
+    } else {
+      setGameId(ALL_GAMES_VALUE);
     }
-  }, [catalog]);
+  }, [selectableCatalog]);
 
   const loadValidations = useCallback(() => {
     listMyValidations(gmId).then(setValidations).catch(() => setValidations([]));
@@ -75,8 +85,8 @@ export function FormationTechnique() {
 
   const categories: FicheCategory[] = FORMATION_PAGE_CATEGORIES;
   const scopedFiches = useMemo(
-    () => filterFichesForGame(fiches, catalog, gameId),
-    [fiches, catalog, gameId]
+    () => filterFichesForGame(fiches, selectableCatalog, gameId),
+    [fiches, selectableCatalog, gameId]
   );
   const global = progressFor(scopedFiches, validations);
 
@@ -125,7 +135,11 @@ export function FormationTechnique() {
     <div className="space-y-5 pb-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Formations & Procédures</h1>
-        {options.formationsObligatoires ? (
+        {hasNoCompetences ? (
+          <p className="mt-2 text-sm text-muted-foreground">
+            Aucune compétence RH enregistrée : aucune fiche à remplir (progression 0/0).
+          </p>
+        ) : options.formationsObligatoires ? (
           <p className="mt-2 text-sm text-muted-foreground">
             Progression globale{' '}
             <span
@@ -145,7 +159,7 @@ export function FormationTechnique() {
         )}
       </div>
 
-      <GameScopeSelect catalog={catalog} value={gameId} onChange={onGameChange} />
+      <GameScopeSelect catalog={selectableCatalog} value={gameId} onChange={onGameChange} />
 
       <Tabs defaultValue={categories[0]} className="w-full">
         <TabsList className="flex h-auto w-full flex-wrap gap-1">
@@ -219,7 +233,9 @@ export function FormationTechnique() {
                   <CardContent className="py-8 text-center text-muted-foreground">
                     {searchTerm
                       ? 'Aucune fiche ne correspond à votre recherche.'
-                      : 'Aucune fiche dans cette catégorie.'}
+                      : hasNoCompetences
+                        ? 'Aucune compétence RH : aucune fiche à remplir.'
+                        : 'Aucune fiche dans cette catégorie.'}
                   </CardContent>
                 </Card>
               ) : (
@@ -244,7 +260,7 @@ export function FormationTechnique() {
                                   <span className="block font-medium leading-snug">{fiche.title}</span>
                                   <span className="mt-1 inline-flex">
                                     <Badge variant="outline" className="text-[10px] font-normal">
-                                      {ficheScopeBadgeLabel(fiche, catalog)}
+                                      {ficheScopeBadgeLabel(fiche, selectableCatalog)}
                                     </Badge>
                                   </span>
                                   {fiche.summary && (

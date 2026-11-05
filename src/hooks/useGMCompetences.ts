@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { isMockMode, supabase } from '@/lib/supabase';
+import { parseAuthorizedGameIds } from '@/lib/competenceFilter';
 import { useAuth } from './useAuth';
 
 /**
@@ -8,18 +9,24 @@ import { useAuth } from './useAuth';
  * Flow: auth.uid() → profiles.gm_id → gm_game_competencies → games → gh_game_rh_map → gh_games.id[]
  * 
  * Returns:
- * - `authorizedGameIds`: array of gh_games.id the GM is authorized for, or null if formateur/admin (no filter)
+ * - `authorizedGameIds`: gh_games.id[] autorisés, `null` si formateur/admin (pas de filtre), `[]` si 0 compétence
  * - `isLoading`: loading state
  * - `error`: error if any
  * - `reload`: function to reload the competences
  */
 export function useGMCompetences() {
-  const { user, isFormateur } = useAuth();
-  const [authorizedGameIds, setAuthorizedGameIds] = useState<string[] | null>(null);
+  const { user, isFormateur, loading: authLoading } = useAuth();
+  // Fail closed tant que le RPC n'a pas répondu : un GM ne doit jamais voir le circuit VR par défaut.
+  const [authorizedGameIds, setAuthorizedGameIds] = useState<string[] | null>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
   const reload = useCallback(async () => {
+    if (authLoading) {
+      setIsLoading(true);
+      return;
+    }
+
     if (isMockMode || !supabase || !user) {
       // In mock mode or not logged in, allow all games (no filter)
       setAuthorizedGameIds(null);
@@ -49,20 +56,20 @@ export function useGMCompetences() {
         throw rpcError;
       }
 
-      // data is uuid[] or null
-      const gameIds = data as string[] | null;
+      // GM : null / valeur inattendue → [] (0 fiche). Jamais null (= tout afficher).
+      const gameIds = parseAuthorizedGameIds(data);
       console.log('[useGMCompetences] Authorized gh_games IDs:', gameIds);
       setAuthorizedGameIds(gameIds);
       setError(null);
     } catch (err) {
       console.error('[useGMCompetences] Error loading competences:', err);
       setError(err as Error);
-      // On error, default to no filter (show all) to avoid breaking the app
-      setAuthorizedGameIds(null);
+      // Fail closed: un GM sans RPC ne doit pas voir le circuit VR Center par défaut
+      setAuthorizedGameIds([]);
     } finally {
       setIsLoading(false);
     }
-  }, [user, isFormateur]);
+  }, [user, isFormateur, authLoading]);
 
   useEffect(() => {
     reload();
