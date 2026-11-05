@@ -43,7 +43,7 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-/** Upload one image for a fiche step; returns its public URL. */
+/** Upload one image for a fiche step; returns the storage path (for private bucket). */
 export async function uploadFicheImage(ficheId: string, file: File): Promise<string> {
   const blob = await compressImage(file);
   if (isMockMode || !supabase) return blobToDataUrl(blob);
@@ -54,15 +54,51 @@ export async function uploadFicheImage(ficheId: string, file: File): Promise<str
     .from(FICHE_IMAGES_BUCKET)
     .upload(path, blob, { contentType: blob.type || 'image/jpeg', upsert: false });
   if (error) throw new Error(error.message);
-  return supabase.storage.from(FICHE_IMAGES_BUCKET).getPublicUrl(path).data.publicUrl;
+  return path;
 }
 
 /** Best-effort removal of an uploaded image (ignored for data URLs / foreign URLs). */
-export async function deleteFicheImage(url: string): Promise<void> {
+export async function deleteFicheImage(pathOrUrl: string): Promise<void> {
   if (isMockMode || !supabase) return;
-  const marker = `/object/public/${FICHE_IMAGES_BUCKET}/`;
-  const idx = url.indexOf(marker);
-  if (idx < 0) return;
-  const path = decodeURIComponent(url.slice(idx + marker.length).split('?')[0]);
+  let path: string;
+  if (pathOrUrl.startsWith('data:')) return;
+  if (pathOrUrl.includes('://')) {
+    const publicMarker = `/object/public/${FICHE_IMAGES_BUCKET}/`;
+    const authMarker = `/storage/v1/object/sign/${FICHE_IMAGES_BUCKET}/`;
+    const pubIdx = pathOrUrl.indexOf(publicMarker);
+    const authIdx = pathOrUrl.indexOf(authMarker);
+    if (pubIdx >= 0) {
+      path = decodeURIComponent(pathOrUrl.slice(pubIdx + publicMarker.length).split('?')[0]);
+    } else if (authIdx >= 0) {
+      path = decodeURIComponent(pathOrUrl.slice(authIdx + authMarker.length).split('?')[0]);
+    } else {
+      return;
+    }
+  } else {
+    path = pathOrUrl;
+  }
   await supabase.storage.from(FICHE_IMAGES_BUCKET).remove([path]);
+}
+
+/** Generate signed URLs for fiche image paths (1h expiry). Returns map path→URL. */
+export async function getSignedImageUrls(paths: string[]): Promise<Record<string, string>> {
+  if (isMockMode || !supabase) return Object.fromEntries(paths.map((p) => [p, p]));
+  const storagePaths = paths.filter((p) => !p.startsWith('data:') && !p.includes('://'));
+  if (storagePaths.length === 0) {
+    return Object.fromEntries(paths.map((p) => [p, p]));
+  }
+  const { data, error } = await supabase.storage
+    .from(FICHE_IMAGES_BUCKET)
+    .createSignedUrls(storagePaths, 3600);
+  if (error) throw new Error(error.message);
+  const result: Record<string, string> = {};
+  paths.forEach((p) => {
+    if (p.startsWith('data:') || p.includes('://')) {
+      result[p] = p;
+    }
+  });
+  data?.forEach((item) => {
+    if (item.signedUrl && item.path) result[item.path] = item.signedUrl;
+  });
+  return result;
 }
