@@ -46,8 +46,8 @@ type ParcoursRow = {
   name: string;
   description: string | null;
   is_provisional: boolean;
-  locations: { slug: string } | { slug: string }[] | null;
-  parcours_steps: Array<ParcoursStep & { step_key: string; deleted_at: string | null }> | null;
+  gh_locations: { slug: string } | { slug: string }[] | null;
+  gh_parcours_steps: Array<ParcoursStep & { step_key: string; deleted_at: string | null }> | null;
 };
 
 /** All parcours with their non-deleted steps. Falls back to the in-code list. */
@@ -56,14 +56,14 @@ export async function fetchParcoursList(): Promise<ParcoursDefinition[]> {
   const { data, error } = await supabase
     .from('gh_parcours')
     .select(
-      'id, name, description, is_provisional, gh_locations!location_slug(slug), gh_parcours_steps(id, parcours_id, step_key, label, hint, note, sort_order, is_active, deleted_at)'
+      'id, name, description, is_provisional, gh_locations!location_id(slug), gh_parcours_steps(id, parcours_id, step_key, label, hint, note, sort_order, is_active, deleted_at)'
     );
   if (error || !data?.length) {
     if (error) console.warn('Parcours: lecture impossible, parcours intégrés utilisés.', error.message);
     return cloneDemo();
   }
   return (data as unknown as ParcoursRow[]).map((row) => {
-    const location = Array.isArray(row.locations) ? row.locations[0] : row.locations;
+    const location = Array.isArray(row.gh_locations) ? row.gh_locations[0] : row.gh_locations;
     return {
       id: row.id,
       name: row.name,
@@ -71,7 +71,7 @@ export async function fetchParcoursList(): Promise<ParcoursDefinition[]> {
       locationSlug: location?.slug || '',
       isProvisional: row.is_provisional,
       steps: sortSteps(
-        (row.parcours_steps || [])
+        (row.gh_parcours_steps || [])
           .filter((step) => !step.deleted_at)
           .map((step) => ({
             id: step.id,
