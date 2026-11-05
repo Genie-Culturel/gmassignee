@@ -1,7 +1,6 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { LayoutDashboard, PlayCircle, BookOpen, LogOut, ExternalLink } from 'lucide-react';
+import { LayoutDashboard, PlayCircle, BookOpen, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { isMockMode } from '@/lib/supabase';
 import { setDemoFlag } from '@/lib/config';
@@ -9,7 +8,7 @@ import { setDemoFlag } from '@/lib/config';
 export function Layout() {
   const location = useLocation();
   const currentPath = location.pathname.split('/')[1] || 'dashboard';
-  const { displayName, isAdmin, isFormateur, signOut } = useAuth();
+  const { displayName, isAdmin, isFormateur } = useAuth();
 
   const toggleDemo = () => {
     setDemoFlag(!isMockMode);
@@ -28,11 +27,6 @@ export function Layout() {
               {!isMockMode && !isAdmin && isFormateur ? ' · formateur' : ''}
             </p>
           </div>
-          {!isMockMode && (
-            <Button variant="ghost" size="sm" onClick={() => signOut()} aria-label="Se déconnecter">
-              <LogOut className="h-4 w-4" />
-            </Button>
-          )}
         </div>
       </header>
 
