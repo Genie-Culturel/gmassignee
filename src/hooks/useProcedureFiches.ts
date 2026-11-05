@@ -5,10 +5,13 @@ import { hydrateTrainingFiche, loadDemoFiches } from '@/lib/trainingRepository';
 import { isFicheDeleted, sortFichesByOrder } from '@/lib/training';
 import { useGMCompetences } from './useGMCompetences';
 import { useAuth } from './useAuth';
+import { useVenueCatalog } from './useVenueCatalog';
+import { filterFichesByCompetences } from '@/lib/competenceFilter';
 
 export function useProcedureFiches(opts?: { includeInactive?: boolean }) {
   const { isFormateur } = useAuth();
   const { authorizedGameIds, isLoading: competencesLoading } = useGMCompetences();
+  const { catalog, isLoading: catalogLoading } = useVenueCatalog();
   const [fiches, setFiches] = useState<ProcedureFiche[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -19,8 +22,8 @@ export function useProcedureFiches(opts?: { includeInactive?: boolean }) {
 
   useEffect(() => {
     async function fetchFiches() {
-      // Wait for competences to load before fetching fiches
-      if (competencesLoading) {
+      // Wait for competences + catalogue (slugs lieux/jeux) before filtering
+      if (competencesLoading || catalogLoading) {
         return;
       }
 
@@ -67,37 +70,10 @@ export function useProcedureFiches(opts?: { includeInactive?: boolean }) {
           });
         });
 
-        // Apply competence-based filtering
-        // If authorizedGameIds is null, the user is a formateur/admin → show all
-        // If authorizedGameIds is [], the user has no competences → show only 'all' scoped fiches
-        // Otherwise, show 'all' + 'locations' + game-scoped fiches matching authorized games
-        let filtered = allFiches;
-        if (!isFormateur && authorizedGameIds !== null) {
-          filtered = allFiches.filter((fiche) => {
-            // Always show fiches with scope_kind = 'all'
-            if (fiche.scope_kind === 'all') {
-              return true;
-            }
-
-            // Show fiches with scope_kind = 'locations' (general venue procedures)
-            // These are not game-specific, so we show them
-            if (fiche.scope_kind === 'locations') {
-              return true;
-            }
-
-            // For game-scoped fiches, check if any of the fiche's games are in authorized list
-            if (fiche.scope_kind === 'games' && fiche.scope_game_ids && fiche.scope_game_ids.length > 0) {
-              const hasAuthorizedGame = fiche.scope_game_ids.some((gameId) =>
-                authorizedGameIds.includes(gameId)
-              );
-              return hasAuthorizedGame;
-            }
-
-            // Default: hide if we can't determine
-            return false;
-          });
-          console.log('[useProcedureFiches] Filtered to', filtered.length, 'fiches based on competences');
-        }
+        // null = formateur/admin (pas de filtre). [] = 0 compétence → 0 fiche.
+        const idsForFilter = isFormateur ? null : authorizedGameIds;
+        const filtered = filterFichesByCompetences(allFiches, idsForFilter, catalog);
+        console.log('[useProcedureFiches] Filtered to', filtered.length, 'fiches based on competences');
 
         setFiches(sortFichesByOrder(filtered));
       } catch (err) {
@@ -108,9 +84,9 @@ export function useProcedureFiches(opts?: { includeInactive?: boolean }) {
     }
 
     fetchFiches();
-  }, [tick, includeInactive, authorizedGameIds, competencesLoading, isFormateur]);
+  }, [tick, includeInactive, authorizedGameIds, competencesLoading, catalogLoading, catalog, isFormateur]);
 
-  return { fiches, isLoading, error, reload };
+  return { fiches, isLoading, error, reload, authorizedGameIds: isFormateur ? null : authorizedGameIds };
 }
 
 export function useFichesByIncidentType(incidentType: string) {

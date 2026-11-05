@@ -8,7 +8,7 @@ import { useAuth } from './useAuth';
  * Flow: auth.uid() → profiles.gm_id → gm_game_competencies → games → gh_game_rh_map → gh_games.id[]
  * 
  * Returns:
- * - `authorizedGameIds`: array of gh_games.id the GM is authorized for, or null if formateur/admin (no filter)
+ * - `authorizedGameIds`: gh_games.id[] autorisés, `null` si formateur/admin (pas de filtre), `[]` si 0 compétence
  * - `isLoading`: loading state
  * - `error`: error if any
  * - `reload`: function to reload the competences
@@ -49,7 +49,7 @@ export function useGMCompetences() {
         throw rpcError;
       }
 
-      // data is uuid[] or null
+      // null = formateur/admin (pas de filtre). [] = 0 compétence. Ne pas coalescer null → [].
       const gameIds = data as string[] | null;
       console.log('[useGMCompetences] Authorized gh_games IDs:', gameIds);
       setAuthorizedGameIds(gameIds);
@@ -57,8 +57,8 @@ export function useGMCompetences() {
     } catch (err) {
       console.error('[useGMCompetences] Error loading competences:', err);
       setError(err as Error);
-      // On error, default to no filter (show all) to avoid breaking the app
-      setAuthorizedGameIds(null);
+      // Fail closed: un GM sans RPC ne doit pas voir le circuit VR Center par défaut
+      setAuthorizedGameIds([]);
     } finally {
       setIsLoading(false);
     }

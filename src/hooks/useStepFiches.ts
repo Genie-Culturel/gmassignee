@@ -6,18 +6,21 @@ import { loadDemoFiches } from '@/lib/trainingRepository';
 import { isFicheDeleted } from '@/lib/training';
 import { useGMCompetences } from './useGMCompetences';
 import { useAuth } from './useAuth';
+import { useVenueCatalog } from './useVenueCatalog';
+import { filterFichesByCompetences } from '@/lib/competenceFilter';
 
 /** Fiches linked to each step of one parcours (« Voir la procédure »). */
 export function useStepFiches(parcoursId: string | undefined) {
   const { isFormateur } = useAuth();
   const { authorizedGameIds, isLoading: competencesLoading } = useGMCompetences();
+  const { catalog, isLoading: catalogLoading } = useVenueCatalog();
   const [links, setLinks] = useState<StepFicheLinks>({});
   const [fichesById, setFichesById] = useState<Map<string, ProcedureFiche>>(new Map());
   const [tick, setTick] = useState(0);
   const reload = useCallback(() => setTick((value) => value + 1), []);
 
   useEffect(() => {
-    if (!parcoursId || competencesLoading) return;
+    if (!parcoursId || competencesLoading || catalogLoading) return;
     let cancelled = false;
     (async () => {
       try {
@@ -51,20 +54,10 @@ export function useStepFiches(parcoursId: string | undefined) {
           console.log('[useStepFiches] Loaded', fiches.length, 'fiches before filtering');
         }
 
-        // Apply competence-based filtering (same logic as useProcedureFiches)
-        let filtered = fiches.filter((fiche) => fiche.is_active && !isFicheDeleted(fiche));
-        if (!isFormateur && authorizedGameIds !== null) {
-          filtered = filtered.filter((fiche) => {
-            if (fiche.scope_kind === 'all' || fiche.scope_kind === 'locations') {
-              return true;
-            }
-            if (fiche.scope_kind === 'games' && fiche.scope_game_ids && fiche.scope_game_ids.length > 0) {
-              return fiche.scope_game_ids.some((gameId) => authorizedGameIds.includes(gameId));
-            }
-            return false;
-          });
-          console.log('[useStepFiches] Filtered to', filtered.length, 'fiches based on competences');
-        }
+        const active = fiches.filter((fiche) => fiche.is_active && !isFicheDeleted(fiche));
+        const idsForFilter = isFormateur ? null : authorizedGameIds;
+        const filtered = filterFichesByCompetences(active, idsForFilter, catalog);
+        console.log('[useStepFiches] Filtered to', filtered.length, 'fiches based on competences');
 
         if (cancelled) return;
         setLinks(nextLinks);
@@ -76,7 +69,7 @@ export function useStepFiches(parcoursId: string | undefined) {
     return () => {
       cancelled = true;
     };
-  }, [parcoursId, tick, authorizedGameIds, competencesLoading, isFormateur]);
+  }, [parcoursId, tick, authorizedGameIds, competencesLoading, catalogLoading, catalog, isFormateur]);
 
   const byStep = useMemo(() => {
     const result: Record<string, ProcedureFiche[]> = {};
