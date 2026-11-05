@@ -153,7 +153,7 @@ function readDemoDeleted(): string[] {
 
 function demoSessions(): PersistedSession[] {
   const deleted = new Set(readDemoDeleted());
-  return allDemoSessions().filter((s) => !deleted.has(s.sessionId));
+  return allDemoSessions().filter((s) => !deleted.has(s.sessionId) && !s.cancelledAt);
 }
 
 function allDemoSessions(): PersistedSession[] {
@@ -190,6 +190,7 @@ function allDemoSessions(): PersistedSession[] {
       completedSteps: ['reception_seating', 'salon_briefing'],
       stepTimes: { reception_seating: at('14:15'), salon_briefing: at('14:24') },
       endedAt: at('15:40'),
+      cancelledAt: null,
       clientEmail: 'client.demo@vrcenter.ch',
       videosSentAt: at('15:45'),
       sales: [
@@ -214,6 +215,7 @@ function allDemoSessions(): PersistedSession[] {
       completedSteps: ['reception_seating'],
       stepTimes: { reception_seating: at('17:58') },
       endedAt: at('19:10'),
+      cancelledAt: null,
       clientEmail: '',
       videosSentAt: null,
       sales: [{ id: 'z1', productName: 'Autre', quantity: 1, unitPrice: 0, paymentMethod: 'twint' }],
@@ -234,6 +236,7 @@ function allDemoSessions(): PersistedSession[] {
       completedSteps: ['reception_seating'],
       stepTimes: { reception_seating: at('16:22') },
       endedAt: null,
+      cancelledAt: null,
       clientEmail: 'evg@example.com',
       videosSentAt: null,
     },
@@ -288,10 +291,11 @@ export async function listRecordedSessions(): Promise<RecordedSessionRow[]> {
     .select(
       'id, game, session_date, session_time, group_name, gm_name, client_email, videos_sent_at, has_incident, incident_type, incident_details, notes, sales_comment, flag_reviewed_at, is_manual, assignment_id, total_collected, sales_recorded_at, gh_session_sales(quantity, unit_price, payment_method), gh_session_media(count)'
     )
+    .is('cancelled_at', null)
     .order('started_at', { ascending: false })
     .limit(60);
   if (error) throw new Error(error.message);
-  
+
   const sessionIds = (data || []).map((row) => row.id);
   
   // Batch check for bug entries: sessions with bug reports should show incident flag

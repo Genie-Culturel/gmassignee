@@ -11,10 +11,19 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
+  Loader2,
   PlayCircle,
   ExternalLink,
   Users,
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { INCIDENT_TYPE_LABELS, buildBugReporterUrl } from '@/lib/constants';
 import { IncidentType, ProcedureFiche, SalesProduct, SessionStep } from '@/lib/database.types';
 import { FicheButton } from '@/components/FicheButton';
@@ -52,6 +61,7 @@ import {
   SaleItem,
   SessionBug,
   assignmentKey,
+  cancelOpenSession,
   createManualSession,
   createOrResumeFromAssignment,
   endSession as persistEndSession,
@@ -149,6 +159,7 @@ export function SuiviParties() {
   const [bugs, setBugs] = useState<SessionBug[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
 
   const [manualGroupName, setManualGroupName] = useState('');
@@ -217,7 +228,7 @@ export function SuiviParties() {
       if (remembered) {
         loadSession(remembered)
           .then((row) => {
-            if (!cancelled && row && !row.endedAt) applyLoaded(row);
+            if (!cancelled && row && !row.endedAt && !row.cancelledAt) applyLoaded(row);
           })
           .catch(() => rememberActiveSession(null));
       }
@@ -312,24 +323,44 @@ export function SuiviParties() {
     }
   };
 
+  const leaveActiveSession = async () => {
+    setActiveSession(null);
+    setStepTimes({});
+    setIncidentType(null);
+    setIncidentDetails('');
+    setSalesItems([]);
+    setSalesComment('');
+    setBugs([]);
+    setCancelOpen(false);
+    if (emailTimer.current) clearTimeout(emailTimer.current);
+    if (notesTimer.current) clearTimeout(notesTimer.current);
+    if (user && !isMockMode) {
+      setOpenSessions(await listOpenSessions(user.id));
+    }
+  };
+
   const handleEndSession = async () => {
     if (!activeSession) return;
     setBusy(true);
     try {
       await persistEndSession(activeSession.sessionId);
-      setActiveSession(null);
-      setStepTimes({});
-      setIncidentType(null);
-      setIncidentDetails('');
-      setSalesItems([]);
-      setSalesComment('');
-      setBugs([]);
-      if (emailTimer.current) clearTimeout(emailTimer.current);
-      if (user && !isMockMode) {
-        setOpenSessions(await listOpenSessions(user.id));
-      }
+      await leaveActiveSession();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Impossible de terminer la session');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCancelSession = async () => {
+    if (!activeSession) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await cancelOpenSession(activeSession.sessionId);
+      await leaveActiveSession();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible d’annuler la session');
     } finally {
       setBusy(false);
     }
@@ -617,9 +648,20 @@ export function SuiviParties() {
                   </span>
                 </CardDescription>
               </div>
-              <Badge variant="success" className="text-sm shrink-0">
-                {completedCount} / {sessionSteps.length} étapes
-              </Badge>
+              <div className="flex flex-col items-end gap-2 shrink-0">
+                <Badge variant="success" className="text-sm">
+                  {completedCount} / {sessionSteps.length} étapes
+                </Badge>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => setCancelOpen(true)}
+                >
+                  Annuler
+                </Button>
+              </div>
             </div>
           </CardHeader>
         </Card>
@@ -794,13 +836,60 @@ export function SuiviParties() {
           </CardContent>
         </Card>
 
-        <div className="flex gap-3">
+        <div className="flex flex-col-reverse gap-3 sm:flex-row">
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            disabled={busy}
+            onClick={() => setCancelOpen(true)}
+          >
+            Annuler
+          </Button>
           <Button onClick={handleEndSession} size="lg" className="flex-1" disabled={busy}>
             <CheckCircle2 className="mr-2 h-5 w-5" />
             Terminer la session
           </Button>
         </div>
       </div>
+
+      <Dialog open={cancelOpen} onOpenChange={(open) => !busy && setCancelOpen(open)}>
+        <DialogContent role="alertdialog" className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <DialogHeader className="text-left">
+            <DialogTitle>Annuler cette session ?</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                {activeSession && (
+                  <p className="rounded-md border bg-muted/40 px-3 py-2 text-foreground">
+                    <span className="font-medium">{activeSession.game}</span>
+                    {activeSession.isManual && (
+                      <span className="ml-2 align-middle">
+                        <ManualSessionBadge />
+                      </span>
+                    )}
+                    <br />
+                    {formatDate(activeSession.date + 'T12:00:00')} · {activeSession.time}
+                    {` · ${activeSession.playerCount} joueur${activeSession.playerCount > 1 ? 's' : ''}`}
+                  </p>
+                )}
+                <p>
+                  À utiliser si tu as démarré la mauvaise partie ou seulement un test. Le créneau
+                  redevient disponible, et cette session n’apparaîtra pas dans l’historique.
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" disabled={busy} onClick={() => setCancelOpen(false)}>
+              Retour
+            </Button>
+            <Button type="button" variant="destructive" disabled={busy} onClick={() => void handleCancelSession()}>
+              {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
+              Annuler
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
