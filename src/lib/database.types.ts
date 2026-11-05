@@ -817,6 +817,10 @@ export interface Database {
         Args: { p_session_id: string };
         Returns: void;
       };
+      gh_get_authorized_game_ids: {
+        Args: { p_user_id?: string };
+        Returns: string[] | null;
+      };
       has_role: {
         Args: { _user_id: string; _role: AppRole };
         Returns: boolean;

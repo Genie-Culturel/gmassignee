@@ -3,8 +3,12 @@ import { supabase, isMockMode } from '@/lib/supabase';
 import { ProcedureFiche } from '@/lib/database.types';
 import { hydrateTrainingFiche, loadDemoFiches } from '@/lib/trainingRepository';
 import { isFicheDeleted, sortFichesByOrder } from '@/lib/training';
+import { useGMCompetences } from './useGMCompetences';
+import { useAuth } from './useAuth';
 
 export function useProcedureFiches(opts?: { includeInactive?: boolean }) {
+  const { isFormateur } = useAuth();
+  const { authorizedGameIds, isLoading: competencesLoading } = useGMCompetences();
   const [fiches, setFiches] = useState<ProcedureFiche[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -15,6 +19,11 @@ export function useProcedureFiches(opts?: { includeInactive?: boolean }) {
 
   useEffect(() => {
     async function fetchFiches() {
+      // Wait for competences to load before fetching fiches
+      if (competencesLoading) {
+        return;
+      }
+
       if (isMockMode) {
         const rows = sortFichesByOrder(
           loadDemoFiches()
@@ -28,6 +37,8 @@ export function useProcedureFiches(opts?: { includeInactive?: boolean }) {
 
       try {
         console.log('[useProcedureFiches] Fetching fiches from gh_procedure_fiches...');
+        console.log('[useProcedureFiches] Authorized game IDs:', authorizedGameIds);
+        
         let query = supabase!
           .from('gh_procedure_fiches')
           .select('*, gh_fiche_scope_locations(location_id), gh_fiche_scope_games(game_id)')
@@ -41,23 +52,54 @@ export function useProcedureFiches(opts?: { includeInactive?: boolean }) {
           console.error('[useProcedureFiches] Query error:', fetchError);
           throw fetchError;
         }
-        console.log('[useProcedureFiches] Loaded', data?.length || 0, 'fiches');
-        setFiches(
-          sortFichesByOrder(
-            (data || []).map((row) => {
-              const record = row as ProcedureFiche & {
-                gh_fiche_scope_locations?: { location_id: string }[];
-                gh_fiche_scope_games?: { game_id: string }[];
-              };
-              return hydrateTrainingFiche({
-                ...record,
-                scope_kind: record.scope_kind || 'all',
-                scope_location_ids: (record.gh_fiche_scope_locations || []).map((item) => item.location_id),
-                scope_game_ids: (record.gh_fiche_scope_games || []).map((item) => item.game_id),
-              });
-            })
-          )
-        );
+        console.log('[useProcedureFiches] Loaded', data?.length || 0, 'fiches before filtering');
+        
+        const allFiches = (data || []).map((row) => {
+          const record = row as ProcedureFiche & {
+            gh_fiche_scope_locations?: { location_id: string }[];
+            gh_fiche_scope_games?: { game_id: string }[];
+          };
+          return hydrateTrainingFiche({
+            ...record,
+            scope_kind: record.scope_kind || 'all',
+            scope_location_ids: (record.gh_fiche_scope_locations || []).map((item) => item.location_id),
+            scope_game_ids: (record.gh_fiche_scope_games || []).map((item) => item.game_id),
+          });
+        });
+
+        // Apply competence-based filtering
+        // If authorizedGameIds is null, the user is a formateur/admin → show all
+        // If authorizedGameIds is [], the user has no competences → show only 'all' scoped fiches
+        // Otherwise, show 'all' + 'locations' + game-scoped fiches matching authorized games
+        let filtered = allFiches;
+        if (!isFormateur && authorizedGameIds !== null) {
+          filtered = allFiches.filter((fiche) => {
+            // Always show fiches with scope_kind = 'all'
+            if (fiche.scope_kind === 'all') {
+              return true;
+            }
+
+            // Show fiches with scope_kind = 'locations' (general venue procedures)
+            // These are not game-specific, so we show them
+            if (fiche.scope_kind === 'locations') {
+              return true;
+            }
+
+            // For game-scoped fiches, check if any of the fiche's games are in authorized list
+            if (fiche.scope_kind === 'games' && fiche.scope_game_ids && fiche.scope_game_ids.length > 0) {
+              const hasAuthorizedGame = fiche.scope_game_ids.some((gameId) =>
+                authorizedGameIds.includes(gameId)
+              );
+              return hasAuthorizedGame;
+            }
+
+            // Default: hide if we can't determine
+            return false;
+          });
+          console.log('[useProcedureFiches] Filtered to', filtered.length, 'fiches based on competences');
+        }
+
+        setFiches(sortFichesByOrder(filtered));
       } catch (err) {
         setError(err as Error);
       } finally {
@@ -66,7 +108,7 @@ export function useProcedureFiches(opts?: { includeInactive?: boolean }) {
     }
 
     fetchFiches();
-  }, [tick, includeInactive]);
+  }, [tick, includeInactive, authorizedGameIds, competencesLoading, isFormateur]);
 
   return { fiches, isLoading, error, reload };
 }
