@@ -352,6 +352,8 @@ export interface Database {
           planned_end_time: string | null;
           /** Lovable activities.id (text) linking to planning */
           planning_activity_id: string | null;
+          /** GM cancelled a wrong start / test (migration 053). Hidden from Historique. */
+          cancelled_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -360,6 +362,7 @@ export interface Database {
           gm_id: string;
           started_at?: string;
           ended_at?: string | null;
+          cancelled_at?: string | null;
           group_name?: string | null;
           notes?: string | null;
           has_incident?: boolean;
@@ -387,6 +390,7 @@ export interface Database {
           gm_id?: string;
           started_at?: string;
           ended_at?: string | null;
+          cancelled_at?: string | null;
           group_name?: string | null;
           notes?: string | null;
           has_incident?: boolean;
@@ -836,6 +840,10 @@ export interface Database {
         Returns: void;
       };
       gh_admin_delete_session: {
+        Args: { p_session_id: string };
+        Returns: void;
+      };
+      gh_cancel_open_session: {
         Args: { p_session_id: string };
         Returns: void;
       };

@@ -44,6 +44,8 @@ export interface PersistedSession {
   /** ISO timestamp when the GM saved the encaissement module (null = never used). */
   salesRecordedAt: string | null;
   endedAt: string | null;
+  /** GM cancelled a wrong start / test (gh_vr_sessions.cancelled_at). */
+  cancelledAt: string | null;
   clientEmail: string;
   videosSentAt: string | null;
   /** Started via « Démarrer une session manuelle » (vr_sessions.is_manual). */
@@ -141,6 +143,7 @@ function rowToSession(
     salesComment,
     salesRecordedAt: (row.sales_recorded_at as string) || null,
     endedAt: (row.ended_at as string) || null,
+    cancelledAt: (row.cancelled_at as string) || null,
     clientEmail: (row.client_email as string) || '',
     videosSentAt: (row.videos_sent_at as string) || null,
     isManual: typeof row.is_manual === 'boolean' ? row.is_manual : !row.assignment_id,
@@ -223,7 +226,7 @@ export async function listOpenSessions(gmId: string): Promise<PersistedSession[]
 
 const demoSessions = new Map<string, PersistedSession>();
 
-function emptyDemoSession(partial: Omit<PersistedSession, 'startedAt' | 'completedSteps' | 'stepTimes' | 'sales' | 'salesComment' | 'salesRecordedAt' | 'endedAt' | 'incidentType' | 'incidentDetails' | 'notes' | 'clientEmail' | 'videosSentAt' | 'isManual' | 'plannedEndTime' | 'planningActivityId'> & {
+function emptyDemoSession(partial: Omit<PersistedSession, 'startedAt' | 'completedSteps' | 'stepTimes' | 'sales' | 'salesComment' | 'salesRecordedAt' | 'endedAt' | 'cancelledAt' | 'incidentType' | 'incidentDetails' | 'notes' | 'clientEmail' | 'videosSentAt' | 'isManual' | 'plannedEndTime' | 'planningActivityId'> & {
   notes?: string;
   clientEmail?: string;
   plannedEndTime?: string | null;
@@ -244,6 +247,7 @@ function emptyDemoSession(partial: Omit<PersistedSession, 'startedAt' | 'complet
     salesComment: '',
     salesRecordedAt: null,
     endedAt: null,
+    cancelledAt: null,
     clientEmail: partial.clientEmail || '',
     videosSentAt: null,
   };
@@ -264,7 +268,7 @@ export async function createOrResumeFromAssignment(params: {
   if (isMockMode || !supabase) {
     const sessionId = `demo-${key}`;
     const existing = demoSessions.get(sessionId);
-    if (existing && !existing.endedAt) return existing;
+    if (existing && !existing.endedAt && !existing.cancelledAt) return existing;
     return emptyDemoSession({
       sessionId,
       assignmentId: key,
@@ -545,6 +549,32 @@ export async function endSession(sessionId: string) {
   rememberActiveSession(null);
 }
 
+/**
+ * Undo a wrong start / test: soft-cancel the still-open session so the
+ * assignment can be started again and Historique does not list it as a
+ * finished party.
+ */
+export async function cancelOpenSession(sessionId: string) {
+  if (isMockMode || !supabase) {
+    const session = demoSessions.get(sessionId);
+    if (session) {
+      if (session.cancelledAt) {
+        rememberActiveSession(null);
+        return;
+      }
+      if (session.endedAt) throw new Error('Cette session est déjà terminée');
+      const now = new Date().toISOString();
+      session.cancelledAt = now;
+      session.endedAt = now;
+    }
+    rememberActiveSession(null);
+    return;
+  }
+  const { error } = await supabase.rpc('gh_cancel_open_session', { p_session_id: sessionId });
+  throwIfError(error, 'Annulation de la session');
+  rememberActiveSession(null);
+}
+
 export async function ensureCheckin(gmId: string) {
   if (isMockMode || !supabase) return;
   const today = new Date().toISOString().slice(0, 10);
@@ -586,6 +616,7 @@ export async function listSessionsThisMonth(gmId: string): Promise<number> {
     .from('gh_vr_sessions')
     .select('id', { count: 'exact', head: true })
     .eq('gm_id', gmId)
+    .is('cancelled_at', null)
     .gte('started_at', start.toISOString());
   if (error) return 0;
   return count || 0;
