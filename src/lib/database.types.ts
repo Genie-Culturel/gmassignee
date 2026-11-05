@@ -25,7 +25,7 @@ export type PaymentMethod = 'twint' | 'especes' | 'carte' | 'facture';
 export type FicheScopeKind = 'all' | 'locations' | 'games';
 
 /** User role in the Lovable app (public.user_roles.role, enum app_role). */
-export type AppRole = 'admin' | 'gm' | 'stock_manager' | 'planificateur';
+export type AppRole = 'admin' | 'gm' | 'stock_manager' | 'planificateur' | 'formateur_suivi';
 
 /** Historical VR Center step keys (former Postgres enum session_step). */
 export type LegacyVrStep =

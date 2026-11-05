@@ -6,6 +6,7 @@ interface AuthContextValue {
   user: User | null;
   loading: boolean;
   isAdmin: boolean;
+  isFormateur: boolean;
   displayName: string;
   signIn: (email: string, password: string) => Promise<string | null>;
   signUp: (email: string, password: string, displayName: string) => Promise<string | null>;
@@ -29,6 +30,21 @@ async function checkIsAdmin(user: User | null): Promise<boolean> {
   }
 }
 
+async function checkIsFormateur(user: User | null): Promise<boolean> {
+  if (!user || !supabase) return false;
+  try {
+    const { data } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .in('role', ['admin', 'formateur_suivi'])
+      .maybeSingle();
+    return Boolean(data);
+  } catch {
+    return false;
+  }
+}
+
 function readDisplayName(user: User | null): string {
   if (!user) return 'GM Demo';
   const meta = user.user_metadata || {};
@@ -44,11 +60,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(!isMockMode);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isFormateur, setIsFormateur] = useState(false);
 
   useEffect(() => {
     if (isMockMode || !supabase) {
       setLoading(false);
       setIsAdmin(true);
+      setIsFormateur(true);
       return;
     }
 
@@ -61,6 +79,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           checkIsAdmin(sessionUser).then((admin) => {
             if (!cancelled) setIsAdmin(admin);
           });
+          checkIsFormateur(sessionUser).then((formateur) => {
+            if (!cancelled) setIsFormateur(formateur);
+          });
         }
         setLoading(false);
       }
@@ -71,8 +92,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(sessionUser);
       if (sessionUser) {
         checkIsAdmin(sessionUser).then(setIsAdmin);
+        checkIsFormateur(sessionUser).then(setIsFormateur);
       } else {
         setIsAdmin(false);
+        setIsFormateur(false);
       }
     });
 
@@ -86,9 +109,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       loading,
-      // En mode démo, isAdmin est forcé à true (ligne 51).
+      // En mode démo, isAdmin et isFormateur sont forcés à true.
       // Les données sont locales (localStorage) et ne touchent pas la vraie base.
       isAdmin,
+      isFormateur,
       displayName: isMockMode ? 'GM Demo' : readDisplayName(user),
       signIn: async (email, password) => {
         if (!supabase) return 'Supabase non configuré';
@@ -112,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await supabase?.auth.signOut();
       },
     }),
-    [user, loading, isAdmin]
+    [user, loading, isAdmin, isFormateur]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

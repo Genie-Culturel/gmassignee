@@ -53,7 +53,7 @@ export function SessionMediaAdmin() {
   const [onlyFlagged, setOnlyFlagged] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const { isAdmin } = useAuth();
+  const { isFormateur } = useAuth();
   const [toDelete, setToDelete] = useState<RecordedSessionRow | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -253,7 +253,7 @@ export function SessionMediaAdmin() {
           </label>
         </div>
         
-        {isAdmin && selectedIds.size > 0 && (
+        {isFormateur && selectedIds.size > 0 && (
           <div className="flex items-center gap-3 rounded-md border bg-muted/40 px-3 py-2">
             <span className="text-sm font-medium">{selectedIds.size} session(s) sélectionnée(s)</span>
             <Button
@@ -308,7 +308,7 @@ export function SessionMediaAdmin() {
           <table className="w-full min-w-[620px] text-sm">
             <thead>
               <tr className="border-b text-left text-muted-foreground">
-                {isAdmin && (
+                {isFormateur && (
                   <th className="w-10 px-3 py-2">
                     <Checkbox
                       checked={allPageIdsSelected}
@@ -323,7 +323,7 @@ export function SessionMediaAdmin() {
                 <th className="px-3 py-2 font-medium">Client</th>
                 <th className="px-3 py-2 font-medium">Vidéos envoyées</th>
                 <th className="px-3 py-2 font-medium">À relever</th>
-                {isAdmin && (
+                {isFormateur && (
                   <th className="w-10 px-1 py-2">
                     <span className="sr-only">Supprimer</span>
                   </th>
@@ -341,7 +341,7 @@ export function SessionMediaAdmin() {
                   onClick={() => setOpenId(row.sessionId)}
                   onKeyDown={(event) => rowKeyDown(event, row.sessionId)}
                 >
-                  {isAdmin && (
+                  {isFormateur && (
                     <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                       <Checkbox
                         checked={selectedIds.has(row.sessionId)}
@@ -374,7 +374,7 @@ export function SessionMediaAdmin() {
                       <span className="text-muted-foreground">—</span>
                     )}
                   </td>
-                  {isAdmin && (
+                  {isFormateur && (
                     <td className="px-1 py-2">
                       <button
                         type="button"
@@ -436,7 +436,7 @@ export function SessionMediaAdmin() {
         onClose={() => setOpenId(null)}
         onReviewedChange={toggleReviewed}
         onDeleteRequest={
-          isAdmin
+          isFormateur
             ? (row) => {
                 setDeleteError(null);
                 setToDelete(row);
