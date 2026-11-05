@@ -2,17 +2,26 @@ import { ProcedureFiche } from './database.types';
 import { VenueCatalog, VenueGame } from './venues';
 
 /**
- * Seule la compétence Saga ouvre le circuit VR Center générique
- * (lobby, pop-corn, salle, boissons…). Planta / Serviteur / Schoolcrafter /
- * Archeogame : fiches du jeu seulement.
+ * Jeux VR du Centre qui ouvrent le circuit générique (lobby, pop-corn, salle, boissons…).
+ * Archeogame et nettoyage sont au même lieu mais n'ouvrent PAS le circuit.
  */
-export const VR_CIRCUIT_SLUGS = ['saga'] as const;
+export const VR_CIRCUIT_SLUGS = ['planta', 'serviteur', 'saga', 'schoolcrafter'] as const;
+
+/** Jeux situés au VR Center qui n'ouvrent pas le circuit. */
+export const VR_CIRCUIT_EXCLUDED_SLUGS = ['archeogame', 'nettoyage'] as const;
 
 /** Compétence RH « Nettoyage centre VR » : fiches nettoyage seulement. */
 export const NETTOYAGE_SLUGS = ['nettoyage'] as const;
 
-export function isVrCircuitGame(game: Pick<VenueGame, 'slug'>): boolean {
-  return (VR_CIRCUIT_SLUGS as readonly string[]).includes(game.slug);
+export function isVrCircuitGame(
+  game: Pick<VenueGame, 'slug' | 'location_id'>,
+  catalog: VenueCatalog
+): boolean {
+  const slug = (game.slug || '').toLowerCase();
+  if ((VR_CIRCUIT_EXCLUDED_SLUGS as readonly string[]).includes(slug)) return false;
+  if ((VR_CIRCUIT_SLUGS as readonly string[]).includes(slug)) return true;
+  const location = catalog.locations.find((row) => row.id === game.location_id);
+  return location?.slug === 'vr_center';
 }
 
 export function isNettoyageGame(game: Pick<VenueGame, 'slug'>): boolean {
@@ -77,10 +86,11 @@ export function idsForCompetenceFilter(
  *
  * - `authorizedGameIds === null` : pas de filtre (formateur / admin / démo).
  * - `[]` : aucune fiche (0 compétence RH).
- * - Saga : circuit VR Center + fiches Saga.
- * - Planta / Serviteur / Schoolcrafter / Da Vinci / Archeogame : fiches du jeu
- *   (+ fiches lieu du parcours, hors circuit VR Center).
+ * - Planta / Serviteur / Saga / Schoolcrafter (ou autre jeu VR Center hors exclusions) :
+ *   circuit VR Center + fiches du jeu.
+ * - Archeogame : fiches Archeogame seulement (pas le circuit VR).
  * - Nettoyage : fiches nettoyage seulement.
+ * - Da Vinci / Chandoline / etc. : fiches du jeu + fiches lieu du parcours, pas le circuit VR.
  */
 export function filterFichesByCompetences(
   fiches: ProcedureFiche[],
@@ -92,7 +102,7 @@ export function filterFichesByCompetences(
 
   const authorized = new Set(authorizedGameIds);
   const authorizedGames = catalog.games.filter((game) => authorized.has(game.id));
-  const hasVrCircuit = authorizedGames.some(isVrCircuitGame);
+  const hasVrCircuit = authorizedGames.some((game) => isVrCircuitGame(game, catalog));
   const hasNettoyage = authorizedGames.some(isNettoyageGame);
   const authorizedLocationIds = new Set(authorizedGames.map((game) => game.location_id));
 
@@ -109,7 +119,7 @@ export function filterFichesByCompetences(
     }
 
     // Fiches nettoyage de session : visibles pour la compétence nettoyage,
-    // et aussi via le circuit VR (Saga, etc.) plus bas.
+    // et aussi via le circuit VR (Planta / Saga / …) plus bas.
     if (hasNettoyage && isNettoyageFiche(fiche)) {
       return true;
     }
