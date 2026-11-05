@@ -250,6 +250,14 @@ function SortableFicheRow({
       >
         <GripVertical className="h-3.5 w-3.5" aria-hidden />
       </button>
+      <div
+        className={cn(
+          'mt-1.5 h-2 w-2 shrink-0 rounded-full',
+          fiche.is_active ? 'bg-emerald-500' : 'bg-muted-foreground/30'
+        )}
+        title={fiche.is_active ? 'Actif' : 'Inactif'}
+        aria-label={fiche.is_active ? 'Actif' : 'Inactif'}
+      />
       <span className="min-w-0 flex-1 text-left text-sm font-medium leading-snug">{fiche.title}</span>
     </li>
   );
@@ -259,6 +267,13 @@ function FicheRowPreview({ fiche }: { fiche: ProcedureFiche }) {
   return (
     <div className="flex items-start gap-2 rounded-md border bg-card px-2 py-2.5 shadow-md">
       <GripVertical className="mt-0.5 h-3.5 w-3.5 text-muted-foreground/60" aria-hidden />
+      <div
+        className={cn(
+          'mt-1.5 h-2 w-2 shrink-0 rounded-full',
+          fiche.is_active ? 'bg-emerald-500' : 'bg-muted-foreground/30'
+        )}
+        aria-hidden
+      />
       <span className="text-sm font-medium leading-snug">{fiche.title}</span>
     </div>
   );
