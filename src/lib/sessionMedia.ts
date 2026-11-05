@@ -3,8 +3,8 @@ import { isMockMode, supabase } from './supabase';
 import { DEFAULT_SUPABASE_ANON_KEY, DEFAULT_SUPABASE_URL, souvenirsPageUrl, STORAGE_BUCKET_SESSION_MEDIA, EDGE_FUNCTION_SEND_SESSION_VIDEOS } from './config';
 
 export const SESSION_MEDIA_BUCKET = STORAGE_BUCKET_SESSION_MEDIA;
-export const SESSION_MEDIA_MAX_BYTES = 50 * 1024 * 1024;
-export const SESSION_MEDIA_MAX_LABEL = '50 Mo';
+export const SESSION_MEDIA_MAX_BYTES = 300 * 1024 * 1024;
+export const SESSION_MEDIA_MAX_LABEL = '300 Mo';
 export const SESSION_MEDIA_TTL_DAYS = 14;
 
 export const FILMING_NOTICE =
@@ -100,7 +100,7 @@ export function uploadSessionFile(params: {
   if (file.size > SESSION_MEDIA_MAX_BYTES) {
     return Promise.reject(
       new Error(
-        `Fichier trop lourd (${formatBytes(file.size)}). Limite actuelle : ${SESSION_MEDIA_MAX_LABEL} par fichier (plan gratuit Supabase). Passe le projet en Pro pour les gros fichiers.`
+        `Fichier trop lourd (${formatBytes(file.size)}). Limite actuelle : ${SESSION_MEDIA_MAX_LABEL} par fichier (plan Pro Supabase).`
       )
     );
   }

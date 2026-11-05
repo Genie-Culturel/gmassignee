@@ -107,7 +107,7 @@ export function SessionVideos({
             file,
             status: 'too_large',
             progress: 0,
-            error: `Trop lourd (${formatBytes(file.size)}). Limite actuelle : ${SESSION_MEDIA_MAX_LABEL} / fichier (plan gratuit).`,
+            error: `Trop lourd (${formatBytes(file.size)}). Limite actuelle : ${SESSION_MEDIA_MAX_LABEL} / fichier (plan Pro).`,
           },
         ]);
         continue;
@@ -193,7 +193,7 @@ export function SessionVideos({
         <CardTitle>Vidéos &amp; photos souvenirs</CardTitle>
         <CardDescription>
           Filme avec ton téléphone, téléverse les vidéos ici, puis transmets le lien au client. Limite
-          actuelle : {SESSION_MEDIA_MAX_LABEL} par fichier (plan gratuit). Photos acceptées pour les tests.
+          actuelle : {SESSION_MEDIA_MAX_LABEL} par fichier (plan Pro). Photos acceptées pour les tests.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

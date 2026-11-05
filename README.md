@@ -10,7 +10,7 @@ Deux parties liées :
 
 - **Mes sessions** : même structure que le dashboard GM GMassignee — **Mes Activités Aujourd'hui** et **Mes Prochaines Activités**. Chaque ligne : jeu + `[nb joueurs]`, badge Assigné, date, créneau début–fin. Un clic démarre / reprend la session pré-remplie. Un bandeau rappelle de démarrer **à l'arrivée** : `started_at` = heure d'arrivée GM, chaque étape cochée garde `completed_at`.
 - **Démarrage manuel** : fallback si la partie n'est pas dans le planning. Le GM choisit le **jeu** (noms officiels de la table `games`) ; le parcours du lieu du jeu est pris automatiquement.
-- **Vidéos clients** : depuis le suivi de session, le GM envoie 1–2 vidéos (téléphone perso) vers un bucket privé `session-media` (TUS, 50 Mo/fichier en plan gratuit). Un e-mail chaleureux part au client (Resend) avec une page de téléchargement valable 14 jours ; les fichiers sont ensuite supprimés. En mode démo, upload et envoi sont simulés localement.
+- **Vidéos clients** : depuis le suivi de session, le GM envoie 1–2 vidéos (téléphone perso) vers un bucket privé `session-media` (TUS, 300 Mo/fichier en plan Pro). Un e-mail chaleureux part au client (Resend) avec une page de téléchargement valable 14 jours ; les fichiers sont ensuite supprimés. En mode démo, upload et envoi sont simulés localement.
 - **Incidents** : Bug / Freeze ouvre le [Bug reporter](https://genie-culturel.github.io/Bug_report_VR/) pré-rempli + la fiche de dépannage. Malaise / Casse / Autre gardent fiche + note ; Autre affiche aussi le lien bug reporter.
 - **Ventes & encaissement** : lignes, CHF, Twint / Espèces / Carte / Facture.
 
@@ -164,7 +164,7 @@ L'ancien projet `gm-vrcenter` (vxeprhyswkqugyewpwfm) reste documenté dans `supa
 | `010_move_troubleshooting_to_depannage.sql` | Déplace les fiches Dépannage vers `depannage_bugs` |
 | `011_session_persistence.sql` | Colonnes de reprise (`game`, `session_date`, `session_time`, `player_count`, `parcours_id`, `assignment_id`, `gm_name`), `event_id` nullable, unique étape |
 | `012_gm_training.sql` | Formation obligatoire : `version` / `is_required` sur les fiches, `quiz_questions`, `fiche_validations`, triggers de version, RPC quiz sans exposer les bonnes réponses |
-| `013_session_media.sql` | Vidéos clients : `client_email` / `videos_sent_at` / `videos_download_token` sur `vr_sessions`, table `session_media`, bucket privé `session-media` (50 Mo), RLS, `cleanup_expired_session_media()` |
+| `013_session_media.sql` | Vidéos clients : `client_email` / `videos_sent_at` / `videos_download_token` sur `vr_sessions`, table `session_media`, bucket privé `session-media` (300 Mo), RLS, `cleanup_expired_session_media()` |
 | `014_soft_delete_fiches.sql` | Suppression logique des fiches : `procedure_fiches.deleted_at` (distinct de `is_active`). L’historique `fiche_validations` est conservé. |
 | `015_fiche_locations_games.sql` | Lieux (`locations`) et jeux (`games`), portée des fiches (`scope_kind` + `fiche_scope_locations` / `fiche_scope_games`). Seed VR Center / Chandoline / Sion / Sierre. Les fiches existantes sont rattachées au VR Center ; les lancements Planta / Saga / Serviteur sont rattachés au jeu. |
 | `016_fiche_sort_order.sql` | Ordre manuel des fiches : `procedure_fiches.sort_order` par catégorie, initialisé sur l’ordre actuel. Le trigger de version ignore ce champ. |
