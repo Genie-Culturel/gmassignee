@@ -334,6 +334,8 @@ export interface Database {
           total_collected: number | null;
           total_to_invoice: number | null;
           sales_comment: string | null;
+          /** Set when the GM saved the encaissement module (including 0.–). */
+          sales_recorded_at: string | null;
           game: string | null;
           session_date: string | null;
           session_time: string | null;
@@ -366,6 +368,7 @@ export interface Database {
           total_collected?: number | null;
           total_to_invoice?: number | null;
           sales_comment?: string | null;
+          sales_recorded_at?: string | null;
           game?: string | null;
           session_date?: string | null;
           session_time?: string | null;
@@ -392,6 +395,7 @@ export interface Database {
           total_collected?: number | null;
           total_to_invoice?: number | null;
           sales_comment?: string | null;
+          sales_recorded_at?: string | null;
           game?: string | null;
           session_date?: string | null;
           session_time?: string | null;

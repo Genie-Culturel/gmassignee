@@ -41,6 +41,8 @@ export interface PersistedSession {
   stepTimes: Partial<Record<SessionStep, string>>;
   sales: SaleItem[];
   salesComment: string;
+  /** ISO timestamp when the GM saved the encaissement module (null = never used). */
+  salesRecordedAt: string | null;
   endedAt: string | null;
   clientEmail: string;
   videosSentAt: string | null;
@@ -137,6 +139,7 @@ function rowToSession(
     stepTimes: loaded.stepTimes,
     sales,
     salesComment,
+    salesRecordedAt: (row.sales_recorded_at as string) || null,
     endedAt: (row.ended_at as string) || null,
     clientEmail: (row.client_email as string) || '',
     videosSentAt: (row.videos_sent_at as string) || null,
@@ -220,7 +223,7 @@ export async function listOpenSessions(gmId: string): Promise<PersistedSession[]
 
 const demoSessions = new Map<string, PersistedSession>();
 
-function emptyDemoSession(partial: Omit<PersistedSession, 'startedAt' | 'completedSteps' | 'stepTimes' | 'sales' | 'salesComment' | 'endedAt' | 'incidentType' | 'incidentDetails' | 'notes' | 'clientEmail' | 'videosSentAt' | 'isManual' | 'plannedEndTime' | 'planningActivityId'> & {
+function emptyDemoSession(partial: Omit<PersistedSession, 'startedAt' | 'completedSteps' | 'stepTimes' | 'sales' | 'salesComment' | 'salesRecordedAt' | 'endedAt' | 'incidentType' | 'incidentDetails' | 'notes' | 'clientEmail' | 'videosSentAt' | 'isManual' | 'plannedEndTime' | 'planningActivityId'> & {
   notes?: string;
   clientEmail?: string;
   plannedEndTime?: string | null;
@@ -239,6 +242,7 @@ function emptyDemoSession(partial: Omit<PersistedSession, 'startedAt' | 'complet
     stepTimes: {},
     sales: [],
     salesComment: '',
+    salesRecordedAt: null,
     endedAt: null,
     clientEmail: partial.clientEmail || '',
     videosSentAt: null,
@@ -401,6 +405,7 @@ export async function updateSessionFields(
     incidentType?: IncidentType | null;
     incidentDetails?: string;
     salesComment?: string;
+    salesRecordedAt?: string | null;
     totalCollected?: number;
     totalToInvoice?: number;
     endedAt?: string | null;
@@ -415,6 +420,7 @@ export async function updateSessionFields(
     if (patch.incidentType !== undefined) session.incidentType = patch.incidentType;
     if (patch.incidentDetails !== undefined) session.incidentDetails = patch.incidentDetails;
     if (patch.salesComment !== undefined) session.salesComment = patch.salesComment;
+    if (patch.salesRecordedAt !== undefined) session.salesRecordedAt = patch.salesRecordedAt;
     if (patch.endedAt !== undefined) session.endedAt = patch.endedAt;
     if (patch.clientEmail !== undefined) session.clientEmail = patch.clientEmail;
     if (patch.videosSentAt !== undefined) session.videosSentAt = patch.videosSentAt;
@@ -428,6 +434,7 @@ export async function updateSessionFields(
   }
   if (patch.incidentDetails !== undefined) body.incident_details = patch.incidentDetails;
   if (patch.salesComment !== undefined) body.sales_comment = patch.salesComment;
+  if (patch.salesRecordedAt !== undefined) body.sales_recorded_at = patch.salesRecordedAt;
   if (patch.totalCollected !== undefined) body.total_collected = patch.totalCollected;
   if (patch.totalToInvoice !== undefined) body.total_to_invoice = patch.totalToInvoice;
   if (patch.endedAt !== undefined) body.ended_at = patch.endedAt;
@@ -435,6 +442,13 @@ export async function updateSessionFields(
   if (patch.videosSentAt !== undefined) body.videos_sent_at = patch.videosSentAt;
   if (Object.keys(body).length === 0) return;
   const { error } = await supabase.from('gh_vr_sessions').update(body).eq('id', sessionId);
+  if (error && body.sales_recorded_at !== undefined && /sales_recorded_at/.test(error.message)) {
+    delete body.sales_recorded_at;
+    if (Object.keys(body).length === 0) return;
+    const retry = await supabase.from('gh_vr_sessions').update(body).eq('id', sessionId);
+    throwIfError(retry.error, 'Mise à jour de la session');
+    return;
+  }
   throwIfError(error, 'Mise à jour de la session');
 }
 
@@ -475,7 +489,16 @@ export async function replaceSales(
   comment: string,
   products: SalesProduct[]
 ) {
-  if (isMockMode || !supabase) return;
+  const recordedAt = new Date().toISOString();
+  if (isMockMode || !supabase) {
+    const session = demoSessions.get(sessionId);
+    if (session) {
+      session.sales = items;
+      session.salesComment = comment;
+      session.salesRecordedAt = session.salesRecordedAt || recordedAt;
+    }
+    return;
+  }
   const { error: delErr } = await supabase.from('gh_session_sales').delete().eq('session_id', sessionId);
   throwIfError(delErr, 'Ventes');
   if (items.length) {
@@ -505,6 +528,7 @@ export async function replaceSales(
   );
   await updateSessionFields(sessionId, {
     salesComment: comment,
+    salesRecordedAt: recordedAt,
     totalCollected: totals.collected,
     totalToInvoice: totals.toInvoice,
   });

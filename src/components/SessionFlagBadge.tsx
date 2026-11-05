@@ -14,7 +14,7 @@ const FLAG_STYLE: Record<SessionFlag['kind'], { tone: string; Icon: typeof Flag 
   cash: { tone: 'border-emerald-200 bg-emerald-100 text-emerald-800', Icon: Banknote },
 };
 
-/** Red = incident, amber = remark, green = money collected; grey once marked « Relevé ». */
+/** Red = incident, amber = remark, green = encaissement à relever (y compris 0.–) ; grey once marked « Relevé ». */
 export function SessionFlagBadge({ flag, reviewed, className }: SessionFlagBadgeProps) {
   if (!flag) return null;
   const { tone, Icon } = FLAG_STYLE[flag.kind];
