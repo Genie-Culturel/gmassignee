@@ -354,8 +354,10 @@ async function replaceFicheScope(
   scope: { kind: FicheScopeKind; locationIds: string[]; gameIds: string[] }
 ) {
   if (!supabase) return;
-  await supabase.from('gh_fiche_scope_locations').delete().eq('fiche_id', ficheId);
-  await supabase.from('gh_fiche_scope_games').delete().eq('fiche_id', ficheId);
+  const { error: deleteLocError } = await supabase.from('gh_fiche_scope_locations').delete().eq('fiche_id', ficheId);
+  if (deleteLocError) throw new Error(deleteLocError.message);
+  const { error: deleteGamesError } = await supabase.from('gh_fiche_scope_games').delete().eq('fiche_id', ficheId);
+  if (deleteGamesError) throw new Error(deleteGamesError.message);
   if (scope.kind === 'locations' && scope.locationIds.length) {
     assertLiveIds(scope.locationIds, 'lieu');
     const { error } = await supabase
