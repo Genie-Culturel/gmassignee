@@ -72,6 +72,15 @@ function shorten(text: string, max = 160): string {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
+/** True when the GM saved the encaissement module — including an explicit 0.– total. */
+export function isSalesModuleUsed(input: {
+  collected: number;
+  saleCount?: number;
+  salesRecordedAt?: string | null;
+}): boolean {
+  return input.collected > 0 || (input.saleCount ?? 0) > 0 || Boolean(input.salesRecordedAt);
+}
+
 export function computeSessionFlags(input: {
   hasIncident: boolean;
   incidentType: IncidentType | null;
@@ -80,6 +89,8 @@ export function computeSessionFlags(input: {
   salesComment: string;
   collected: number;
   collectedMethods?: string[];
+  /** GM saved the encaissement module (rows or sales_recorded_at), even at 0.–. */
+  salesRecorded?: boolean;
 }): SessionFlag[] {
   const flags: SessionFlag[] = [];
   const details = (input.incidentDetails || '').trim();
@@ -91,7 +102,7 @@ export function computeSessionFlags(input: {
     .filter(Boolean)
     .join(' · ');
   if (remark) flags.push({ kind: 'remark', label: 'Remarque', excerpt: shorten(remark) });
-  if (input.collected > 0) {
+  if (input.collected > 0 || input.salesRecorded) {
     const methods = input.collectedMethods?.length ? ` (${input.collectedMethods.join(', ')})` : '';
     flags.push({
       kind: 'cash',
@@ -156,6 +167,7 @@ function allDemoSessions(): PersistedSession[] {
     stepsSnapshot: null,
     sales: [],
     salesComment: '',
+    salesRecordedAt: null,
     plannedEndTime: null,
     planningActivityId: null,
   };
@@ -185,6 +197,27 @@ function allDemoSessions(): PersistedSession[] {
         { id: 'd2', productName: 'Partie VR', quantity: 1, unitPrice: 240, paymentMethod: 'facture' },
       ],
       salesComment: 'Facture à envoyer à la RH',
+      salesRecordedAt: at('15:42'),
+    },
+    {
+      ...base,
+      sessionId: 'demo-zero-cash',
+      isManual: true,
+      game: 'Novasphère',
+      time: '18:00',
+      startedAt: at('17:55'),
+      groupName: 'Anniversaire',
+      gmName: 'GM Demo',
+      notes: '',
+      incidentType: null,
+      incidentDetails: '',
+      completedSteps: ['reception_seating'],
+      stepTimes: { reception_seating: at('17:58') },
+      endedAt: at('19:10'),
+      clientEmail: '',
+      videosSentAt: null,
+      sales: [{ id: 'z1', productName: 'Autre', quantity: 1, unitPrice: 0, paymentMethod: 'twint' }],
+      salesRecordedAt: at('19:05'),
     },
     {
       ...base,
@@ -208,6 +241,7 @@ function allDemoSessions(): PersistedSession[] {
 }
 
 function sessionToRow(session: PersistedSession, hasIncident: boolean, reviewedAt: string | null): RecordedSessionRow {
+  const fromSales = collectedFromSales(session.sales);
   return {
     sessionId: session.sessionId,
     game: session.game,
@@ -225,8 +259,13 @@ function sessionToRow(session: PersistedSession, hasIncident: boolean, reviewedA
       incidentDetails: session.incidentDetails,
       notes: session.notes,
       salesComment: session.salesComment,
-      collected: collectedFromSales(session.sales).amount,
-      collectedMethods: collectedFromSales(session.sales).methods,
+      collected: fromSales.amount,
+      collectedMethods: fromSales.methods,
+      salesRecorded: isSalesModuleUsed({
+        collected: fromSales.amount,
+        saleCount: session.sales.length,
+        salesRecordedAt: session.salesRecordedAt,
+      }),
     }),
     flagReviewedAt: reviewedAt,
     mediaCount: session.sessionId === 'demo-sent' ? 2 : 0,
@@ -247,7 +286,7 @@ export async function listRecordedSessions(): Promise<RecordedSessionRow[]> {
   const { data, error } = await supabase
     .from('gh_vr_sessions')
     .select(
-      'id, game, session_date, session_time, group_name, gm_name, client_email, videos_sent_at, has_incident, incident_type, incident_details, notes, sales_comment, flag_reviewed_at, is_manual, assignment_id, total_collected, gh_session_sales(quantity, unit_price, payment_method), gh_session_media(count)'
+      'id, game, session_date, session_time, group_name, gm_name, client_email, videos_sent_at, has_incident, incident_type, incident_details, notes, sales_comment, flag_reviewed_at, is_manual, assignment_id, total_collected, sales_recorded_at, gh_session_sales(quantity, unit_price, payment_method), gh_session_media(count)'
     )
     .order('started_at', { ascending: false })
     .limit(60);
@@ -297,6 +336,7 @@ export async function listRecordedSessions(): Promise<RecordedSessionRow[]> {
     const fromSales = collectedFromSales(sales);
     const collected = Math.max(fromSales.amount, Number(row.total_collected || 0));
     const mediaAgg = row.gh_session_media as { count: number }[] | null | undefined;
+    const salesRecordedAt = (row as { sales_recorded_at?: string | null }).sales_recorded_at || null;
     
     // If session has bug entries but no incident type set, treat as bug incident
     const hasBugEntries = sessionsWithBugs.has(row.id);
@@ -322,6 +362,11 @@ export async function listRecordedSessions(): Promise<RecordedSessionRow[]> {
       salesComment: row.sales_comment || '',
       collected,
       collectedMethods: fromSales.methods,
+      salesRecorded: isSalesModuleUsed({
+        collected,
+        saleCount: sales.length,
+        salesRecordedAt,
+      }),
     }),
     flagReviewedAt: row.flag_reviewed_at || null,
     mediaCount: Array.isArray(mediaAgg) ? Number(mediaAgg[0]?.count || 0) : null,
