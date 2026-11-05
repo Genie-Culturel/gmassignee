@@ -11,6 +11,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
+  Info,
   Loader2,
   PlayCircle,
   ExternalLink,
@@ -38,6 +39,7 @@ import { SessionVideos } from '@/components/SessionVideos';
 import {
   AssignedSession,
   DEMO_GM_ID,
+  STAFF_NO_ASSIGNMENT_HINT,
   getAssignedSessions,
 } from '@/lib/assignedSessions';
 import {
@@ -143,7 +145,7 @@ function openBugReporter(session: ActiveSession, remarks?: string) {
 }
 
 export function SuiviParties() {
-  const { user, displayName } = useAuth();
+  const { user, displayName, isFormateur } = useAuth();
   const { options } = useGmOptions();
   const gmId = user?.id || DEMO_GM_ID;
 
@@ -161,6 +163,7 @@ export function SuiviParties() {
   const [busy, setBusy] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
+  const [assignmentsLoaded, setAssignmentsLoaded] = useState(false);
 
   const [manualGroupName, setManualGroupName] = useState('');
   const [manualGameId, setManualGameId] = useState('');
@@ -197,7 +200,8 @@ export function SuiviParties() {
 
   useEffect(() => {
     let cancelled = false;
-    
+    setAssignmentsLoaded(false);
+
     // Load assigned sessions - handle errors properly
     getAssignedSessions(gmId)
       .then((rows) => {
@@ -205,6 +209,7 @@ export function SuiviParties() {
           console.log('[SuiviParties] Loaded', rows.length, 'assigned sessions');
           setAssigned(rows);
           setAssignmentError(null);
+          setAssignmentsLoaded(true);
         }
       })
       .catch((err) => {
@@ -213,6 +218,7 @@ export function SuiviParties() {
           console.error('[SuiviParties] Failed to load assignments:', errorMsg);
           setAssignmentError(errorMsg);
           setAssigned([]);
+          setAssignmentsLoaded(true);
         }
       });
     
@@ -475,6 +481,14 @@ export function SuiviParties() {
               <p className="text-sm mt-1 font-mono">{assignmentError}</p>
               <p className="text-sm mt-2">Vérifiez la console du navigateur pour plus de détails.</p>
             </AlertDescription>
+          </Alert>
+        )}
+
+        {assignmentsLoaded && !assignmentError && isFormateur && assigned.length === 0 && (
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertTitle>Aucune activité assignée</AlertTitle>
+            <AlertDescription className="mt-2">{STAFF_NO_ASSIGNMENT_HINT}</AlertDescription>
           </Alert>
         )}
 

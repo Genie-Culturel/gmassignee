@@ -855,6 +855,10 @@ export interface Database {
         Args: { _user_id: string; _role: AppRole };
         Returns: boolean;
       };
+      has_formateur_role: {
+        Args: { user_id?: string };
+        Returns: boolean;
+      };
     };
     Enums: {
       gh_checklist_type: ChecklistType;

@@ -10,6 +10,8 @@
  * To plug in the real planning tables later, replace the body of
  * `fetchFromGmassigneePlanning` and map rows onto AssignedSession.
  */
+import { staffFlagsFromRoles } from './roles';
+
 export type AssignmentStatus = 'assigned';
 
 export const ASSIGNMENT_STATUS_LABELS: Record<AssignmentStatus, string> = {
@@ -46,6 +48,38 @@ export interface AssignedSession {
 export const DEMO_GM_ID = 'gm-demo';
 export const DEMO_GM_NAME = 'GM Demo';
 
+export const MISSING_PROFILE_ERROR =
+  "Profil GM introuvable. Contactez l'administrateur pour créer votre profil.";
+export const MISSING_GM_LINK_ERROR =
+  "Votre profil n'est pas lié à un GM. Contactez l'administrateur.";
+
+/** Admin / formateur without a personal GM row: show an empty planning, do not block Suivi. */
+export const STAFF_NO_ASSIGNMENT_HINT =
+  "Compte admin / formateur : aucune activité de planning n'est liée à ce compte. Tu peux démarrer une session manuelle ci-dessous.";
+
+export type PlanningGmLinkAction = 'continue' | 'empty' | 'missing_profile' | 'missing_gm_id';
+
+/**
+ * Decide how to treat a missing `profiles.gm_id`.
+ * Regular GMs still get a hard error (data to fix). Staff (admin / formateur_suivi)
+ * must be able to open Suivi des parties without a personal GM link.
+ */
+export function resolvePlanningGmLink(opts: {
+  profileFound: boolean;
+  gmId: string | null | undefined;
+  isStaff: boolean;
+}): PlanningGmLinkAction {
+  if (opts.gmId) return 'continue';
+  if (opts.isStaff) return 'empty';
+  return opts.profileFound ? 'missing_gm_id' : 'missing_profile';
+}
+
+export function planningGmLinkError(action: PlanningGmLinkAction): string | null {
+  if (action === 'missing_profile') return MISSING_PROFILE_ERROR;
+  if (action === 'missing_gm_id') return MISSING_GM_LINK_ERROR;
+  return null;
+}
+
 export function assignmentTitle(session: Pick<AssignedSession, 'game' | 'playerCount'>): string {
   return `${session.game} [${session.playerCount}]`;
 }
@@ -67,6 +101,23 @@ export function splitAssignedSessions(sessions: AssignedSession[]): {
     today: sessions.filter((s) => s.date === today),
     upcoming: sessions.filter((s) => s.date > today),
   };
+}
+
+/** Demo-only: `?emptyPlanning=1` (or hash query) to preview the admin empty state. */
+function readEmptyPlanningFlag(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const search = new URLSearchParams(window.location.search);
+    if (search.get('emptyPlanning') === '1') return true;
+    const hash = window.location.hash;
+    const qIndex = hash.indexOf('?');
+    if (qIndex >= 0) {
+      return new URLSearchParams(hash.slice(qIndex)).get('emptyPlanning') === '1';
+    }
+  } catch {
+    /* ignore */
+  }
+  return false;
 }
 
 function isoDateOffset(days: number): string {
@@ -223,6 +274,23 @@ export async function getAssignedSessions(gmId: string): Promise<AssignedSession
   return fetchFromGmassigneePlanning(gmId);
 }
 
+type PlanningSupabase = NonNullable<(typeof import('./supabase'))['supabase']>;
+
+/** admin or formateur_suivi — same roles as `has_formateur_role` / useAuth.isFormateur. */
+async function userHasStaffRole(client: PlanningSupabase): Promise<boolean> {
+  const {
+    data: { user },
+  } = await client.auth.getUser();
+  if (!user) return false;
+  const { data, error } = await client.from('user_roles').select('role').eq('user_id', user.id);
+  if (error) {
+    console.warn('[Planning] Could not resolve staff role:', error.message);
+    const { data: isStaff } = await client.rpc('has_formateur_role');
+    return isStaff === true;
+  }
+  return staffFlagsFromRoles((data || []).map((row) => row.role)).isFormateur;
+}
+
 /**
  * Fetch from the Lovable GMassignee planning (same Supabase project dnxyidnkmtrmkxucqrry).
  *
@@ -236,6 +304,9 @@ export async function getAssignedSessions(gmId: string): Promise<AssignedSession
  *   1. Get current user's gm_id from profiles (profiles.user_id = auth.uid())
  *   2. Query event_assignments filtered by that gm_id
  *   3. Join with activities to get session details
+ *
+ * Admin / formateur_suivi without gm_id: return [] (empty planning), never throw
+ * the "profil n'est pas lié à un GM" error. Regular GMs still get that error.
  *
  * Mapping onto AssignedSession (all carried into gh_vr_sessions on start):
  *   id ← activities.id (text)     → gh_vr_sessions.planning_activity_id (text)
@@ -253,6 +324,10 @@ export async function fetchFromGmassigneePlanning(gmId: string): Promise<Assigne
   // Only use mock data if explicitly in mock mode
   if (isMockMode || !supabase) {
     console.log('[Planning] Running in mock mode');
+    if (readEmptyPlanningFlag()) {
+      console.log('[Planning] Demo emptyPlanning=1 — empty assignments (admin UX)');
+      return [];
+    }
     return getMockAssignedSessions(gmId);
   }
 
@@ -286,19 +361,32 @@ export async function fetchFromGmassigneePlanning(gmId: string): Promise<Assigne
       throw new Error(`Impossible de charger le profil GM: ${profileError.message}`);
     }
 
-    if (!profile) {
-      console.error('[Planning] No profile found for user:', user.id);
-      throw new Error('Profil GM introuvable. Contactez l\'administrateur pour créer votre profil.');
+    const userGmId = profile?.gm_id as string | null | undefined;
+    const gmLinkAction = resolvePlanningGmLink({
+      profileFound: Boolean(profile),
+      gmId: userGmId,
+      isStaff: await userHasStaffRole(supabase),
+    });
+
+    if (gmLinkAction === 'empty') {
+      console.log('[Planning] Staff account without gm_id — empty assignments', {
+        email: user.email,
+        profileFound: Boolean(profile),
+      });
+      return [];
+    }
+
+    const gmLinkError = planningGmLinkError(gmLinkAction);
+    if (gmLinkError) {
+      console.error('[Planning] Cannot load assignments:', gmLinkAction);
+      throw new Error(gmLinkError);
+    }
+
+    if (!userGmId) {
+      throw new Error(MISSING_GM_LINK_ERROR);
     }
 
     console.log('[Planning] Profile found:', profile);
-
-    const userGmId = profile.gm_id;
-    if (!userGmId) {
-      console.error('[Planning] Profile has no gm_id');
-      throw new Error('Votre profil n\'est pas lié à un GM. Contactez l\'administrateur.');
-    }
-
     console.log('[Planning] GM ID:', userGmId);
 
     // Step 2 & 3: Query activities via event_assignments - defensive select('*')
