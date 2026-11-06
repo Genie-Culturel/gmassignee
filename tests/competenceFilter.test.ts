@@ -7,6 +7,7 @@ import {
   filterFichesByCompetences,
   idsForCompetenceFilter,
   parseAuthorizedGameIds,
+  authorizedGameIdsFromRpc,
 } from '../src/lib/competenceFilter.ts';
 import { ProcedureFiche } from '../src/lib/database.types.ts';
 import { DEMO_CATALOG, VenueCatalog } from '../src/lib/venues.ts';
@@ -313,4 +314,11 @@ test('parseAuthorizedGameIds / idsForCompetenceFilter', () => {
   assert.deepEqual(parseAuthorizedGameIds(['game-saga', '', 1, null]), ['game-saga']);
   assert.deepEqual(idsForCompetenceFilter(false, null), []);
   assert.equal(idsForCompetenceFilter(true, []), null);
+});
+
+test('authorizedGameIdsFromRpc : null formateur ≠ [] (0 compétence)', () => {
+  assert.equal(authorizedGameIdsFromRpc(null), null);
+  assert.equal(authorizedGameIdsFromRpc(undefined), null);
+  assert.deepEqual(authorizedGameIdsFromRpc([]), []);
+  assert.deepEqual(authorizedGameIdsFromRpc(['game-planta']), ['game-planta']);
 });

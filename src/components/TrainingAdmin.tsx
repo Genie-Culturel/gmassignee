@@ -7,6 +7,7 @@ import {
   demoTrackingRows,
   listAdminValidations,
   listGmProfiles,
+  listGmAuthorizedGameIds,
   listQuizQuestionsAdmin,
   saveFiche,
   saveQuizQuestion,
@@ -77,7 +78,7 @@ export function TrainingAdmin({ fiches, catalog, gmId, myValidations, onFichesCh
           <ParcoursAdmin catalog={catalog} fiches={fiches} filterGameId={filterGameId} />
         </TabsContent>
         <TabsContent value="suivi" className="mt-4">
-          <AdminTracking fiches={visible} gmId={gmId} myValidations={myValidations} />
+          <AdminTracking fiches={visible} catalog={catalog} gmId={gmId} myValidations={myValidations} />
         </TabsContent>
         <TabsContent value="fiches" className="mt-4">
           <AdminFicheEditor
@@ -94,10 +95,12 @@ export function TrainingAdmin({ fiches, catalog, gmId, myValidations, onFichesCh
 
 function AdminTracking({
   fiches,
+  catalog,
   gmId,
   myValidations,
 }: {
   fiches: ProcedureFiche[];
+  catalog: VenueCatalog;
   gmId: string;
   myValidations: FicheValidation[];
 }) {
@@ -113,7 +116,10 @@ function AdminTracking({
           return;
         }
         const [profiles, validations] = await Promise.all([listGmProfiles(), listAdminValidations()]);
-        if (!cancelled) setRows(buildTrackingRows(profiles, fiches, validations));
+        const authorizedGameIdsByGm = await listGmAuthorizedGameIds(profiles.map((profile) => profile.gm_id));
+        if (!cancelled) {
+          setRows(buildTrackingRows(profiles, fiches, validations, { catalog, authorizedGameIdsByGm }));
+        }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Suivi indisponible');
       }
@@ -121,7 +127,7 @@ function AdminTracking({
     return () => {
       cancelled = true;
     };
-  }, [fiches, gmId, myValidations]);
+  }, [fiches, catalog, gmId, myValidations]);
 
   if (error) {
     return (
@@ -135,7 +141,10 @@ function AdminTracking({
     <Card>
       <CardHeader>
         <CardTitle className="text-lg">Suivi des validations</CardTitle>
-        <CardDescription>Progression de chaque GM sur les fiches requises</CardDescription>
+        <CardDescription>
+          Progression de chaque GM sur les fiches requises de ses circuits RH (même filtre que sa vue
+          Formations). 0 compétence → 0/0.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 p-3 sm:p-6 sm:pt-0">
         <div className="space-y-3 sm:hidden">
@@ -148,8 +157,11 @@ function AdminTracking({
               </p>
               <p className="mt-2 text-xs font-medium text-muted-foreground">Manquantes</p>
               <p className="text-sm leading-snug">
-                {row.missing.length ? row.missing.slice(0, 3).join(', ') : '—'}
-                {row.missing.length > 3 ? ` +${row.missing.length - 3}` : ''}
+                {row.no_competences
+                  ? 'Aucune compétence'
+                  : row.missing.length
+                    ? `${row.missing.slice(0, 3).join(', ')}${row.missing.length > 3 ? ` +${row.missing.length - 3}` : ''}`
+                    : '—'}
               </p>
               <p className="mt-2 text-xs font-medium text-muted-foreground">À revalider</p>
               <p className="text-sm leading-snug">
@@ -179,7 +191,9 @@ function AdminTracking({
                     {row.done}/{row.total}
                   </td>
                   <td className="px-3 py-2">
-                    {row.missing.length ? (
+                    {row.no_competences ? (
+                      <span className="text-xs text-muted-foreground">Aucune compétence</span>
+                    ) : row.missing.length ? (
                       <ul className="space-y-0.5 text-xs">
                         {row.missing.slice(0, 4).map((title) => (
                           <li key={title}>{title}</li>

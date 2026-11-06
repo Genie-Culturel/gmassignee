@@ -250,3 +250,28 @@ export function newStepKey(parcoursId: string): string {
   const prefix = STEP_KEY_PREFIX[parcoursId] || 'step';
   return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Live `gh_parcours_steps.id` is a UUID. Demo fallback IDs look like `escape_life_sion:sion_booking_info`. */
+export function isParcoursStepRowId(id: string): boolean {
+  return UUID_RE.test(id);
+}
+
+export function assertParcoursStepWriteResult(
+  data: { id: string; is_active?: boolean }[] | null | undefined,
+  patch: Partial<Pick<ParcoursStep, 'is_active'>>
+) {
+  if (!data?.length) {
+    throw new Error(
+      'Étape : modification non enregistrée (droits insuffisants ou étape introuvable).'
+    );
+  }
+  if (
+    patch.is_active !== undefined &&
+    typeof data[0].is_active === 'boolean' &&
+    data[0].is_active !== patch.is_active
+  ) {
+    throw new Error('Étape : la case Active n’a pas été enregistrée.');
+  }
+}
