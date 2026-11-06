@@ -9,9 +9,9 @@ import {
 } from './database.types';
 import { mockFiches } from './mockData';
 import { DEMO_GM_ID } from './assignedSessions';
-import { FORMATION_PAGE_CATEGORIES } from './constants';
-import { isFicheDeleted } from './training';
-import { DEMO_EXTRA_FICHES, FicheScopeKind } from './venues';
+import { GmTrainingRow, buildTrackingRows, isFicheDeleted, requiredFichesForGm } from './training';
+import { DEMO_CATALOG, DEMO_EXTRA_FICHES, FicheScopeKind } from './venues';
+import { authorizedGameIdsFromRpc } from './competenceFilter';
 import { DEMO_PARCOURS_FICHES } from './demoParcoursFiches';
 
 export const TRAINING_STORAGE_KEY = 'gmassignee_fiche_validations';
@@ -575,14 +575,35 @@ export async function deleteQuizQuestion(id: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
-export interface GmTrainingRow {
-  gm_id: string;
-  display_name: string;
-  email: string;
-  done: number;
-  total: number;
-  missing: string[];
-  revalidate: string[];
+/** Load RH → gh_games ids per auth user. `null` = formateur (pas de filtre). `[]` = 0 compétence. */
+export async function listGmAuthorizedGameIds(
+  userIds: string[]
+): Promise<Map<string, string[] | null>> {
+  const result = new Map<string, string[] | null>();
+  if (!userIds.length || isMockMode || !supabase) return result;
+
+  const { data, error } = await supabase.rpc('gh_list_gm_authorized_game_ids');
+  if (!error && Array.isArray(data)) {
+    for (const row of data as { user_id: string; game_ids: string[] | null }[]) {
+      result.set(row.user_id, authorizedGameIdsFromRpc(row.game_ids));
+    }
+    for (const userId of userIds) {
+      if (!result.has(userId)) result.set(userId, []);
+    }
+    return result;
+  }
+
+  const rows = await Promise.all(
+    userIds.map(async (userId) => {
+      const { data: ids, error: rpcError } = await supabase!.rpc('gh_get_authorized_game_ids', {
+        p_user_id: userId,
+      });
+      if (rpcError) return [userId, [] as string[]] as const;
+      return [userId, authorizedGameIdsFromRpc(ids)] as const;
+    })
+  );
+  for (const [userId, ids] of rows) result.set(userId, ids);
+  return result;
 }
 
 export async function listAdminValidations(): Promise<FicheValidation[]> {
@@ -607,42 +628,6 @@ export async function listGmProfiles(): Promise<{ gm_id: string; display_name: s
   return (data || []) as { gm_id: string; display_name: string; email: string }[];
 }
 
-export function buildTrackingRows(
-  profiles: { gm_id: string; display_name: string; email: string }[],
-  fiches: ProcedureFiche[],
-  validations: FicheValidation[]
-): GmTrainingRow[] {
-  const required = fiches.filter(
-    (fiche) =>
-      !isFicheDeleted(fiche) &&
-      fiche.is_active &&
-      fiche.is_required !== false &&
-      FORMATION_PAGE_CATEGORIES.includes(fiche.category)
-  );
-  return profiles.map((profile) => {
-    const mine = validations.filter((row) => row.gm_id === profile.gm_id);
-    const byFiche = new Map(mine.map((row) => [row.fiche_id, row]));
-    const missing: string[] = [];
-    const revalidate: string[] = [];
-    let done = 0;
-    for (const fiche of required) {
-      const row = byFiche.get(fiche.id);
-      if (!row) missing.push(fiche.title);
-      else if (row.version < (fiche.version ?? 1)) revalidate.push(fiche.title);
-      else done += 1;
-    }
-    return {
-      gm_id: profile.gm_id,
-      display_name: profile.display_name,
-      email: profile.email,
-      done,
-      total: required.length,
-      missing,
-      revalidate,
-    };
-  });
-}
-
 export function demoTrackingRows(
   currentGmId: string,
   fiches: ProcedureFiche[],
@@ -653,30 +638,25 @@ export function demoTrackingRows(
     { gm_id: 'gm-julien', display_name: 'Julien Quinodoz', email: 'julien@genie-culturel.ch' },
     { gm_id: 'gm-aline', display_name: 'Aline', email: 'aline@genie-culturel.ch' },
   ];
-  const required = fiches.filter(
-    (fiche) =>
-      !isFicheDeleted(fiche) &&
-      fiche.is_active &&
-      fiche.is_required !== false &&
-      FORMATION_PAGE_CATEGORIES.includes(fiche.category)
-  );
-  const julien: FicheValidation[] = required.map((fiche) => ({
+  const authorizedGameIdsByGm: Record<string, string[] | null> = {
+    [currentGmId]: ['game-planta'],
+    'gm-julien': ['game-planta', 'game-davinci'],
+    'gm-aline': [],
+  };
+  const requiredByJulien = requiredFichesForGm(fiches, authorizedGameIdsByGm['gm-julien'], DEMO_CATALOG);
+  const julien: FicheValidation[] = requiredByJulien.map((fiche) => ({
     gm_id: 'gm-julien',
     fiche_id: fiche.id,
     version: fiche.version ?? 1,
     validated_at: new Date().toISOString(),
   }));
-  const aline: FicheValidation[] = required.slice(0, 2).map((fiche) => ({
-    gm_id: 'gm-aline',
-    fiche_id: fiche.id,
-    version: fiche.version ?? 1,
-    validated_at: new Date().toISOString(),
-  }));
-  return buildTrackingRows(profiles, fiches, [
-    ...myValidations.map((row) => ({ ...row, gm_id: currentGmId })),
-    ...julien,
-    ...aline,
-  ]);
+  return buildTrackingRows(
+    profiles,
+    fiches,
+    [...myValidations.map((row) => ({ ...row, gm_id: currentGmId })), ...julien],
+    { catalog: DEMO_CATALOG, authorizedGameIdsByGm }
+  );
 }
 
-export { mockFiches, DEMO_QUIZ };
+export { buildTrackingRows, mockFiches, DEMO_QUIZ };
+export type { GmTrainingRow } from './training';

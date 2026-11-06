@@ -562,6 +562,8 @@ export interface Database {
         Row: {
           id: string;
           name: string;
+          description: string | null;
+          location_id: string;
           location_slug: string | null;
           is_default: boolean;
           is_provisional: boolean;
@@ -571,6 +573,8 @@ export interface Database {
         Insert: {
           id?: string;
           name: string;
+          description?: string | null;
+          location_id: string;
           location_slug?: string | null;
           is_default?: boolean;
           is_provisional?: boolean;
@@ -580,6 +584,8 @@ export interface Database {
         Update: {
           id?: string;
           name?: string;
+          description?: string | null;
+          location_id?: string;
           location_slug?: string | null;
           is_default?: boolean;
           is_provisional?: boolean;
@@ -595,7 +601,10 @@ export interface Database {
           label: string;
           hint: string | null;
           note: string | null;
-          order_index: number;
+          sort_order: number;
+          order_index?: number;
+          is_active: boolean;
+          deleted_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -606,7 +615,10 @@ export interface Database {
           label: string;
           hint?: string | null;
           note?: string | null;
-          order_index: number;
+          sort_order?: number;
+          order_index?: number;
+          is_active?: boolean;
+          deleted_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -617,7 +629,10 @@ export interface Database {
           label?: string;
           hint?: string | null;
           note?: string | null;
+          sort_order?: number;
           order_index?: number;
+          is_active?: boolean;
+          deleted_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -850,6 +865,10 @@ export interface Database {
       gh_get_authorized_game_ids: {
         Args: { p_user_id?: string };
         Returns: string[] | null;
+      };
+      gh_list_gm_authorized_game_ids: {
+        Args: Record<string, never>;
+        Returns: { user_id: string; game_ids: string[] | null }[];
       };
       has_role: {
         Args: { _user_id: string; _role: AppRole };

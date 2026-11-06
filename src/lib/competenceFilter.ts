@@ -69,6 +69,15 @@ export function parseAuthorizedGameIds(data: unknown): string[] {
 }
 
 /**
+ * Résultat RPC `gh_get_authorized_game_ids` / `gh_list_gm_authorized_game_ids`.
+ * `null` = formateur/admin (pas de filtre). `[]` = 0 compétence. Jamais confondre les deux.
+ */
+export function authorizedGameIdsFromRpc(data: unknown): string[] | null {
+  if (data == null) return null;
+  return parseAuthorizedGameIds(data);
+}
+
+/**
  * `null` uniquement pour formateur/admin (pas de filtre).
  * Un GM, y compris si `authorizedGameIds` est encore null, est traité comme `[]`.
  */

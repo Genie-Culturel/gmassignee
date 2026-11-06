@@ -1,5 +1,12 @@
 import { isMockMode, supabase } from './supabase';
-import { DEMO_PARCOURS, ParcoursDefinition, ParcoursStep, newStepKey } from './parcours';
+import {
+  DEMO_PARCOURS,
+  ParcoursDefinition,
+  ParcoursStep,
+  assertParcoursStepWriteResult,
+  isParcoursStepRowId,
+  newStepKey,
+} from './parcours';
 import { DEMO_STEP_FICHE_LINKS } from './demoParcoursFiches';
 
 const DEMO_PARCOURS_STORAGE_KEY = 'gmassignee_demo_parcours';
@@ -81,7 +88,7 @@ export async function fetchParcoursList(): Promise<ParcoursDefinition[]> {
             hint: step.hint,
             note: step.note,
             sort_order: step.sort_order,
-            is_active: step.is_active,
+            is_active: step.is_active !== false,
           }))
       ),
     };
@@ -96,11 +103,18 @@ export async function updateParcoursStep(
     updateDemoStep(id, (step) => ({ ...step, ...patch }));
     return;
   }
-  const { error } = await supabase
+  if (!isParcoursStepRowId(id)) {
+    throw new Error(
+      'Étape : identifiant invalide (parcours de démo). Recharge la page — la liste n’a pas pu être lue depuis la base.'
+    );
+  }
+  const { data, error } = await supabase
     .from('gh_parcours_steps')
     .update({ ...patch, updated_at: new Date().toISOString() })
-    .eq('id', id);
+    .eq('id', id)
+    .select('id, is_active');
   if (error) throw new Error(`Étape : ${error.message}`);
+  assertParcoursStepWriteResult(data, patch);
 }
 
 export async function addParcoursStep(parcoursId: string, label: string, sortOrder: number) {

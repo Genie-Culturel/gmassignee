@@ -113,10 +113,10 @@ export function ParcoursAdmin({
     setBusy(true);
     try {
       await action();
-      reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Modification non enregistrée');
     } finally {
+      reload();
       setBusy(false);
     }
   };
@@ -368,6 +368,7 @@ function SortableStepRow({
   const [label, setLabel] = useState(step.label);
   const [hint, setHint] = useState(step.hint || '');
   const [note, setNote] = useState(step.note || '');
+  const [active, setActive] = useState(step.is_active);
   const labelRef = useRef(step.label);
 
   useEffect(() => {
@@ -376,6 +377,7 @@ function SortableStepRow({
   }, [step.label]);
   useEffect(() => setHint(step.hint || ''), [step.hint]);
   useEffect(() => setNote(step.note || ''), [step.note]);
+  useEffect(() => setActive(step.is_active), [step.is_active]);
 
   const saveLabel = () => {
     const value = label.trim();
@@ -398,7 +400,7 @@ function SortableStepRow({
     <li
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={cn('flex items-start gap-2 px-2 py-3', isDragging && 'opacity-40', !step.is_active && 'bg-muted/40')}
+      className={cn('flex items-start gap-2 px-2 py-3', isDragging && 'opacity-40', !active && 'bg-muted/40')}
     >
       <button
         type="button"
@@ -418,7 +420,7 @@ function SortableStepRow({
           maxLength={60}
           onChange={(e) => setLabel(e.target.value)}
           onBlur={saveLabel}
-          className={cn('h-9 font-medium', !step.is_active && 'text-muted-foreground line-through')}
+          className={cn('h-9 font-medium', !active && 'text-muted-foreground line-through')}
         />
         <Textarea
           aria-label="Rappel"
@@ -439,14 +441,19 @@ function SortableStepRow({
             onBlur={saveNote}
             className="h-8 max-w-[14rem] text-xs"
           />
-          <label className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-2 text-xs">
             <Checkbox
-              checked={step.is_active}
+              checked={active}
               disabled={disabled}
-              onCheckedChange={(checked) => onUpdate({ is_active: checked === true })}
+              onCheckedChange={(checked) => {
+                const next = checked === true;
+                if (next === active) return;
+                setActive(next);
+                onUpdate({ is_active: next });
+              }}
             />
-            Active
-          </label>
+            <span>Active</span>
+          </div>
           <Button
             type="button"
             variant="ghost"
