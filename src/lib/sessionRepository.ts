@@ -305,6 +305,11 @@ export async function createOrResumeFromAssignment(params: {
     );
     rememberActiveSession(session.sessionId);
     await ensureCheckin(params.gmId);
+    const fromPlanning = (params.assignment.clientEmail || '').trim();
+    if (fromPlanning && !session.clientEmail) {
+      await updateSessionFields(session.sessionId, { clientEmail: fromPlanning });
+      session.clientEmail = fromPlanning;
+    }
     return session;
   }
 

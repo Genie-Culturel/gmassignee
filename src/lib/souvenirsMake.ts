@@ -32,6 +32,32 @@ export function isClientEmail(value: string): boolean {
   return EMAIL_RE.test(value.trim());
 }
 
+const EMAIL_IN_TEXT_RE = /(?:mailto:)?([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/gi;
+
+/** First valid e-mail in free text (reservation details, HTML, mailto:). */
+export function firstEmailInText(value: string | null | undefined): string | undefined {
+  if (!value) return undefined;
+  const decoded = value.replace(/&#64;/gi, '@').replace(/&amp;/g, '&');
+  EMAIL_IN_TEXT_RE.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = EMAIL_IN_TEXT_RE.exec(decoded))) {
+    const candidate = match[1].replace(/[.,;:]+$/g, '').trim();
+    if (isClientEmail(candidate)) return candidate;
+  }
+  return undefined;
+}
+
+/**
+ * Same split as Lovable `EventDescriptionFormatter`: header (« Informations générales »)
+ * then 5+ dashes, then « Détails de la réservation » (booking number, name, e-mail…).
+ */
+export function reservationDetailsText(description: string | null | undefined): string {
+  if (!description) return '';
+  const parts = description.split(/\n?[-–—]{5,}\n?/);
+  if (parts.length >= 2) return parts.slice(1).join('\n').trim();
+  return description;
+}
+
 export function sanitizeDropboxLabel(value: string): string {
   return value.replace(DROPBOX_UNSAFE, ' ').replace(/\s+/g, ' ').trim();
 }
@@ -85,10 +111,6 @@ export function formatSouvenirsExpiry(iso: string): string {
   return formatDotDate(d);
 }
 
-/**
- * Client e-mail on a planning `activities` row (or nested `client`).
- * Typed schema only has title/description/notes; production may carry extra columns.
- */
 export function buildSouvenirsMakePayload(input: {
   clientEmail: string;
   souvenirLink: string;
@@ -111,13 +133,18 @@ export function buildSouvenirsMakePayload(input: {
   };
 }
 
+/**
+ * Client e-mail for a planning `activities` row.
+ * Dedicated columns first (if present), else first valid e-mail in
+ * `description` « Détails de la réservation » (Make free text), then notes.
+ */
 export function clientEmailFromActivity(activity: Record<string, unknown> | null | undefined): string | undefined {
   if (!activity || typeof activity !== 'object') return undefined;
   const nested =
     activity.client && typeof activity.client === 'object'
       ? (activity.client as Record<string, unknown>)
       : null;
-  const candidates: unknown[] = [
+  const dedicated: unknown[] = [
     activity.client_email,
     activity.clientEmail,
     activity.customer_email,
@@ -127,8 +154,20 @@ export function clientEmailFromActivity(activity: Record<string, unknown> | null
     nested?.email,
     nested?.client_email,
   ];
-  for (const value of candidates) {
+  for (const value of dedicated) {
     if (typeof value === 'string' && isClientEmail(value)) return value.trim();
+  }
+  const description = typeof activity.description === 'string' ? activity.description : '';
+  const fromDetails = firstEmailInText(reservationDetailsText(description));
+  if (fromDetails) return fromDetails;
+  const fromWholeDescription = firstEmailInText(description);
+  if (fromWholeDescription) return fromWholeDescription;
+  for (const key of ['admin_notes', 'notes', 'note'] as const) {
+    const value = activity[key];
+    if (typeof value === 'string') {
+      const found = firstEmailInText(value);
+      if (found) return found;
+    }
   }
   return undefined;
 }
