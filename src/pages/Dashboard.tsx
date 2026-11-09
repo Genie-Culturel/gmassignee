@@ -5,14 +5,15 @@ import { useAuth } from '@/hooks/useAuth';
 import { SessionMediaAdmin } from '@/components/SessionMediaAdmin';
 
 export function Dashboard() {
-  const { displayName, isFormateur } = useAuth();
+  const { user, displayName, isFormateur } = useAuth();
 
   return (
     <div className="space-y-6 pb-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Historique des sessions</h1>
         <p className="text-muted-foreground mt-2">
-          Vue d'ensemble de tes activités{!isMockMode ? ` · ${displayName}` : ''}
+          Vue d'ensemble de tes activités
+          {!isMockMode ? ` · ${user?.email || displayName}` : ''}
           {isFormateur && !isMockMode ? ' · Toutes les sessions' : ''}
         </p>
       </div>
