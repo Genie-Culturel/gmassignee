@@ -797,6 +797,10 @@ export function SuiviParties() {
             key={`${activeSession.sessionId}-videos`}
             sessionId={activeSession.sessionId}
             gmId={gmId}
+            gmName={activeSession.gmName}
+            game={activeSession.game}
+            date={activeSession.date}
+            time={activeSession.time}
             clientEmail={activeSession.clientEmail}
             videosSentAt={activeSession.videosSentAt}
             onClientEmailChange={(email) => {

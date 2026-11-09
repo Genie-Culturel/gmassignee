@@ -13,17 +13,31 @@ import {
   isAllowedMedia,
   listSessionMedia,
   sendSessionVideos,
+  sendSouvenirsToMake,
   uploadSessionFile,
   LocalUpload,
   SessionMediaFile,
   SESSION_MEDIA_MAX_BYTES,
 } from '@/lib/sessionMedia';
+import { isClientEmail } from '@/lib/souvenirsMake';
 import { formatDate, formatTime } from '@/lib/utils';
-import { Copy, Share2, Upload } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Copy, Loader2, Mail, Share2, Upload } from 'lucide-react';
 
 interface SessionVideosProps {
   sessionId: string;
   gmId: string;
+  gmName: string;
+  game: string;
+  date: string;
+  time: string;
   clientEmail: string;
   videosSentAt: string | null;
   onClientEmailChange: (email: string) => void;
@@ -36,6 +50,10 @@ const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 
 export function SessionVideos({
   sessionId,
   gmId,
+  gmName,
+  game,
+  date,
+  time,
   clientEmail,
   videosSentAt,
   onClientEmailChange,
@@ -52,6 +70,11 @@ export function SessionVideos({
     message?: string;
   } | null>(null);
   const [handedOver, setHandedOver] = useState<'copied' | 'shared' | null>(null);
+  const [confirmSend, setConfirmSend] = useState(false);
+  const [sendingMake, setSendingMake] = useState(false);
+  const [makeSent, setMakeSent] = useState(false);
+  const [makeError, setMakeError] = useState<string | null>(null);
+  const [sentToEmail, setSentToEmail] = useState('');
 
   useEffect(() => {
     listSessionMedia(sessionId)
@@ -61,6 +84,11 @@ export function SessionVideos({
     setResult(null);
     setHandedOver(null);
     setError(null);
+    setConfirmSend(false);
+    setSendingMake(false);
+    setMakeSent(false);
+    setMakeError(null);
+    setSentToEmail('');
   }, [sessionId]);
 
   const patchUpload = (localId: string, next: Partial<LocalUpload>) => {
@@ -146,6 +174,49 @@ export function SessionVideos({
     }
   };
 
+  const sendToClient = async () => {
+    const email = clientEmail.trim();
+    if (!isClientEmail(email)) {
+      setError('Indique un e-mail client valide.');
+      setConfirmSend(false);
+      return;
+    }
+    if (!remote.length) {
+      setError('Ajoute au moins une vidéo ou une photo.');
+      setConfirmSend(false);
+      return;
+    }
+    if (uploads.some((u) => u.status === 'uploading')) {
+      setError('Attends la fin des uploads.');
+      setConfirmSend(false);
+      return;
+    }
+    setSendingMake(true);
+    setError(null);
+    setMakeError(null);
+    try {
+      const res = await sendSouvenirsToMake({
+        sessionId,
+        clientEmail: email,
+        gmName,
+        game,
+        date,
+        time,
+      });
+      setMakeSent(true);
+      setSentToEmail(email);
+      setResult({ emailed: true, downloadUrl: res.souvenirLink });
+      setHandedOver(null);
+      onSent(res.videosSentAt);
+      setConfirmSend(false);
+    } catch (err) {
+      setMakeError(err instanceof Error ? err.message : 'L’envoi au client a échoué.');
+      setConfirmSend(false);
+    } finally {
+      setSendingMake(false);
+    }
+  };
+
   const markHandedOver = (how: 'copied' | 'shared') => {
     setHandedOver(how);
     onSent(new Date().toISOString());
@@ -200,7 +271,7 @@ export function SessionVideos({
         <p className="text-sm text-muted-foreground">{FILMING_NOTICE}</p>
 
         <div className="space-y-2">
-          <Label htmlFor="client-email">E-mail du client (optionnel)</Label>
+          <Label htmlFor="client-email">E-mail du client</Label>
           <Input
             id="client-email"
             type="email"
@@ -210,6 +281,9 @@ export function SessionVideos({
             value={clientEmail}
             onChange={(e) => onClientEmailChange(e.target.value)}
           />
+          <p className="text-xs text-muted-foreground">
+            Prérempli depuis la session (modifiable). Requis pour « Envoyer au client ».
+          </p>
         </div>
 
         <input
@@ -281,13 +355,41 @@ export function SessionVideos({
           </p>
         )}
 
-        <Button className="w-full min-h-11" size="lg" disabled={busy} onClick={() => void send()}>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full min-h-11"
+          size="lg"
+          disabled={busy || sendingMake}
+          onClick={() => void send()}
+        >
           {busy ? 'Création du lien…' : 'Créer le lien client'}
+        </Button>
+
+        <Button
+          type="button"
+          className="w-full min-h-11"
+          size="lg"
+          disabled={busy || sendingMake}
+          onClick={() => setConfirmSend(true)}
+        >
+          {sendingMake ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+          ) : (
+            <Mail className="mr-2 h-4 w-4" aria-hidden />
+          )}
+          {sendingMake ? 'Envoi…' : makeSent ? 'Renvoyer au client' : 'Envoyer au client'}
         </Button>
 
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {makeError && (
+          <Alert variant="destructive">
+            <AlertDescription>Envoi au client impossible : {makeError}</AlertDescription>
           </Alert>
         )}
 
@@ -305,7 +407,10 @@ export function SessionVideos({
               <p className="font-semibold">Vidéos téléversées, lien client prêt.</p>
               <p className="text-sm">Tu peux supprimer les vidéos de ton téléphone.</p>
               {result.emailed ? (
-                <p className="text-sm">Le lien a été envoyé automatiquement par e-mail à {clientEmail}.</p>
+                <div className="space-y-1 text-sm">
+                  <p>Le lien a été envoyé par e-mail à {sentToEmail || clientEmail}.</p>
+                  {makeSent && <p>Les fichiers sont archivés dans Dropbox.</p>}
+                </div>
               ) : (
                 <div className="space-y-1 text-sm">
                   {result.message && <p className="font-medium">{result.message}</p>}
@@ -365,6 +470,32 @@ export function SessionVideos({
           </p>
         )}
       </CardContent>
+
+      <Dialog open={confirmSend} onOpenChange={(open) => !sendingMake && setConfirmSend(open)}>
+        <DialogContent role="alertdialog" className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <DialogHeader className="text-left">
+            <DialogTitle>Envoyer les souvenirs au client ?</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                <p>
+                  Un e-mail avec le lien souvenirs partira à{' '}
+                  <span className="font-medium text-foreground">{clientEmail.trim() || '…'}</span>.
+                  Les fichiers seront aussi archivés dans Dropbox.
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" disabled={sendingMake} onClick={() => setConfirmSend(false)}>
+              Annuler
+            </Button>
+            <Button type="button" disabled={sendingMake} onClick={() => void sendToClient()}>
+              {sendingMake ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
+              Envoyer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
