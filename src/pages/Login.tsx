@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { setDemoFlag } from '@/lib/config';
 
 export function Login() {
-  const { signIn, signUp, handoffEmail } = useAuth();
+  const { signIn, signUp, handoffEmail, handoffActive } = useAuth();
   const [mode, setMode] = useState<'in' | 'up'>('in');
   const [email, setEmail] = useState(handoffEmail);
   const [password, setPassword] = useState('');
@@ -16,7 +16,7 @@ export function Login() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const fromLovable = Boolean(handoffEmail);
+  const fromLovable = handoffActive || Boolean(handoffEmail);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();

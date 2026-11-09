@@ -1,5 +1,6 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import { LayoutDashboard, PlayCircle, BookOpen, ExternalLink, Pencil } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useGmOptions } from '@/hooks/useGmOptions';
@@ -19,9 +20,11 @@ export function Layout() {
   const currentPath = location.pathname.split('/')[1] || 'dashboard';
   const editorTab = isFormationEditorPath(location.pathname, location.search);
   const tabValue = editorTab ? 'formation-editeur' : currentPath;
-  const { displayName, isAdmin, isFormateur } = useAuth();
+  const { user, displayName, isAdmin, isFormateur, switchAccount } = useAuth();
   const { showSuiviParties, showFormations } = useGmOptions();
   const showEditeur = showFormations && isFormateur;
+  const accountEmail = user?.email || '';
+  const roleLabel = isAdmin ? 'admin' : isFormateur ? 'formateur' : '';
 
   const toggleDemo = () => {
     setDemoFlag(!isMockMode);
@@ -38,11 +41,32 @@ export function Layout() {
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-bold">GMassignee</h1>
             <p className="text-xs text-muted-foreground truncate">
-              {isMockMode ? 'Mode démo' : displayName}
-              {!isMockMode && isAdmin ? ' · admin' : ''}
-              {!isMockMode && !isAdmin && isFormateur ? ' · formateur' : ''}
+              {isMockMode ? (
+                'Mode démo'
+              ) : (
+                <>
+                  <span className="font-medium text-foreground">{accountEmail || displayName}</span>
+                  {accountEmail && displayName && displayName !== accountEmail
+                    ? ` · ${displayName}`
+                    : ''}
+                  {roleLabel ? ` · ${roleLabel}` : ''}
+                </>
+              )}
             </p>
           </div>
+          {!isMockMode && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              onClick={() => void switchAccount()}
+              aria-label="Changer de compte"
+            >
+              <span className="hidden sm:inline">Changer de compte</span>
+              <span className="sm:hidden">Compte</span>
+            </Button>
+          )}
         </div>
       </header>
 

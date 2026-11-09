@@ -1,9 +1,10 @@
-import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { isMockMode, supabase } from '@/lib/supabase';
 import {
-  parseAuthHandoff,
-  shouldKeepHandoffSession,
+  captureAuthHandoff,
+  decideHandoffSession,
+  resolveCapturedHandoff,
   stripAuthHandoffFromWindow,
 } from '@/lib/authHandoff';
 import { staffFlagsFromRoles } from '@/lib/roles';
@@ -15,9 +16,11 @@ interface AuthContextValue {
   isFormateur: boolean;
   displayName: string;
   handoffEmail: string;
+  handoffActive: boolean;
   signIn: (email: string, password: string) => Promise<string | null>;
   signUp: (email: string, password: string, displayName: string) => Promise<string | null>;
   signOut: () => Promise<void>;
+  switchAccount: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -56,7 +59,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(!isMockMode);
   const [isAdmin, setIsAdmin] = useState(isMockMode);
   const [isFormateur, setIsFormateur] = useState(isMockMode);
-  const [handoffEmail] = useState(() => parseAuthHandoff().email);
+  const [handoff] = useState(() => captureAuthHandoff());
+  const passwordLoginRef = useRef(false);
 
   useEffect(() => {
     if (isMockMode || !supabase) {
@@ -68,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let cancelled = false;
     const client = supabase;
-    const initialHandoff = parseAuthHandoff();
+    const initialHandoff = captureAuthHandoff();
     let pendingHandoff = initialHandoff.active;
 
     const applyRoles = async (sessionUser: User | null) => {
@@ -94,6 +98,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const finishHandoff = async (sessionUser: User | null) => {
       pendingHandoff = false;
+      passwordLoginRef.current = false;
+      resolveCapturedHandoff();
       stripAuthHandoffFromWindow();
       await acceptSession(sessionUser);
     };
@@ -102,23 +108,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
      * Lovable and Pages share Supabase but not origin/localStorage.
      * `handoff=1` means: do not silently keep whoever last logged in on Pages.
      * Same e-mail as the hint → keep. Other/missing session → local sign-out + login.
-     * Explicit SIGNED_IN (the GM typed a password) always wins, then params are stripped.
+     * `SIGNED_IN` from localStorage recovery is NOT a password login (auth-js emits it
+     * on restore / tab focus). Only SIGNED_IN after the login form called signIn() counts.
      */
     const resolveHandoff = async (
       sessionUser: User | null,
       event: string | null
     ): Promise<void> => {
-      if (!pendingHandoff) {
+      const decision = decideHandoffSession({
+        pending: pendingHandoff,
+        passwordLoginRequested: passwordLoginRef.current,
+        event,
+        sessionEmail: sessionUser?.email,
+        hintEmail: initialHandoff.email,
+      });
+
+      if (decision === 'passthrough') {
         await acceptSession(sessionUser);
         return;
       }
 
-      if (event === 'SIGNED_IN' && sessionUser) {
-        await finishHandoff(sessionUser);
-        return;
-      }
-
-      if (shouldKeepHandoffSession(sessionUser?.email, initialHandoff.email)) {
+      if (decision === 'accept') {
         await finishHandoff(sessionUser);
         return;
       }
@@ -177,10 +187,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin,
       isFormateur,
       displayName: isMockMode ? 'GM Demo' : readDisplayName(user),
-      handoffEmail,
+      handoffEmail: handoff.email,
+      handoffActive: handoff.active,
       signIn: async (email, password) => {
         if (!supabase) return 'Supabase non configuré';
+        passwordLoginRef.current = true;
         const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) passwordLoginRef.current = false;
         return error ? error.message : null;
       },
       signUp: async (email, password, displayName) => {
@@ -197,10 +210,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return null;
       },
       signOut: async () => {
-        await supabase?.auth.signOut();
+        await supabase?.auth.signOut({ scope: 'local' });
+      },
+      switchAccount: async () => {
+        await supabase?.auth.signOut({ scope: 'local' });
       },
     }),
-    [user, loading, isAdmin, isFormateur, handoffEmail]
+    [user, loading, isAdmin, isFormateur, handoff]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
