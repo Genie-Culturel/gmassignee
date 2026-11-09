@@ -69,6 +69,7 @@ import {
   endSession as persistEndSession,
   fetchSalesProducts,
   listBugsForSession,
+  listLinkedSessions,
   listOpenSessions,
   loadSession,
   readRememberedSessionId,
@@ -76,6 +77,7 @@ import {
   replaceSales,
   setStepCompleted,
   updateSessionFields,
+  type LinkedSessionSummary,
 } from '@/lib/sessionRepository';
 
 interface ActiveSession {
@@ -86,6 +88,7 @@ interface ActiveSession {
   time: string;
   endTime?: string;
   startedAt: string;
+  endedAt: string | null;
   groupName: string;
   playerCount: number;
   gmName: string;
@@ -118,6 +121,7 @@ function toActive(row: PersistedSession, endTime?: string): ActiveSession {
     time: row.time,
     endTime: endTime || row.plannedEndTime || undefined,
     startedAt: row.startedAt,
+    endedAt: row.endedAt,
     groupName: row.groupName,
     playerCount: row.playerCount,
     gmName: row.gmName,
@@ -151,6 +155,7 @@ export function SuiviParties() {
 
   const [assigned, setAssigned] = useState<AssignedSession[]>([]);
   const [openSessions, setOpenSessions] = useState<PersistedSession[]>([]);
+  const [linkedSessions, setLinkedSessions] = useState<LinkedSessionSummary[]>([]);
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
   const [stepTimes, setStepTimes] = useState<Partial<Record<SessionStep, string>>>({});
   const [incidentType, setIncidentType] = useState<IncidentType | null>(null);
@@ -187,7 +192,8 @@ export function SuiviParties() {
     setIncidentDetails(row.incidentDetails);
     setSalesItems(row.sales);
     setSalesComment(row.salesComment);
-    rememberActiveSession(row.sessionId);
+    if (row.endedAt || row.cancelledAt) rememberActiveSession(null);
+    else rememberActiveSession(row.sessionId);
   }, []);
 
   const refreshBugs = useCallback(async (sessionId: string) => {
@@ -227,9 +233,6 @@ export function SuiviParties() {
     });
     
     if (!isMockMode && user) {
-      listOpenSessions(user.id).then((rows) => {
-        if (!cancelled) setOpenSessions(rows);
-      });
       const remembered = readRememberedSessionId();
       if (remembered) {
         loadSession(remembered)
@@ -258,14 +261,28 @@ export function SuiviParties() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSession?.sessionId, refreshBugs]);
 
-  const openByAssignment = useMemo(() => {
-    const map = new Map<string, PersistedSession>();
-    for (const row of openSessions) {
-      if (row.assignmentId) map.set(row.assignmentId, row);
-    }
-    return map;
-  }, [openSessions]);
+  useEffect(() => {
+    if (!assignmentsLoaded) return;
+    let cancelled = false;
+    const id = user?.id || gmId;
+    Promise.all([listOpenSessions(id), listLinkedSessions(id, assigned)])
+      .then(([open, linked]) => {
+        if (!cancelled) {
+          setOpenSessions(open);
+          setLinkedSessions(linked);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Impossible de lier les sessions');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [assignmentsLoaded, assigned, gmId, user?.id]);
 
+  const isEditingEnded = Boolean(activeSession?.endedAt);
   const parcours = getParcoursOrDefault(parcoursList, activeSession?.parcoursId);
   const sessionSteps = useMemo(
     () => buildSessionSteps(activeSession?.stepsSnapshot ?? null, parcours, stepTimes),
@@ -294,14 +311,17 @@ export function SuiviParties() {
       });
       applyLoaded(row, assignment.endTime);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Impossible de démarrer la session');
+      setError(err instanceof Error ? err.message : 'Impossible d’ouvrir la session');
     } finally {
       setBusy(false);
     }
   };
 
   const resumeOpen = (row: PersistedSession) => {
-    const match = assigned.find((session) => assignmentKey(session) === row.assignmentId);
+    const match = assigned.find(
+      (session) =>
+        session.id === row.planningActivityId || assignmentKey(session) === row.assignmentId
+    );
     applyLoaded(row, match?.endTime);
   };
 
@@ -329,6 +349,39 @@ export function SuiviParties() {
     }
   };
 
+  const refreshSessionLists = async () => {
+    const id = user?.id || gmId;
+    const [open, linked] = await Promise.all([
+      listOpenSessions(id),
+      listLinkedSessions(id, assigned),
+    ]);
+    setOpenSessions(open);
+    setLinkedSessions(linked);
+  };
+
+  const flushPendingEdits = async () => {
+    if (!activeSession) return;
+    const notesPending = Boolean(notesTimer.current);
+    const emailPending = Boolean(emailTimer.current);
+    if (notesTimer.current) {
+      clearTimeout(notesTimer.current);
+      notesTimer.current = null;
+    }
+    if (emailTimer.current) {
+      clearTimeout(emailTimer.current);
+      emailTimer.current = null;
+    }
+    if (notesPending) {
+      await updateSessionFields(activeSession.sessionId, {
+        notes: activeSession.notes,
+        incidentDetails,
+      });
+    }
+    if (emailPending) {
+      await updateSessionFields(activeSession.sessionId, { clientEmail: activeSession.clientEmail });
+    }
+  };
+
   const leaveActiveSession = async () => {
     setActiveSession(null);
     setStepTimes({});
@@ -340,16 +393,17 @@ export function SuiviParties() {
     setCancelOpen(false);
     if (emailTimer.current) clearTimeout(emailTimer.current);
     if (notesTimer.current) clearTimeout(notesTimer.current);
-    if (user && !isMockMode) {
-      setOpenSessions(await listOpenSessions(user.id));
-    }
+    await refreshSessionLists();
   };
 
   const handleEndSession = async () => {
     if (!activeSession) return;
     setBusy(true);
     try {
-      await persistEndSession(activeSession.sessionId);
+      await flushPendingEdits();
+      if (!activeSession.endedAt) {
+        await persistEndSession(activeSession.sessionId);
+      }
       await leaveActiveSession();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Impossible de terminer la session');
@@ -525,13 +579,14 @@ export function SuiviParties() {
           <div>
             <h2 className="text-xl font-semibold tracking-tight">Mes sessions</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Tes parties assignées : « Démarrer la session » reprend toutes les infos du planning.
+              Tes parties assignées. Une session déjà lancée se reprend ; une session terminée
+              s&apos;ouvre en modification (même fiche, sans doublon).
             </p>
           </div>
           <SessionStartNotice />
           <AssignedActivities
             sessions={assigned}
-            openByAssignment={openByAssignment}
+            linkedSessions={linkedSessions}
             busy={busy || setupLoading}
             onStart={startFromAssignment}
           />
@@ -636,9 +691,12 @@ export function SuiviParties() {
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <CardTitle className="flex flex-wrap items-center gap-2">
-                  <Clock className="h-5 w-5 text-primary animate-pulse" />
-                  Session en cours
+                  <Clock className={`h-5 w-5 text-primary ${isEditingEnded ? '' : 'animate-pulse'}`} />
+                  {isEditingEnded ? 'Modifier la session' : 'Session en cours'}
                   {activeSession.isManual && <ManualSessionBadge />}
+                  {isEditingEnded && activeSession.endedAt && (
+                    <Badge variant="success">{`Terminée · ${formatTime(activeSession.endedAt)}`}</Badge>
+                  )}
                 </CardTitle>
                 <CardDescription className="mt-1 space-y-0.5">
                   <span className="block font-medium text-foreground">{activeSession.game}</span>
@@ -659,6 +717,9 @@ export function SuiviParties() {
                   </span>
                   <span className="mt-2 inline-flex items-center rounded-md bg-primary/10 px-2.5 py-1 text-sm font-semibold text-foreground">
                     Arrivée GM : {formatTime(activeSession.startedAt)}
+                    {isEditingEnded && activeSession.endedAt
+                      ? ` · Fin : ${formatTime(activeSession.endedAt)}`
+                      : ''}
                   </span>
                 </CardDescription>
               </div>
@@ -666,15 +727,17 @@ export function SuiviParties() {
                 <Badge variant="success" className="text-sm">
                   {completedCount} / {sessionSteps.length} étapes
                 </Badge>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={busy}
-                  onClick={() => setCancelOpen(true)}
-                >
-                  Annuler
-                </Button>
+                {!isEditingEnded && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => setCancelOpen(true)}
+                  >
+                    Annuler
+                  </Button>
+                )}
               </div>
             </div>
           </CardHeader>
@@ -855,18 +918,20 @@ export function SuiviParties() {
         </Card>
 
         <div className="flex flex-col-reverse gap-3 sm:flex-row">
-          <Button
-            type="button"
-            variant="outline"
-            size="lg"
-            disabled={busy}
-            onClick={() => setCancelOpen(true)}
-          >
-            Annuler
-          </Button>
+          {!isEditingEnded && (
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              disabled={busy}
+              onClick={() => setCancelOpen(true)}
+            >
+              Annuler
+            </Button>
+          )}
           <Button onClick={handleEndSession} size="lg" className="flex-1" disabled={busy}>
             <CheckCircle2 className="mr-2 h-5 w-5" />
-            Terminer la session
+            {isEditingEnded ? 'Enregistrer et fermer' : 'Terminer la session'}
           </Button>
         </div>
       </div>

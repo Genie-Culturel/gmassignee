@@ -20,6 +20,8 @@ const badgeVariants = cva(
           "border-transparent bg-yellow-500 text-white hover:bg-yellow-600",
         assigned:
           "border-transparent bg-indigo-100 text-indigo-700 hover:bg-indigo-100",
+        inProgress:
+          "border-transparent bg-amber-500 text-white hover:bg-amber-600",
       },
     },
     defaultVariants: {
