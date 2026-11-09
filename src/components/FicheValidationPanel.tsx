@@ -33,17 +33,19 @@ export function FicheValidationPanel({
 
   useEffect(() => {
     let cancelled = false;
+    const ficheId = fiche.id;
+    setQuestions([]);
     setConfirmed(false);
     setWrong([]);
     setQuizOk(false);
     setAnswers({});
     setError(null);
-    listQuizQuestions(fiche.id)
+    listQuizQuestions(ficheId)
       .then((rows) => {
-        if (!cancelled) {
-          setQuestions(rows);
-          if (!rows.length) setQuizOk(true);
-        }
+        if (cancelled) return;
+        const mine = rows.filter((row) => row.fiche_id === ficheId);
+        setQuestions(mine);
+        if (!mine.length) setQuizOk(true);
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Quiz indisponible');

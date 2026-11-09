@@ -1,6 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { FicheStep, FicheCategory, FicheValidation, ProcedureFiche, QuizQuestionAdmin } from '@/lib/database.types';
 import { FORMATION_PAGE_CATEGORIES, FICHE_CATEGORY_LABELS } from '@/lib/constants';
+import {
+  FORMATION_EDITOR_TAB,
+  FormationEditorQuery,
+  FormationEditorSection,
+  applyFormationEditorQuery,
+  parseFormationEditorQuery,
+} from '@/lib/formationNav';
+import { assertQuizzesBelongToFiche, quizzesBelongingToFiche } from '@/lib/training';
 import {
   deleteFiche,
   deleteQuizQuestion,
@@ -56,8 +65,78 @@ interface TrainingAdminProps {
 }
 
 export function TrainingAdmin({ fiches, catalog, gmId, myValidations, onFichesChanged }: TrainingAdminProps) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const query = parseFormationEditorQuery(location.search);
+  const section: FormationEditorSection = query.editor ?? 'fiches';
   const [filterGameId, setFilterGameId] = useState(ALL_GAMES_VALUE);
   const visible = filterFichesForGame(fiches, catalog, filterGameId);
+  const [selectedId, setSelectedId] = useState(query.fiche || '');
+
+  const writeQuery = (patch: Partial<FormationEditorQuery>, replace = true) => {
+    const search = applyFormationEditorQuery(location.search, {
+      tab: FORMATION_EDITOR_TAB,
+      ...patch,
+    });
+    navigate({ pathname: location.pathname, search }, { replace });
+  };
+
+  useEffect(() => {
+    if (query.fiche) setSelectedId(query.fiche);
+  }, [query.fiche]);
+
+  useEffect(() => {
+    if (query.fiche) return;
+    setSelectedId(visible[0]?.id || '');
+    // Keep the current fiche after save/create; reset only when the game filter changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterGameId]);
+
+  const editorFiches = useMemo(() => {
+    if (selectedId && !visible.some((fiche) => fiche.id === selectedId)) {
+      const extra = fiches.find((fiche) => fiche.id === selectedId);
+      if (extra) return [extra, ...visible];
+    }
+    return visible;
+  }, [fiches, visible, selectedId]);
+
+  const selectFiche = (id: string) => {
+    setSelectedId(id);
+    writeQuery({
+      editor: 'fiches',
+      fiche: id || null,
+    });
+  };
+
+  const openFicheFromParcours = (ficheId: string, stepId: string) => {
+    setSelectedId(ficheId);
+    writeQuery(
+      { editor: 'fiches', fiche: ficheId, retour: 'parcours', step: stepId },
+      false
+    );
+  };
+
+  const retourParcours = () => {
+    writeQuery({ editor: 'parcours', fiche: null, retour: null, step: query.step });
+  };
+
+  const onSectionChange = (next: string) => {
+    if (next === 'parcours') {
+      writeQuery({ editor: 'parcours', fiche: null, retour: null });
+      return;
+    }
+    if (next === 'suivi') {
+      writeQuery({ editor: 'suivi', fiche: null, retour: null, step: null });
+      return;
+    }
+    writeQuery({
+      editor: 'fiches',
+      fiche: selectedId || null,
+      retour: null,
+      step: null,
+    });
+  };
+
   return (
     <div className="space-y-4">
       <GmOptionsAdmin />
@@ -68,24 +147,39 @@ export function TrainingAdmin({ fiches, catalog, gmId, myValidations, onFichesCh
         value={filterGameId}
         onChange={setFilterGameId}
       />
-      <Tabs defaultValue="fiches" className="w-full">
+      <Tabs value={section} onValueChange={onSectionChange} className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="fiches" className="px-1 text-xs sm:text-sm">Éditer les fiches</TabsTrigger>
           <TabsTrigger value="parcours" className="px-1 text-xs sm:text-sm">Parcours</TabsTrigger>
           <TabsTrigger value="suivi" className="px-1 text-xs sm:text-sm">Suivi des GM</TabsTrigger>
         </TabsList>
-        <TabsContent value="parcours" className="mt-4">
-          <ParcoursAdmin catalog={catalog} fiches={fiches} filterGameId={filterGameId} />
+        <TabsContent
+          value="parcours"
+          forceMount
+          className="mt-4 data-[state=inactive]:hidden"
+        >
+          <ParcoursAdmin
+            catalog={catalog}
+            fiches={fiches}
+            filterGameId={filterGameId}
+            onOpenFiche={openFicheFromParcours}
+            focusStepId={section === 'parcours' ? query.step : null}
+          />
         </TabsContent>
         <TabsContent value="suivi" className="mt-4">
           <AdminTracking fiches={visible} catalog={catalog} gmId={gmId} myValidations={myValidations} />
         </TabsContent>
         <TabsContent value="fiches" className="mt-4">
           <AdminFicheEditor
-            fiches={visible}
+            fiches={editorFiches}
             catalog={catalog}
             filterGameId={filterGameId}
+            selectedId={selectedId}
+            onSelect={selectFiche}
             onFichesChanged={onFichesChanged}
+            showRetourParcours={query.retour === 'parcours'}
+            onRetourParcours={retourParcours}
+            scrollToEditor={query.retour === 'parcours'}
           />
         </TabsContent>
       </Tabs>
@@ -229,15 +323,26 @@ function AdminFicheEditor({
   fiches,
   catalog,
   filterGameId,
+  selectedId,
+  onSelect,
   onFichesChanged,
+  showRetourParcours,
+  onRetourParcours,
+  scrollToEditor,
 }: {
   fiches: ProcedureFiche[];
   catalog: VenueCatalog;
   filterGameId: string;
+  selectedId: string;
+  onSelect: (id: string) => void;
   onFichesChanged: () => void;
+  showRetourParcours?: boolean;
+  onRetourParcours?: () => void;
+  scrollToEditor?: boolean;
 }) {
-  const [selectedId, setSelectedId] = useState<string>(fiches[0]?.id || '');
   const selected = fiches.find((fiche) => fiche.id === selectedId) || null;
+  const selectedIdRef = useRef(selectedId);
+  selectedIdRef.current = selectedId;
   const [title, setTitle] = useState('');
   const [summary, setSummary] = useState('');
   const [category, setCategory] = useState<FicheCategory>('formation_technique');
@@ -248,6 +353,8 @@ function AdminFicheEditor({
   const [placeholder, setPlaceholder] = useState(false);
   const [minor, setMinor] = useState(false);
   const [questions, setQuestions] = useState<QuizQuestionAdmin[]>([]);
+  const [quizzesLoading, setQuizzesLoading] = useState(false);
+  const [questionsFicheId, setQuestionsFicheId] = useState(selectedId);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -255,11 +362,29 @@ function AdminFicheEditor({
   const [scopeLocationIds, setScopeLocationIds] = useState<string[]>([]);
   const [scopeGameIds, setScopeGameIds] = useState<string[]>([]);
 
+  // Reset quizzes during render (not in useEffect) so the previous fiche never paints.
+  const quizzesStale = questionsFicheId !== selectedId;
+  if (quizzesStale) {
+    setQuestionsFicheId(selectedId);
+    setQuestions([]);
+    setQuizzesLoading(Boolean(selectedId));
+  }
+  const shownQuestions = quizzesStale ? [] : quizzesBelongingToFiche(questions, selectedId);
+  const showQuizLoading = quizzesLoading || quizzesStale;
+
   useEffect(() => {
-    setSelectedId(fiches[0]?.id || '');
-    // Reset only when the admin game filter changes; keep the current fiche after save/create.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterGameId]);
+    if (!scrollToEditor || !selectedId) return;
+    const run = () => document.getElementById('admin-fiche-editor')?.scrollIntoView({ block: 'start' });
+    let timeout = 0;
+    const frame = window.requestAnimationFrame(() => {
+      run();
+      timeout = window.setTimeout(run, 0);
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timeout);
+    };
+  }, [scrollToEditor, selectedId]);
 
   useEffect(() => {
     if (!selected) return;
@@ -277,11 +402,38 @@ function AdminFicheEditor({
     setConfirmDelete(false);
     setScopeLocationIds(selected.scope_location_ids || []);
     setScopeGameIds(selected.scope_game_ids || []);
-    listQuizQuestionsAdmin(selected.id).then(setQuestions).catch(() => setQuestions([]));
   }, [selected]);
 
+  useEffect(() => {
+    if (!selectedId) {
+      setQuestions([]);
+      setQuizzesLoading(false);
+      return;
+    }
+    const ficheId = selectedId;
+    setQuestions([]);
+    setQuizzesLoading(true);
+    let cancelled = false;
+    listQuizQuestionsAdmin(ficheId)
+      .then((rows) => {
+        if (cancelled || selectedIdRef.current !== ficheId) return;
+        setQuestions(quizzesBelongingToFiche(rows, ficheId));
+      })
+      .catch(() => {
+        if (cancelled || selectedIdRef.current !== ficheId) return;
+        setQuestions([]);
+      })
+      .finally(() => {
+        if (!cancelled && selectedIdRef.current === ficheId) setQuizzesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId]);
+
   const save = async () => {
-    if (!selected) return;
+    const ficheId = selected?.id;
+    if (!ficheId || quizzesLoading || quizzesStale) return;
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -298,6 +450,7 @@ function AdminFicheEditor({
         const choices = question.choices.filter((choice) => choice.text.trim());
         return {
           ...question,
+          fiche_id: question.fiche_id,
           prompt: question.prompt.trim(),
           choices,
           correct_choice_ids: question.correct_choice_ids.filter((id) =>
@@ -305,13 +458,18 @@ function AdminFicheEditor({
           ),
         };
       });
+      assertQuizzesBelongToFiche(cleanedQuestions, ficheId);
       if (cleanedQuestions.some((q) => !q.prompt || q.choices.length < 2 || q.correct_choice_ids.length < 1)) {
         throw new Error('Chaque question doit avoir un intitulé, au moins 2 réponses et une bonne réponse.');
+      }
+      if (selectedIdRef.current !== ficheId) {
+        throw new Error('La fiche a changé pendant l’enregistrement. Réessayez.');
       }
       const scopeKind = deriveScopeKind(scopeLocationIds, scopeGameIds);
       await saveFiche({
         fiche: {
           ...selected,
+          id: ficheId,
           title,
           summary,
           category,
@@ -325,11 +483,20 @@ function AdminFicheEditor({
         scope: { kind: scopeKind, locationIds: scopeLocationIds, gameIds: scopeGameIds },
       });
       for (const question of cleanedQuestions) {
-        await saveQuizQuestion({ ...question, fiche_id: selected.id }, { skipBump: minor });
+        if (selectedIdRef.current !== ficheId) {
+          throw new Error('La fiche a changé pendant l’enregistrement. Réessayez.');
+        }
+        await saveQuizQuestion({ ...question, fiche_id: ficheId }, { skipBump: minor });
       }
-      if (minor) await clearSkipVersionBump(selected.id);
+      if (minor) await clearSkipVersionBump(ficheId);
       setMessage(minor ? 'Enregistré sans revalidation.' : 'Enregistré — version incrémentée si le contenu a changé.');
       onFichesChanged();
+      if (selectedIdRef.current === ficheId) {
+        const rows = await listQuizQuestionsAdmin(ficheId);
+        if (selectedIdRef.current === ficheId) {
+          setQuestions(quizzesBelongingToFiche(rows, ficheId));
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Enregistrement impossible');
     } finally {
@@ -346,7 +513,7 @@ function AdminFicheEditor({
       const nextId = fiches.find((fiche) => fiche.id !== selected.id)?.id || '';
       await deleteFiche(selected.id);
       setConfirmDelete(false);
-      setSelectedId(nextId);
+      onSelect(nextId);
       onFichesChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Suppression impossible');
@@ -356,7 +523,7 @@ function AdminFicheEditor({
   };
 
   const addQuestion = () => {
-    if (!selected) return;
+    if (!selected || quizzesLoading || quizzesStale) return;
     setQuestions((rows) => [
       ...rows,
       {
@@ -376,11 +543,16 @@ function AdminFicheEditor({
 
   return (
     <div className="space-y-4">
+      {showRetourParcours && onRetourParcours && (
+        <Button type="button" variant="secondary" onClick={onRetourParcours}>
+          ← Retour au parcours
+        </Button>
+      )}
       <FicheOrderList
         fiches={fiches}
         catalog={catalog}
         selectedId={selectedId}
-        onSelect={setSelectedId}
+        onSelect={onSelect}
         onReordered={onFichesChanged}
       />
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -412,7 +584,7 @@ function AdminFicheEditor({
             });
             await clearSkipVersionBump(created.id);
             onFichesChanged();
-            setSelectedId(created.id);
+            onSelect(created.id);
           }}
         >
           Nouvelle fiche
@@ -420,8 +592,13 @@ function AdminFicheEditor({
       </div>
 
       {selected && (
-        <Card>
+        <Card id="admin-fiche-editor">
           <CardHeader>
+            {showRetourParcours && onRetourParcours && (
+              <Button type="button" variant="secondary" size="sm" className="mb-3" onClick={onRetourParcours}>
+                ← Retour au parcours
+              </Button>
+            )}
             <CardTitle className="text-lg">Éditer la fiche</CardTitle>
             <CardDescription>
               Version actuelle : {selected.version ?? 1}. Décoche « correction mineure » pour forcer une
@@ -504,14 +681,17 @@ function AdminFicheEditor({
               Correction mineure (ne pas demander de revalidation)
             </label>
 
-            <div className="space-y-3 border-t pt-4">
+            <div key={selectedId} className="space-y-3 border-t pt-4">
               <div className="flex items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold">Questions (QCM)</h3>
-                <Button type="button" size="sm" variant="outline" onClick={addQuestion}>
+                <Button type="button" size="sm" variant="outline" disabled={showQuizLoading} onClick={addQuestion}>
                   Ajouter une question
                 </Button>
               </div>
-              {questions.map((question, index) => (
+              {showQuizLoading ? (
+                <p className="text-sm text-muted-foreground">Chargement des questions…</p>
+              ) : (
+                shownQuestions.map((question, index) => (
                 <div key={question.id} className="space-y-2 rounded-lg border p-3">
                   <Input
                     value={question.prompt}
@@ -603,7 +783,8 @@ function AdminFicheEditor({
                     Supprimer la question
                   </Button>
                 </div>
-              ))}
+                ))
+              )}
             </div>
 
             {error && (
@@ -616,7 +797,7 @@ function AdminFicheEditor({
                 <AlertDescription>{message}</AlertDescription>
               </Alert>
             )}
-            <Button className="w-full" disabled={busy} onClick={save}>
+            <Button className="w-full" disabled={busy || showQuizLoading} onClick={save}>
               {busy ? 'Enregistrement…' : 'Enregistrer'}
             </Button>
             <Button

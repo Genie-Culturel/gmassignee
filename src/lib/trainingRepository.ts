@@ -501,6 +501,9 @@ export async function saveQuizQuestion(
     const id = question.id && !question.id.startsWith('new-') ? question.id : `q-demo-${Date.now()}`;
     const next = { ...question, id };
     const idx = list.findIndex((row) => row.id === id);
+    if (idx >= 0 && list[idx].fiche_id !== question.fiche_id) {
+      throw new Error('Les questions ne correspondent pas à cette fiche. Réessayez.');
+    }
     const unchanged =
       idx >= 0 &&
       list[idx].prompt === next.prompt &&
@@ -531,8 +534,14 @@ export async function saveQuizQuestion(
     if (skipError) throw new Error(skipError.message);
   }
   if (question.id && !question.id.startsWith('new-')) {
-    const { error } = await supabase.from('gh_quiz_questions').update(body).eq('id', question.id);
+    const { data, error } = await supabase
+      .from('gh_quiz_questions')
+      .update(body)
+      .eq('id', question.id)
+      .eq('fiche_id', question.fiche_id)
+      .select('id');
     if (error) throw new Error(error.message);
+    if (!data?.length) throw new Error('Question introuvable pour cette fiche.');
     return;
   }
   const { error } = await supabase.from('gh_quiz_questions').insert(body);

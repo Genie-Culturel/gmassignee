@@ -33,6 +33,7 @@ import {
   updateParcoursStep,
 } from '@/lib/parcoursRepository';
 import { DEMO_LOCATIONS, VenueCatalog, findGame } from '@/lib/venues';
+import { parcoursStepElementId } from '@/lib/formationNav';
 import { useParcoursList } from '@/hooks/useParcoursList';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -67,14 +68,35 @@ function candidateFiches(fiches: ProcedureFiche[], catalog: VenueCatalog, locati
     .sort((a, b) => a.title.localeCompare(b.title, 'fr'));
 }
 
+/** Called on mousedown so the focused field is still the active element (click would already have blurred it). */
+function confirmLeaveParcoursEdits(): boolean {
+  const active = document.activeElement;
+  const drafting =
+    (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) &&
+    active.dataset.saved !== undefined &&
+    active.value !== active.dataset.saved;
+  if (drafting) {
+    const ok = window.confirm(
+      'Des modifications du parcours ne sont pas encore enregistrées. Elles seront conservées à votre retour. Continuer ?'
+    );
+    if (!ok) return false;
+  }
+  if (active instanceof HTMLElement) active.blur();
+  return true;
+}
+
 export function ParcoursAdmin({
   catalog,
   fiches,
   filterGameId,
+  onOpenFiche,
+  focusStepId,
 }: {
   catalog: VenueCatalog;
   fiches: ProcedureFiche[];
   filterGameId: string;
+  onOpenFiche?: (ficheId: string, stepId: string) => void;
+  focusStepId?: string | null;
 }) {
   const { parcoursList, isLoading, error: loadError, reload } = useParcoursList();
   const locations = catalog.locations.length ? catalog.locations : DEMO_LOCATIONS;
@@ -93,6 +115,21 @@ export function ParcoursAdmin({
   const parcours = parcoursForLocationSlug(parcoursList, locationSlug);
   const steps = parcours?.steps || [];
   const { links, reload: reloadLinks } = useStepFiches(parcours?.id);
+
+  useEffect(() => {
+    if (!focusStepId) return;
+    const id = parcoursStepElementId(focusStepId);
+    const run = () => document.getElementById(id)?.scrollIntoView({ block: 'center' });
+    let timeout = 0;
+    const frame = window.requestAnimationFrame(() => {
+      run();
+      timeout = window.setTimeout(run, 0);
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timeout);
+    };
+  }, [focusStepId, parcours?.id]);
   const candidates = candidateFiches(fiches, catalog, locationSlug);
   const ficheById = new Map(fiches.map((fiche) => [fiche.id, fiche]));
   const missingFiche = steps.filter((step) => step.is_active && !(links[step.key] || []).length).length;
@@ -204,6 +241,12 @@ export function ParcoursAdmin({
                   candidates={candidates}
                   onLink={(ficheId) => void runLink(() => linkStepFiche(parcours.id, step.key, ficheId))}
                   onUnlink={(ficheId) => void runLink(() => unlinkStepFiche(parcours.id, step.key, ficheId))}
+                  onOpen={
+                    onOpenFiche
+                      ? (ficheId) => onOpenFiche(ficheId, step.id)
+                      : undefined
+                  }
+                  onOpenMouseDown={onOpenFiche ? confirmLeaveParcoursEdits : undefined}
                 />
               )}
             />
@@ -212,6 +255,7 @@ export function ParcoursAdmin({
                 placeholder="Nouvelle étape (ex. Briefing équipes)"
                 value={newLabel}
                 maxLength={60}
+                data-saved=""
                 onChange={(e) => setNewLabel(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') addStep();
@@ -398,6 +442,7 @@ function SortableStepRow({
 
   return (
     <li
+      id={parcoursStepElementId(step.id)}
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn('flex items-start gap-2 px-2 py-3', isDragging && 'opacity-40', !active && 'bg-muted/40')}
@@ -418,6 +463,7 @@ function SortableStepRow({
           aria-label="Nom de l’étape"
           value={label}
           maxLength={60}
+          data-saved={step.label}
           onChange={(e) => setLabel(e.target.value)}
           onBlur={saveLabel}
           className={cn('h-9 font-medium', !active && 'text-muted-foreground line-through')}
@@ -427,6 +473,7 @@ function SortableStepRow({
           placeholder="Rappel affiché sous l’étape (optionnel)"
           value={hint}
           rows={2}
+          data-saved={step.hint || ''}
           onChange={(e) => setHint(e.target.value)}
           onBlur={saveHint}
           className="min-h-0 text-xs"
@@ -437,6 +484,7 @@ function SortableStepRow({
             placeholder="Condition (ex. Option Vinum)"
             value={note}
             maxLength={40}
+            data-saved={step.note || ''}
             onChange={(e) => setNote(e.target.value)}
             onBlur={saveNote}
             className="h-8 max-w-[14rem] text-xs"
@@ -478,13 +526,18 @@ function StepFichePicker({
   candidates,
   onLink,
   onUnlink,
+  onOpen,
+  onOpenMouseDown,
 }: {
   linkedIds: string[];
   ficheById: Map<string, ProcedureFiche>;
   candidates: ProcedureFiche[];
   onLink: (ficheId: string) => void;
   onUnlink: (ficheId: string) => void;
+  onOpen?: (ficheId: string) => void;
+  onOpenMouseDown?: () => boolean;
 }) {
+  const skipOpenRef = useRef(false);
   const available = candidates.filter((fiche) => !linkedIds.includes(fiche.id));
   return (
     <div className="space-y-1.5">
@@ -497,13 +550,45 @@ function StepFichePicker({
           return (
             <span
               key={id}
-              className="inline-flex max-w-full items-center gap-1 rounded-md border bg-muted/50 py-0.5 pl-2 pr-0.5 text-xs"
+              className="inline-flex max-w-full items-center gap-1 rounded-md border bg-muted/50 py-0.5 pl-1.5 pr-0.5 text-xs"
             >
-              <FileText className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
-              <span className="truncate">{fiche ? fiche.title : 'Fiche supprimée ou inactive'}</span>
+              {fiche && onOpen ? (
+                <button
+                  type="button"
+                  title="Ouvrir la fiche"
+                  aria-label={`Ouvrir la fiche ${fiche.title}`}
+                  onMouseDown={(event) => {
+                    if (onOpenMouseDown && !onOpenMouseDown()) {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      skipOpenRef.current = true;
+                    }
+                  }}
+                  onClick={() => {
+                    if (skipOpenRef.current) {
+                      skipOpenRef.current = false;
+                      return;
+                    }
+                    onOpen(id);
+                  }}
+                  className="inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1 rounded-sm py-0.5 pl-0.5 text-left hover:underline"
+                >
+                  <FileText className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
+                  <span className="truncate">{fiche.title}</span>
+                </button>
+              ) : (
+                <>
+                  <FileText className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
+                  <span className="truncate">{fiche ? fiche.title : 'Fiche supprimée ou inactive'}</span>
+                </>
+              )}
               <button
                 type="button"
-                onClick={() => onUnlink(id)}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onUnlink(id);
+                }}
                 className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
                 aria-label={`Retirer la fiche ${fiche?.title || ''}`}
               >
