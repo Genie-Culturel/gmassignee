@@ -170,3 +170,21 @@ export function progressFor(
     percent: required.length ? Math.round((done / required.length) * 100) : 0,
   };
 }
+
+/** Keep only quiz rows that belong to the fiche currently being edited. */
+export function quizzesBelongingToFiche<T extends { fiche_id: string }>(
+  rows: T[],
+  ficheId: string
+): T[] {
+  return rows.filter((row) => row.fiche_id === ficheId);
+}
+
+/** Refuse to persist quizzes that belong to another fiche (stale UI after a switch). */
+export function assertQuizzesBelongToFiche<T extends { fiche_id: string }>(
+  rows: T[],
+  ficheId: string
+): void {
+  if (!ficheId || rows.some((row) => row.fiche_id !== ficheId)) {
+    throw new Error('Les questions ne correspondent pas à cette fiche. Réessayez.');
+  }
+}

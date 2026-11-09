@@ -37,7 +37,7 @@ import {
   readStoredGameId,
   writeStoredGameId,
 } from '@/lib/venues';
-import { FORMATION_EDITOR_TAB, formationTabFromSearch } from '@/lib/formationNav';
+import { FORMATION_EDITOR_TAB, applyFormationEditorQuery, formationTabFromSearch } from '@/lib/formationNav';
 
 const SHORT_CATEGORY_LABELS: Partial<Record<FicheCategory, string>> = {
   procedure_deroulement: 'Procédure',
@@ -96,11 +96,11 @@ export function FormationTechnique() {
 
   const onTabChange = (next: string) => {
     setActiveTab(next);
-    const params = new URLSearchParams(location.search);
-    if (next === FORMATION_EDITOR_TAB) params.set('tab', FORMATION_EDITOR_TAB);
-    else params.delete('tab');
-    const search = params.toString();
-    navigate({ pathname: location.pathname, search: search ? `?${search}` : '' }, { replace: true });
+    const search =
+      next === FORMATION_EDITOR_TAB
+        ? applyFormationEditorQuery(location.search, { tab: FORMATION_EDITOR_TAB })
+        : applyFormationEditorQuery(location.search, { tab: null });
+    navigate({ pathname: location.pathname, search }, { replace: true });
   };
   const scopedFiches = useMemo(
     () => filterFichesForGame(fiches, selectableCatalog, gameId),
