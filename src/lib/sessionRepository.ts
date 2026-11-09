@@ -6,6 +6,12 @@ import {
   SessionStep,
 } from './database.types';
 import { AssignedSession } from './assignedSessions';
+import {
+  LinkedSessionLike,
+  pickLinkedSession,
+  sessionMatchesActivity,
+  shouldCreateNewSession,
+} from './activitySessionLink';
 import { DEFAULT_PARCOURS_ID, ParcoursStepDef } from './parcours';
 import { mockSalesProducts } from './mockData';
 import { ACTIVE_SESSION_STORAGE_KEY } from './config';
@@ -68,6 +74,23 @@ export interface SessionBug {
 
 export function assignmentKey(assignment: AssignedSession): string {
   return `${assignment.id}:${assignment.date}`;
+}
+
+export type LinkedSessionSummary = LinkedSessionLike;
+
+function rowToLinkedSummary(row: Record<string, unknown>): LinkedSessionSummary {
+  return {
+    sessionId: String(row.id),
+    assignmentId: (row.assignment_id as string) || null,
+    planningActivityId: (row.planning_activity_id as string) || null,
+    startedAt: String(row.started_at || ''),
+    endedAt: (row.ended_at as string) || null,
+    cancelledAt: (row.cancelled_at as string) || null,
+  };
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values.filter(Boolean))];
 }
 
 export function rememberActiveSession(id: string | null) {
@@ -207,12 +230,16 @@ export async function loadSession(sessionId: string): Promise<PersistedSession |
 }
 
 export async function listOpenSessions(gmId: string): Promise<PersistedSession[]> {
-  if (isMockMode || !supabase) return [];
+  if (isMockMode || !supabase) {
+    ensureDemoLinkedFixtures();
+    return [...demoSessions.values()].filter((row) => !row.endedAt && !row.cancelledAt);
+  }
   const { data, error } = await supabase
     .from('gh_vr_sessions')
     .select('*')
     .eq('gm_id', gmId)
     .is('ended_at', null)
+    .is('cancelled_at', null)
     .order('started_at', { ascending: false });
   throwIfError(error, 'Liste des sessions ouvertes');
   const rows = data || [];
@@ -222,6 +249,68 @@ export async function listOpenSessions(gmId: string): Promise<PersistedSession[]
     loaded.push(rowToSession(row as Record<string, unknown>, parts.steps, parts.sales, parts.salesComment));
   }
   return loaded;
+}
+
+const LINKED_SESSION_COLUMNS =
+  'id, assignment_id, planning_activity_id, started_at, ended_at, cancelled_at';
+
+/**
+ * Non-cancelled gh_vr_sessions for this GM that belong to the given planning
+ * activities (planning_activity_id or assignment_id). Includes ended rows so
+ * « Mes Activités » can show Terminée / Modifier instead of Démarrer again.
+ */
+export async function listLinkedSessions(
+  gmId: string,
+  assignments: AssignedSession[]
+): Promise<LinkedSessionSummary[]> {
+  if (isMockMode || !supabase) {
+    ensureDemoLinkedFixtures();
+    return [...demoSessions.values()]
+      .filter((row) => !row.cancelledAt)
+      .filter((row) => assignments.some((activity) => sessionMatchesActivity(row, activity)));
+  }
+  if (!assignments.length) return [];
+
+  const ids = uniqueStrings(assignments.map((row) => row.id));
+  const keys = uniqueStrings([
+    ...ids,
+    ...assignments.map((row) => assignmentKey(row)),
+  ]);
+
+  const [byPlanning, byAssignment] = await Promise.all([
+    supabase
+      .from('gh_vr_sessions')
+      .select(LINKED_SESSION_COLUMNS)
+      .eq('gm_id', gmId)
+      .is('cancelled_at', null)
+      .in('planning_activity_id', ids),
+    supabase
+      .from('gh_vr_sessions')
+      .select(LINKED_SESSION_COLUMNS)
+      .eq('gm_id', gmId)
+      .is('cancelled_at', null)
+      .in('assignment_id', keys),
+  ]);
+  throwIfError(byPlanning.error, 'Lien planning → session');
+  throwIfError(byAssignment.error, 'Lien planning → session');
+
+  const byId = new Map<string, LinkedSessionSummary>();
+  for (const row of [...(byPlanning.data || []), ...(byAssignment.data || [])]) {
+    const summary = rowToLinkedSummary(row as Record<string, unknown>);
+    byId.set(summary.sessionId, summary);
+  }
+  return [...byId.values()];
+}
+
+async function loadLinkedSessionForAssignment(
+  gmId: string,
+  assignment: AssignedSession
+): Promise<PersistedSession | null> {
+  const summaries = await listLinkedSessions(gmId, [assignment]);
+  const picked = pickLinkedSession(assignment, summaries);
+  if (!picked || shouldCreateNewSession(picked)) return null;
+  if (isMockMode || !supabase) return demoSessions.get(picked.sessionId) || null;
+  return loadSession(picked.sessionId);
 }
 
 const demoSessions = new Map<string, PersistedSession>();
@@ -255,6 +344,82 @@ function emptyDemoSession(partial: Omit<PersistedSession, 'startedAt' | 'complet
   return session;
 }
 
+function localIsoDate(d = new Date()): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+let demoFixturesReady = false;
+
+/** Demo-only: one open + one ended planning session so the GM list can show Reprendre / Modifier. */
+function ensureDemoLinkedFixtures() {
+  if (demoFixturesReady) return;
+  demoFixturesReady = true;
+  const today = localIsoDate();
+
+  const openKey = `asgn-today-open:${today}`;
+  if (!demoSessions.has(`demo-${openKey}`)) {
+    emptyDemoSession({
+      sessionId: `demo-${openKey}`,
+      assignmentId: openKey,
+      game: 'Novasphère',
+      date: today,
+      time: '14:00',
+      groupName: 'Anniversaire',
+      playerCount: 6,
+      gmName: 'GM Demo',
+      parcoursId: DEFAULT_PARCOURS_ID,
+      stepsSnapshot: null,
+      plannedEndTime: '14:45',
+      planningActivityId: 'asgn-today-open',
+    });
+  }
+
+  const endedKey = `asgn-today-ended:${today}`;
+  if (!demoSessions.has(`demo-${endedKey}`)) {
+    const row = emptyDemoSession({
+      sessionId: `demo-${endedKey}`,
+      assignmentId: endedKey,
+      game: 'Le Serviteur de la rédemption I ou 2',
+      date: today,
+      time: '12:00',
+      groupName: 'Famille Demo',
+      playerCount: 8,
+      gmName: 'GM Demo',
+      parcoursId: DEFAULT_PARCOURS_ID,
+      stepsSnapshot: null,
+      clientEmail: 'client.demo@vrcenter.ch',
+      plannedEndTime: '13:20',
+      planningActivityId: 'asgn-today-ended',
+    });
+    row.startedAt = new Date(`${today}T12:05:00`).toISOString();
+    row.endedAt = new Date(`${today}T15:49:00`).toISOString();
+    row.videosSentAt = row.endedAt;
+    row.salesRecordedAt = row.endedAt;
+    row.sales = [
+      { id: 'demo-ended-sale', productName: 'Boisson', quantity: 2, unitPrice: 4, paymentMethod: 'twint' },
+    ];
+  }
+}
+
+async function hydrateResumedSession(
+  session: PersistedSession,
+  params: { gmId: string; assignment: AssignedSession }
+): Promise<PersistedSession> {
+  if (!session.endedAt && !session.cancelledAt) {
+    rememberActiveSession(session.sessionId);
+    await ensureCheckin(params.gmId);
+  }
+  const fromPlanning = (params.assignment.clientEmail || '').trim();
+  if (fromPlanning && !session.clientEmail) {
+    await updateSessionFields(session.sessionId, { clientEmail: fromPlanning });
+    session.clientEmail = fromPlanning;
+  }
+  return session;
+}
+
 export async function createOrResumeFromAssignment(params: {
   assignment: AssignedSession;
   gmId: string;
@@ -264,13 +429,13 @@ export async function createOrResumeFromAssignment(params: {
   parcoursId: string;
   stepsSnapshot: ParcoursStepDef[];
 }): Promise<PersistedSession> {
+  const existing = await loadLinkedSessionForAssignment(params.gmId, params.assignment);
+  if (existing) return hydrateResumedSession(existing, params);
+
   const key = assignmentKey(params.assignment);
   if (isMockMode || !supabase) {
-    const sessionId = `demo-${key}`;
-    const existing = demoSessions.get(sessionId);
-    if (existing && !existing.endedAt && !existing.cancelledAt) return existing;
     return emptyDemoSession({
-      sessionId,
+      sessionId: `demo-${key}`,
       assignmentId: key,
       game: params.game || params.assignment.game,
       date: params.assignment.date,
@@ -285,32 +450,6 @@ export async function createOrResumeFromAssignment(params: {
       plannedEndTime: params.assignment.endTime || null,
       planningActivityId: params.assignment.id,
     });
-  }
-
-  const existing = await supabase
-    .from('gh_vr_sessions')
-    .select('*')
-    .eq('gm_id', params.gmId)
-    .eq('assignment_id', key)
-    .is('ended_at', null)
-    .maybeSingle();
-  throwIfError(existing.error, 'Recherche de session');
-  if (existing.data) {
-    const parts = await loadParts(existing.data.id);
-    const session = rowToSession(
-      existing.data as Record<string, unknown>,
-      parts.steps,
-      parts.sales,
-      parts.salesComment
-    );
-    rememberActiveSession(session.sessionId);
-    await ensureCheckin(params.gmId);
-    const fromPlanning = (params.assignment.clientEmail || '').trim();
-    if (fromPlanning && !session.clientEmail) {
-      await updateSessionFields(session.sessionId, { clientEmail: fromPlanning });
-      session.clientEmail = fromPlanning;
-    }
-    return session;
   }
 
   return insertSession({

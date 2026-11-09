@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { Calendar, Clock, PlayCircle, Users } from 'lucide-react';
+import { Calendar, Clock, Pencil, PlayCircle, Users } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,19 +10,25 @@ import {
   assignmentTitle,
   splitAssignedSessions,
 } from '@/lib/assignedSessions';
-import { assignmentKey, PersistedSession } from '@/lib/sessionRepository';
+import {
+  activitySessionActionLabel,
+  activitySessionState,
+  endedSessionBadgeLabel,
+  pickLinkedSession,
+  type LinkedSessionLike,
+} from '@/lib/activitySessionLink';
 import { formatLongWeekdayDate } from '@/lib/utils';
 
 interface AssignedActivitiesProps {
   sessions: AssignedSession[];
-  openByAssignment: Map<string, PersistedSession>;
+  linkedSessions: LinkedSessionLike[];
   busy: boolean;
   onStart: (session: AssignedSession) => void;
 }
 
 export function AssignedActivities({
   sessions,
-  openByAssignment,
+  linkedSessions,
   busy,
   onStart,
 }: AssignedActivitiesProps) {
@@ -36,7 +42,7 @@ export function AssignedActivities({
         iconClass="bg-blue-50 text-blue-600"
         empty="Aucune activité aujourd'hui"
         sessions={today}
-        openByAssignment={openByAssignment}
+        linkedSessions={linkedSessions}
         busy={busy}
         onStart={onStart}
       />
@@ -47,7 +53,7 @@ export function AssignedActivities({
         iconClass="bg-emerald-50 text-emerald-600"
         empty="Aucune activité à venir"
         sessions={upcoming}
-        openByAssignment={openByAssignment}
+        linkedSessions={linkedSessions}
         busy={busy}
         onStart={onStart}
       />
@@ -62,7 +68,7 @@ function ActivitySection({
   iconClass,
   empty,
   sessions,
-  openByAssignment,
+  linkedSessions,
   busy,
   onStart,
 }: {
@@ -72,7 +78,7 @@ function ActivitySection({
   iconClass: string;
   empty: string;
   sessions: AssignedSession[];
-  openByAssignment: Map<string, PersistedSession>;
+  linkedSessions: LinkedSessionLike[];
   busy: boolean;
   onStart: (session: AssignedSession) => void;
 }) {
@@ -98,7 +104,7 @@ function ActivitySection({
               <ActivityRow
                 key={session.id}
                 session={session}
-                existing={openByAssignment.get(assignmentKey(session))}
+                linked={pickLinkedSession(session, linkedSessions)}
                 busy={busy}
                 onStart={onStart}
               />
@@ -112,12 +118,12 @@ function ActivitySection({
 
 function ActivityRow({
   session,
-  existing,
+  linked,
   busy,
   onStart,
 }: {
   session: AssignedSession;
-  existing?: PersistedSession;
+  linked: LinkedSessionLike | null;
   busy: boolean;
   onStart: (session: AssignedSession) => void;
 }) {
@@ -125,14 +131,20 @@ function ActivityRow({
   const range = assignmentTimeRange(session);
   const longDate = formatLongWeekdayDate(session.date);
   const players = `${session.playerCount} joueur${session.playerCount > 1 ? 's' : ''}`;
+  const state = activitySessionState(linked);
+  const action = activitySessionActionLabel(state);
+  const ActionIcon = state === 'ended' ? Pencil : PlayCircle;
 
   return (
     <li className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:gap-4 sm:px-6">
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="min-w-0 font-medium leading-snug">{title}</span>
-          <Badge variant="assigned">{assignmentStatusLabel(session.status)}</Badge>
-          {existing && <Badge variant="success">En cours</Badge>}
+          {state === 'none' && <Badge variant="assigned">{assignmentStatusLabel(session.status)}</Badge>}
+          {state === 'in_progress' && <Badge variant="inProgress">En cours</Badge>}
+          {state === 'ended' && linked?.endedAt && (
+            <Badge variant="success">{endedSessionBadgeLabel(linked.endedAt)}</Badge>
+          )}
         </div>
         {session.groupName && (
           <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
@@ -148,13 +160,13 @@ function ActivityRow({
       <Button
         type="button"
         className="h-11 w-full shrink-0 sm:w-auto"
-        variant={existing ? 'secondary' : 'default'}
+        variant={state === 'none' ? 'default' : 'secondary'}
         disabled={busy}
         onClick={() => onStart(session)}
-        aria-label={`${existing ? 'Reprendre' : 'Démarrer'} la session ${title}, ${longDate}, ${range}`}
+        aria-label={`${action} ${title}, ${longDate}, ${range}`}
       >
-        <PlayCircle className="mr-2 h-4 w-4" />
-        {existing ? 'Reprendre la session' : 'Démarrer la session'}
+        <ActionIcon className="mr-2 h-4 w-4" />
+        {action}
       </Button>
     </li>
   );
