@@ -3,13 +3,36 @@ import { test } from 'node:test';
 import {
   buildSouvenirsMakePayload,
   clientEmailFromActivity,
+  firstEmailInText,
   formatSouvenirsExpiry,
   formatSouvenirsSessionDate,
   formatSouvenirsSessionLabel,
   formatSouvenirsSessionTime,
   isClientEmail,
+  reservationDetailsText,
   sanitizeDropboxLabel,
 } from '../src/lib/souvenirsMake.ts';
+
+/** Same shape as Lovable `activities.description` (Make → EventDescriptionFormatter). */
+const SERVEUR_DESCRIPTION = `8 réservées, 0 disponibles
+Halle(s): halle 1
+-----
+22611027087466
+Le Serviteur de la rédemption I ou 2 - Halle 1
+8 personnes
+lundi, 9 novembre 2026 12:00
+Joelle Deburaux
+joelle@solalex.ch
+079 509 20 04 (portable)
+Gryon Vaud 1882
+Switzerland
+Google
+Une entreprise
+Prix total: 416 CHF
+Acompte: 416 CHF
+Versé: 416 CHF
+Total dû: 0 CHF
+no voucher`;
 
 test('sessionLabel : jeu + date + heure au format Dropbox', () => {
   assert.equal(
@@ -88,4 +111,32 @@ test('clientEmailFromActivity lit client_email puis email', () => {
   assert.equal(clientEmailFromActivity({ client: { email: 'nested@x.ch' } }), 'nested@x.ch');
   assert.equal(clientEmailFromActivity({ title: 'Saga [6]' }), undefined);
   assert.equal(clientEmailFromActivity({ email: 'not-an-email' }), undefined);
+});
+
+test('e-mail dans Détails de la réservation (description Make / Lovable)', () => {
+  assert.equal(clientEmailFromActivity({ description: SERVEUR_DESCRIPTION }), 'joelle@solalex.ch');
+  assert.ok(reservationDetailsText(SERVEUR_DESCRIPTION).includes('22611027087466'));
+  assert.equal(firstEmailInText(reservationDetailsText(SERVEUR_DESCRIPTION)), 'joelle@solalex.ch');
+  assert.equal(
+    clientEmailFromActivity({
+      description: `Contact interne info@genieculturel.ch\n-----\n22611027087466\nJoelle\njoelle@solalex.ch`,
+    }),
+    'joelle@solalex.ch'
+  );
+});
+
+test('e-mail dans description sans séparateur, ou mailto/HTML', () => {
+  assert.equal(clientEmailFromActivity({ description: 'Groupe Dupont\nmarie.dupont@example.ch\n079 111 22 33' }), 'marie.dupont@example.ch');
+  assert.equal(firstEmailInText('Contact: mailto:joelle@solalex.ch'), 'joelle@solalex.ch');
+  assert.equal(firstEmailInText('Écrire à <joelle@solalex.ch>.'), 'joelle@solalex.ch');
+});
+
+test('colonne dédiée gagne sur la description', () => {
+  assert.equal(
+    clientEmailFromActivity({
+      client_email: 'prioritaire@vrcenter.ch',
+      description: SERVEUR_DESCRIPTION,
+    }),
+    'prioritaire@vrcenter.ch'
+  );
 });

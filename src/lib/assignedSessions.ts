@@ -298,7 +298,10 @@ async function userHasStaffRole(client: PlanningSupabase): Promise<boolean> {
  * Schema:
  *   - profiles: user_id (auth.uid()) -> gm_id (game_masters.id)
  *   - game_masters: id, name
- *   - activities: id (text), title, date, start_time, end_time, description, notes, status
+ *   - activities: id (text), title, date, start_time, end_time, description, status,
+ *     make_event_id, admin_notes, game_id, duration… (prod has no `notes` column)
+ *   - `description` = free text filled by Make; Lovable EventDescriptionFormatter
+ *     shows « Informations générales » + « Détails de la réservation » (e-mail, tél…)
  *   - event_assignments: activity_id -> activities.id, gm_id -> game_masters.id
  *
  * Flow:
@@ -313,8 +316,9 @@ async function userHasStaffRole(client: PlanningSupabase): Promise<boolean> {
  *   id ← activities.id (text)     → gh_vr_sessions.planning_activity_id (text)
  *   game / playerCount ← title    → game, player_count (parsed from "Jeu [N]")
  *   date, startTime, endTime      → session_date, session_time, planned_end_time
- *   groupName ← description       → group_name
- *   notes ← notes                 → notes
+ *   groupName ← description       → group_name (first 100 chars)
+ *   notes ← admin_notes / notes   → notes
+ *   clientEmail ← first e-mail in description « Détails de la réservation »
  *
  * In demo/mock mode, always returns demo data.
  * In real mode (authenticated), NEVER falls back to mock - shows real data, empty state, or errors.
@@ -443,7 +447,7 @@ export async function fetchFromGmassigneePlanning(gmId: string): Promise<Assigne
         endTime: String(activity.end_time || '').slice(0, 5),
         status: 'assigned',
         groupName: String(activity.description || '').slice(0, 100) || undefined,
-        notes: String(activity.notes || '') || undefined,
+        notes: String(activity.admin_notes || activity.notes || '') || undefined,
         clientEmail: clientEmailFromActivity(activity as Record<string, unknown>),
         parcoursId: undefined,
       });
