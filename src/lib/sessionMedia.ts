@@ -1,6 +1,13 @@
 import * as tus from 'tus-js-client';
 import { isMockMode, supabase } from './supabase';
 import { DEFAULT_SUPABASE_ANON_KEY, DEFAULT_SUPABASE_URL, souvenirsPageUrl, STORAGE_BUCKET_SESSION_MEDIA, EDGE_FUNCTION_SEND_SESSION_VIDEOS } from './config';
+import {
+  SOUVENIRS_FILE_URL_TTL_SECONDS,
+  SouvenirsMakeFile,
+  buildSouvenirsMakePayload,
+  isClientEmail,
+  postMakeSouvenirsWebhook,
+} from './souvenirsMake';
 
 export const SESSION_MEDIA_BUCKET = STORAGE_BUCKET_SESSION_MEDIA;
 export const SESSION_MEDIA_MAX_BYTES = 300 * 1024 * 1024;
@@ -263,4 +270,118 @@ async function fallbackLink(sessionId: string): Promise<SendVideosResult> {
     .maybeSingle();
   const token = (sessionRow as { videos_download_token?: string } | null)?.videos_download_token;
   return { ok: true, emailed: false, downloadUrl: token ? downloadPageUrl(token) : '', videosSentAt: null };
+}
+
+/** Public souvenirs page URL; creates `videos_download_token` only if missing (column default usually covers this). */
+export async function ensureSouvenirsLink(sessionId: string): Promise<string> {
+  if (isMockMode || !supabase) return downloadPageUrl(`demo-${sessionId}`);
+  const { data, error } = await supabase
+    .from('gh_vr_sessions')
+    .select('videos_download_token')
+    .eq('id', sessionId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  let token = (data as { videos_download_token?: string } | null)?.videos_download_token;
+  if (!token) {
+    token = crypto.randomUUID();
+    const { error: updErr } = await supabase
+      .from('gh_vr_sessions')
+      .update({ videos_download_token: token })
+      .eq('id', sessionId);
+    if (updErr) throw new Error(updErr.message);
+  }
+  return downloadPageUrl(token);
+}
+
+/**
+ * Directly downloadable signed URLs (private `session-media` bucket).
+ * TTL 48 h so Make can fetch each file into Dropbox.
+ */
+export async function createSessionMediaDownloadUrls(
+  files: SessionMediaFile[],
+  expiresIn = SOUVENIRS_FILE_URL_TTL_SECONDS
+): Promise<SouvenirsMakeFile[]> {
+  const live = files.filter((row) => new Date(row.expires_at).getTime() > Date.now());
+  if (isMockMode || !supabase) {
+    return live.map((row) => ({
+      url: `https://example.invalid/demo/${encodeURIComponent(row.original_name || row.path)}`,
+      name: row.original_name || row.path.split('/').pop() || 'fichier',
+    }));
+  }
+  if (!live.length) return [];
+  const { data, error } = await supabase.storage
+    .from(SESSION_MEDIA_BUCKET)
+    .createSignedUrls(
+      live.map((row) => row.path),
+      expiresIn
+    );
+  if (error) throw new Error(error.message);
+  const byPath = new Map(
+    (data || [])
+      .filter((item) => item.path && item.signedUrl)
+      .map((item) => [item.path as string, item.signedUrl as string])
+  );
+  const out: SouvenirsMakeFile[] = [];
+  for (const row of live) {
+    const url = byPath.get(row.path);
+    if (!url) throw new Error(`URL signée indisponible pour ${row.original_name || row.path}`);
+    out.push({
+      url,
+      name: row.original_name || row.path.split('/').pop() || 'fichier',
+    });
+  }
+  return out;
+}
+
+export interface SendSouvenirsToMakeResult {
+  souvenirLink: string;
+  videosSentAt: string;
+}
+
+/**
+ * One-click send: souvenirs link + file URLs → Make (e-mail client + Dropbox).
+ * Does not call send-session-videos / Resend.
+ */
+export async function sendSouvenirsToMake(params: {
+  sessionId: string;
+  clientEmail: string;
+  gmName: string;
+  game: string;
+  date: string;
+  time: string;
+}): Promise<SendSouvenirsToMakeResult> {
+  const email = params.clientEmail.trim();
+  if (!isClientEmail(email)) throw new Error('E-mail du client invalide.');
+
+  const media = await listSessionMedia(params.sessionId);
+  const live = media.filter((row) => new Date(row.expires_at).getTime() > Date.now());
+  if (!live.length) throw new Error('Ajoute au moins une vidéo ou une photo.');
+
+  const files = await createSessionMediaDownloadUrls(live);
+  if (!files.length) throw new Error('Impossible de préparer les fichiers à envoyer.');
+
+  if (!isMockMode && supabase) {
+    await supabase.from('gh_vr_sessions').update({ client_email: email }).eq('id', params.sessionId);
+  }
+
+  const souvenirLink = await ensureSouvenirsLink(params.sessionId);
+  const earliest = live.reduce(
+    (min, row) => (!min || row.expires_at < min ? row.expires_at : min),
+    live[0].expires_at
+  );
+  const payload = buildSouvenirsMakePayload({
+    clientEmail: email,
+    souvenirLink,
+    sessionId: params.sessionId,
+    game: params.game,
+    date: params.date,
+    time: params.time,
+    gmName: params.gmName,
+    expiresAtIso: earliest,
+    files,
+  });
+
+  if (!isMockMode) await postMakeSouvenirsWebhook(payload);
+
+  return { souvenirLink, videosSentAt: new Date().toISOString() };
 }

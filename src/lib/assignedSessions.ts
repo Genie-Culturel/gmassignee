@@ -11,6 +11,7 @@
  * `fetchFromGmassigneePlanning` and map rows onto AssignedSession.
  */
 import { staffFlagsFromRoles } from './roles';
+import { clientEmailFromActivity } from './souvenirsMake';
 
 export type AssignmentStatus = 'assigned';
 
@@ -443,7 +444,7 @@ export async function fetchFromGmassigneePlanning(gmId: string): Promise<Assigne
         status: 'assigned',
         groupName: String(activity.description || '').slice(0, 100) || undefined,
         notes: String(activity.notes || '') || undefined,
-        clientEmail: undefined,
+        clientEmail: clientEmailFromActivity(activity as Record<string, unknown>),
         parcoursId: undefined,
       });
     }
