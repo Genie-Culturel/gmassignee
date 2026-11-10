@@ -172,6 +172,7 @@ export function TrainingAdmin({ fiches, catalog, gmId, myValidations, onFichesCh
         <TabsContent value="fiches" className="mt-4">
           <AdminFicheEditor
             fiches={editorFiches}
+            orderFiches={fiches}
             catalog={catalog}
             filterGameId={filterGameId}
             selectedId={selectedId}
@@ -321,6 +322,7 @@ function AdminTracking({
 
 function AdminFicheEditor({
   fiches,
+  orderFiches,
   catalog,
   filterGameId,
   selectedId,
@@ -331,6 +333,8 @@ function AdminFicheEditor({
   scrollToEditor,
 }: {
   fiches: ProcedureFiche[];
+  /** Unfiltered list for drag-and-drop so a game filter cannot scramble group indexes. */
+  orderFiches: ProcedureFiche[];
   catalog: VenueCatalog;
   filterGameId: string;
   selectedId: string;
@@ -549,7 +553,7 @@ function AdminFicheEditor({
         </Button>
       )}
       <FicheOrderList
-        fiches={fiches}
+        fiches={orderFiches}
         catalog={catalog}
         selectedId={selectedId}
         onSelect={onSelect}

@@ -45,16 +45,14 @@ export function FicheOrderList({
 }) {
   const [error, setError] = useState<string | null>(null);
 
-  // Réordonne au sein d'une sous-catégorie : on réutilise les sort_order existants du groupe.
+  // Réordonne tout le groupe (catégorie + sous-catégorie), pas la liste filtrée.
   const applyOrder = async (groupIds: string[], orderedIds: string[]) => {
-    const visible = sortFichesByOrder(fiches.filter((fiche) => groupIds.includes(fiche.id)));
-    const current = visible.map((fiche) => fiche.id).join('\0');
-    if (orderedIds.join('\0') === current) return;
-    const updates = sortOrderUpdatesForVisibleReorder(visible, orderedIds);
-    const changed = updates.filter((update) => {
-      const prev = visible.find((fiche) => fiche.id === update.id);
-      return prev && prev.sort_order !== update.sort_order;
-    });
+    const groupIdSet = new Set(groupIds);
+    const group = sortFichesByOrder(fiches.filter((fiche) => groupIdSet.has(fiche.id)));
+    if (!group.length) return;
+    const updates = sortOrderUpdatesForVisibleReorder(group, orderedIds);
+    const byId = new Map(group.map((fiche) => [fiche.id, fiche]));
+    const changed = updates.filter((update) => byId.get(update.id)?.sort_order !== update.sort_order);
     if (!changed.length) return;
     setError(null);
     await reorderFiches(changed);

@@ -9,7 +9,13 @@ import {
 } from './database.types';
 import { mockFiches } from './mockData';
 import { DEMO_GM_ID } from './assignedSessions';
-import { GmTrainingRow, buildTrackingRows, isFicheDeleted, requiredFichesForGm } from './training';
+import {
+  GmTrainingRow,
+  assertFicheReorderWriteResult,
+  buildTrackingRows,
+  isFicheDeleted,
+  requiredFichesForGm,
+} from './training';
 import { DEMO_CATALOG, DEMO_EXTRA_FICHES, FicheScopeKind } from './venues';
 import { authorizedGameIdsFromRpc } from './competenceFilter';
 import { DEMO_PARCOURS_FICHES } from './demoParcoursFiches';
@@ -326,11 +332,18 @@ export async function reorderFiches(
   }
   const results = await Promise.all(
     changed.map((update) =>
-      supabase!.from('gh_procedure_fiches').update({ sort_order: update.sort_order }).eq('id', update.id)
+      supabase!
+        .from('gh_procedure_fiches')
+        .update({ sort_order: update.sort_order })
+        .eq('id', update.id)
+        .select('id, sort_order')
     )
   );
   const failed = results.find((result) => result.error);
   if (failed?.error) throw new Error(failed.error.message);
+  for (let i = 0; i < changed.length; i += 1) {
+    assertFicheReorderWriteResult(results[i].data, changed[i]);
+  }
 }
 
 function loadDemoQuiz(): QuizQuestionAdmin[] {
