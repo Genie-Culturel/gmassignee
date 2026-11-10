@@ -149,8 +149,8 @@ export function TrainingAdmin({ fiches, catalog, gmId, myValidations, onFichesCh
       />
       <Tabs value={section} onValueChange={onSectionChange} className="w-full">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="fiches" className="px-1 text-xs sm:text-sm">Éditer les fiches</TabsTrigger>
           <TabsTrigger value="parcours" className="px-1 text-xs sm:text-sm">Parcours</TabsTrigger>
+          <TabsTrigger value="fiches" className="px-1 text-xs sm:text-sm">Éditer les fiches</TabsTrigger>
           <TabsTrigger value="suivi" className="px-1 text-xs sm:text-sm">Suivi des GM</TabsTrigger>
         </TabsList>
         <TabsContent

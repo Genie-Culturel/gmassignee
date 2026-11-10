@@ -60,21 +60,7 @@ export function FicheOrderList({
   };
 
   return (
-    <details open className="group/order rounded-lg border bg-card">
-      <summary className="flex cursor-pointer list-none items-start gap-2 p-3 [&::-webkit-details-marker]:hidden">
-        <ChevronRight
-          className="mt-0.5 h-4 w-4 shrink-0 transition-transform group-open/order:rotate-90"
-          aria-hidden
-        />
-        <span>
-          <span className="block text-sm font-medium">Ordre d’affichage</span>
-          <span className="block text-xs text-muted-foreground">
-            Ouvrir une catégorie, puis glisser une fiche pour changer sa place.
-            Sur mobile : rester appuyé puis glisser. C’est enregistré tout de suite.
-          </span>
-        </span>
-      </summary>
-      <div className="space-y-3 border-t p-3">
+    <div className="space-y-3">
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
@@ -114,8 +100,7 @@ export function FicheOrderList({
           </details>
         );
       })}
-      </div>
-    </details>
+    </div>
   );
 }
 
