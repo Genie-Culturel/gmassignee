@@ -94,16 +94,53 @@ export function sortFichesByOrder(fiches: ProcedureFiche[]): ProcedureFiche[] {
   return [...fiches].sort((a, b) => {
     const order = (a.sort_order ?? 0) - (b.sort_order ?? 0);
     if (order !== 0) return order;
-    return a.title.localeCompare(b.title, 'fr');
+    const title = a.title.localeCompare(b.title, 'fr');
+    if (title !== 0) return title;
+    return a.id.localeCompare(b.id);
   });
 }
 
+/**
+ * Renumber one display group after drag-and-drop.
+ *
+ * Always writes unique 10, 20, 30… in the new visual order so a later
+ * sort by `sort_order` (then title) cannot reshuffle the group. Reusing the
+ * group's existing slots failed when several fiches shared 0 / the same
+ * value: nothing changed on persist, then title-sort mixed the cards.
+ *
+ * `orderedIds` may be a filtered subset: members of `group` not listed keep
+ * their relative places (spliced back into the full group). Other groups
+ * are not in `group` and are left untouched.
+ */
 export function sortOrderUpdatesForVisibleReorder(
-  visible: ProcedureFiche[],
+  group: ProcedureFiche[],
   orderedIds: string[]
 ): { id: string; sort_order: number }[] {
-  const slots = [...visible.map((fiche) => fiche.sort_order ?? 0)].sort((a, b) => a - b);
-  return orderedIds.map((id, index) => ({ id, sort_order: slots[index] ?? (index + 1) * 10 }));
+  const members = sortFichesByOrder(group);
+  const memberIds = new Set(members.map((fiche) => fiche.id));
+  const nextVisible = orderedIds.filter((id) => memberIds.has(id));
+  const visibleSet = new Set(nextVisible);
+  const queue = [...nextVisible];
+  const nextIds = members.map((fiche) =>
+    visibleSet.has(fiche.id) ? (queue.shift() as string) : fiche.id
+  );
+  return nextIds.map((id, index) => ({ id, sort_order: (index + 1) * 10 }));
+}
+
+export function assertFicheReorderWriteResult(
+  data: { id: string; sort_order?: number }[] | null | undefined,
+  expected: { id: string; sort_order: number }
+) {
+  if (!data?.length) {
+    throw new Error('Ordre non enregistré (droits insuffisants ou fiche introuvable).');
+  }
+  const row = data[0];
+  if (row.id !== expected.id) {
+    throw new Error('Ordre non enregistré.');
+  }
+  if (typeof row.sort_order === 'number' && row.sort_order !== expected.sort_order) {
+    throw new Error('Ordre non enregistré.');
+  }
 }
 
 export function requiredTrainingFiches(fiches: ProcedureFiche[]): ProcedureFiche[] {
