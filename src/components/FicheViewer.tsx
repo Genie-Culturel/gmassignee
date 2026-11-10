@@ -6,7 +6,6 @@ import { FICHE_CATEGORY_LABELS } from '@/lib/constants';
 import { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { useFicheImageUrls } from '@/hooks/useFicheImageUrls';
-import { displayFicheImageSrc } from '@/lib/ficheImages';
 
 interface FicheViewerProps {
   fiche: ProcedureFiche;
@@ -66,8 +65,7 @@ export function FicheViewer({ fiche, compact = false }: FicheViewerProps) {
               {step.images && step.images.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {step.images.map((path, i) => {
-                    const url = displayFicheImageSrc(path, imageUrls);
-                    if (!url) return null;
+                    const url = imageUrls[path] || path;
                     return (
                       <button
                         key={path + i}
@@ -79,11 +77,7 @@ export function FicheViewer({ fiche, compact = false }: FicheViewerProps) {
                           src={url}
                           alt={`Point ${step.order} – image ${i + 1}`}
                           loading="lazy"
-                          draggable={false}
                           className="h-28 max-w-[220px] w-auto object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.visibility = 'hidden';
-                          }}
                         />
                       </button>
                     );

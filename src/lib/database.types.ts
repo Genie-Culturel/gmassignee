@@ -44,7 +44,7 @@ export type LegacyVrStep =
   | 'socials_shared'
   | 'cleaning';
 
-/** One point of a fiche. `images`: storage keys in bucket `fiche-images` (or data URLs in demo). */
+/** One point of a fiche. `images`: optional public URLs (screenshots/photos). */
 export interface FicheStep {
   order: number;
   text: string;
