@@ -26,6 +26,7 @@ import {
 } from '@/lib/trainingRepository';
 import { isMockMode } from '@/lib/supabase';
 import { FicheStepsEditor } from '@/components/FicheStepsEditor';
+import { normalizeFicheStepImages } from '@/lib/ficheImages';
 import { GameScopeSelect } from '@/components/GameScopeSelect';
 import { FicheOrderList } from '@/components/FicheOrderList';
 import { FICHE_SUB_GROUPS, ficheSubGroup, ficheSubGroupLabel } from '@/lib/ficheSubGroups';
@@ -396,7 +397,12 @@ function AdminFicheEditor({
     setSummary(selected.summary || '');
     setCategory(selected.category);
     setSubGroup(ficheSubGroup(selected) ?? '');
-    setSteps(selected.content_steps.map((step) => ({ ...step, images: step.images ? [...step.images] : undefined })));
+    setSteps(
+      selected.content_steps.map((step) => {
+        const images = normalizeFicheStepImages(step.images);
+        return { ...step, images: images.length ? images : undefined };
+      })
+    );
     setRequired(selected.is_required !== false);
     setActive(selected.is_active);
     setPlaceholder(Boolean(selected.is_placeholder));
@@ -446,8 +452,10 @@ function AdminFicheEditor({
         .map((step) => ({ ...step, text: step.text.trim() }))
         .filter((step) => step.text || (step.images && step.images.length > 0))
         .map((step, index) => {
+          const images = normalizeFicheStepImages(step.images);
           const next: FicheStep = { ...step, order: index + 1 };
-          if (!next.images || next.images.length === 0) delete next.images;
+          if (images.length) next.images = images;
+          else delete next.images;
           return next;
         });
       const cleanedQuestions = questions.map((question) => {

@@ -1,6 +1,6 @@
 import { useRef, useState, useMemo } from 'react';
 import { FicheStep } from '@/lib/database.types';
-import { uploadFicheImage } from '@/lib/ficheImages';
+import { displayFicheImageSrc, uploadFicheImage } from '@/lib/ficheImages';
 import { useFicheImageUrls } from '@/hooks/useFicheImageUrls';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -39,13 +39,13 @@ export function FicheStepsEditor({ ficheId, steps, onChange, disabled }: Props) 
     setError(null);
     setUploading(index);
     try {
-      const urls: string[] = [];
+      const keys: string[] = [];
       for (const file of Array.from(files)) {
         if (!file.type.startsWith('image/')) continue;
-        urls.push(await uploadFicheImage(ficheId, file));
+        keys.push(await uploadFicheImage(ficheId, file));
       }
       const current = steps[index]?.images ?? [];
-      update(index, { images: [...current, ...urls] });
+      update(index, { images: [...current, ...keys] });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Envoi de l'image impossible");
     } finally {
@@ -74,10 +74,23 @@ export function FicheStepsEditor({ ficheId, steps, onChange, disabled }: Props) 
           {step.images && step.images.length > 0 && (
             <div className="flex flex-wrap gap-2 pl-8">
               {step.images.map((path, i) => {
-                const url = imageUrls[path] || path;
+                const url = displayFicheImageSrc(path, imageUrls);
                 return (
                   <div key={path + i} className="relative">
-                    <img src={url} alt="" loading="lazy" className="h-20 w-auto max-w-[140px] rounded border object-cover" />
+                    {url ? (
+                      <img
+                        src={url}
+                        alt=""
+                        loading="lazy"
+                        draggable={false}
+                        className="h-20 w-auto max-w-[140px] rounded border object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.visibility = 'hidden';
+                        }}
+                      />
+                    ) : (
+                      <div className="h-20 w-24 rounded border bg-muted" />
+                    )}
                     <button
                       type="button"
                       aria-label="Retirer l'image"
