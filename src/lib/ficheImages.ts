@@ -1,6 +1,19 @@
+import { DEFAULT_SUPABASE_URL } from './config';
+import {
+  FICHE_IMAGES_BUCKET,
+  ficheImagePublicUrl,
+  resolveFicheImageSrc as resolveFicheImageSrcPure,
+  storageKeyFromFicheImage,
+} from './ficheImageUrl';
 import { isMockMode, supabase } from './supabase';
 
-export const FICHE_IMAGES_BUCKET = 'fiche-images';
+export { FICHE_IMAGES_BUCKET } from './ficheImageUrl';
+export {
+  normalizeFicheImageForStorage,
+  normalizeFicheStepImages,
+  storageKeyFromFicheImage,
+} from './ficheImageUrl';
+
 const MAX_SIDE = 1600;
 const QUALITY = 0.8;
 
@@ -43,7 +56,20 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-/** Upload one image for a fiche step; returns the storage path (for private bucket). */
+function publicUrlForKey(key: string): string {
+  if (supabase) {
+    const { data } = supabase.storage.from(FICHE_IMAGES_BUCKET).getPublicUrl(key);
+    if (data?.publicUrl) return data.publicUrl;
+  }
+  return ficheImagePublicUrl(key, DEFAULT_SUPABASE_URL);
+}
+
+/** Resolve a stored step image to an absolute `<img src>` (public bucket URL, or as-is for data/http). */
+export function resolveFicheImageSrc(value: string): string {
+  return resolveFicheImageSrcPure(value, publicUrlForKey);
+}
+
+/** Upload one image for a fiche step; returns the storage object key (not a URL). */
 export async function uploadFicheImage(ficheId: string, file: File): Promise<string> {
   const blob = await compressImage(file);
   if (isMockMode || !supabase) return blobToDataUrl(blob);
@@ -60,45 +86,24 @@ export async function uploadFicheImage(ficheId: string, file: File): Promise<str
 /** Best-effort removal of an uploaded image (ignored for data URLs / foreign URLs). */
 export async function deleteFicheImage(pathOrUrl: string): Promise<void> {
   if (isMockMode || !supabase) return;
-  let path: string;
-  if (pathOrUrl.startsWith('data:')) return;
-  if (pathOrUrl.includes('://')) {
-    const publicMarker = `/object/public/${FICHE_IMAGES_BUCKET}/`;
-    const authMarker = `/storage/v1/object/sign/${FICHE_IMAGES_BUCKET}/`;
-    const pubIdx = pathOrUrl.indexOf(publicMarker);
-    const authIdx = pathOrUrl.indexOf(authMarker);
-    if (pubIdx >= 0) {
-      path = decodeURIComponent(pathOrUrl.slice(pubIdx + publicMarker.length).split('?')[0]);
-    } else if (authIdx >= 0) {
-      path = decodeURIComponent(pathOrUrl.slice(authIdx + authMarker.length).split('?')[0]);
-    } else {
-      return;
-    }
-  } else {
-    path = pathOrUrl;
-  }
+  const path = storageKeyFromFicheImage(pathOrUrl);
+  if (!path) return;
   await supabase.storage.from(FICHE_IMAGES_BUCKET).remove([path]);
 }
 
-/** Generate signed URLs for fiche image paths (1h expiry). Returns map path→URL. */
+/**
+ * Map stored step image values to display URLs.
+ * The fiche-images bucket is public (migration 045), so keys resolve via getPublicUrl.
+ * Signed URLs remain accepted as input and are converted back to a public URL via the key.
+ */
 export async function getSignedImageUrls(paths: string[]): Promise<Record<string, string>> {
-  if (isMockMode || !supabase) return Object.fromEntries(paths.map((p) => [p, p]));
-  const storagePaths = paths.filter((p) => !p.startsWith('data:') && !p.includes('://'));
-  if (storagePaths.length === 0) {
-    return Object.fromEntries(paths.map((p) => [p, p]));
-  }
-  const { data, error } = await supabase.storage
-    .from(FICHE_IMAGES_BUCKET)
-    .createSignedUrls(storagePaths, 3600);
-  if (error) throw new Error(error.message);
-  const result: Record<string, string> = {};
-  paths.forEach((p) => {
-    if (p.startsWith('data:') || p.includes('://')) {
-      result[p] = p;
-    }
-  });
-  data?.forEach((item) => {
-    if (item.signedUrl && item.path) result[item.path] = item.signedUrl;
-  });
-  return result;
+  return Object.fromEntries((paths || []).map((path) => [path, resolveFicheImageSrc(path)]));
+}
+
+export function mapFicheImageUrls(paths: string[]): Record<string, string> {
+  return Object.fromEntries((paths || []).map((path) => [path, resolveFicheImageSrc(path)]));
+}
+
+export function displayFicheImageSrc(stored: string, urls: Record<string, string>): string {
+  return urls[stored] || resolveFicheImageSrc(stored);
 }
