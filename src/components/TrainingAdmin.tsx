@@ -347,6 +347,11 @@ function AdminFicheEditor({
   const selected = fiches.find((fiche) => fiche.id === selectedId) || null;
   const selectedIdRef = useRef(selectedId);
   selectedIdRef.current = selectedId;
+  const editorRef = useRef<HTMLDivElement>(null);
+  const skipInitialScrollRef = useRef(!scrollToEditor);
+  const scrollEditorIntoView = () => {
+    editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
   const [title, setTitle] = useState('');
   const [summary, setSummary] = useState('');
   const [category, setCategory] = useState<FicheCategory>('formation_technique');
@@ -377,8 +382,12 @@ function AdminFicheEditor({
   const showQuizLoading = quizzesLoading || quizzesStale;
 
   useEffect(() => {
-    if (!scrollToEditor || !selectedId) return;
-    const run = () => document.getElementById('admin-fiche-editor')?.scrollIntoView({ block: 'start' });
+    if (!selectedId) return;
+    if (skipInitialScrollRef.current) {
+      skipInitialScrollRef.current = false;
+      return;
+    }
+    const run = () => scrollEditorIntoView();
     let timeout = 0;
     const frame = window.requestAnimationFrame(() => {
       run();
@@ -388,7 +397,7 @@ function AdminFicheEditor({
       window.cancelAnimationFrame(frame);
       window.clearTimeout(timeout);
     };
-  }, [scrollToEditor, selectedId]);
+  }, [selectedId]);
 
   useEffect(() => {
     if (!selected) return;
@@ -556,7 +565,12 @@ function AdminFicheEditor({
         fiches={orderFiches}
         catalog={catalog}
         selectedId={selectedId}
-        onSelect={onSelect}
+        onSelect={(id) => {
+          if (id === selectedId) {
+            scrollEditorIntoView();
+          }
+          onSelect(id);
+        }}
         onReordered={onFichesChanged}
       />
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -596,7 +610,7 @@ function AdminFicheEditor({
       </div>
 
       {selected && (
-        <Card id="admin-fiche-editor">
+        <Card id="admin-fiche-editor" ref={editorRef} className="scroll-mt-20">
           <CardHeader>
             {showRetourParcours && onRetourParcours && (
               <Button type="button" variant="secondary" size="sm" className="mb-3" onClick={onRetourParcours}>
