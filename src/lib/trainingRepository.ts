@@ -19,85 +19,18 @@ import {
 import { DEMO_CATALOG, DEMO_EXTRA_FICHES, FicheScopeKind } from './venues';
 import { authorizedGameIdsFromRpc } from './competenceFilter';
 import { DEMO_PARCOURS_FICHES } from './demoParcoursFiches';
+import { DEMO_QUIZ } from './demoLiveData';
 
 export const TRAINING_STORAGE_KEY = 'gmassignee_fiche_validations';
-
-const DEMO_QUIZ: QuizQuestionAdmin[] = [
-  {
-    id: 'q-pc0-1',
-    fiche_id: 'pc-0',
-    prompt: "Combien de temps avant l'arrivée des premiers clients faut-il ouvrir la porte d'entrée du bâtiment ?",
-    choices: [
-      { id: '5', text: '5 minutes' },
-      { id: '15', text: 'Au moins 15 minutes' },
-      { id: 'arrivee', text: 'Seulement quand les clients sonnent' },
-    ],
-    correct_choice_ids: ['15'],
-    order_index: 1,
-    is_example: false,
-  },
-  {
-    id: 'q-pc0-2',
-    fiche_id: 'pc-0',
-    prompt: "Quelle lumière ne faut-il pas oublier d'allumer en préparant le bar ?",
-    choices: [
-      { id: 'frigo', text: 'Celle du réfrigérateur des boissons clients' },
-      { id: 'halle', text: 'Celle des halles de jeu' },
-      { id: 'wc', text: 'Celle des WC' },
-    ],
-    correct_choice_ids: ['frigo'],
-    order_index: 2,
-    is_example: false,
-  },
-  {
-    id: 'q-pc1-1',
-    fiche_id: 'pc-1',
-    prompt: 'Où installer le premier groupe à son arrivée ? (exemple)',
-    choices: [
-      { id: 'lobby', text: "Au lobby (tables d'accueil)" },
-      { id: 'salle', text: 'Directement en salle de jeu' },
-      { id: 'parking', text: 'Sur le parking' },
-    ],
-    correct_choice_ids: ['lobby'],
-    order_index: 1,
-    is_example: true,
-  },
-  {
-    id: 'q-pc1-2',
-    fiche_id: 'pc-1',
-    prompt: 'Combien de tables de 8 y a-t-il au lobby ? (exemple)',
-    choices: [
-      { id: '1', text: '1 table' },
-      { id: '2', text: '2 tables' },
-      { id: '4', text: '4 tables' },
-    ],
-    correct_choice_ids: ['2'],
-    order_index: 2,
-    is_example: true,
-  },
-  {
-    id: 'q-malaise-1',
-    fiche_id: '3',
-    prompt: 'Premier geste si un client se sent mal en VR ? (exemple)',
-    choices: [
-      { id: 'casque', text: 'Retirer immédiatement le casque' },
-      { id: 'continuer', text: 'Le laisser finir la partie' },
-      { id: 'eau_casque', text: "Lui donner de l'eau sans retirer le casque" },
-    ],
-    correct_choice_ids: ['casque'],
-    order_index: 1,
-    is_example: true,
-  },
-];
 
 function seedDemoValidations(gmId: string): FicheValidation[] {
   const now = new Date().toISOString();
   return [
-    { gm_id: gmId, fiche_id: 'pc-1', version: 1, validated_at: now },
-    { gm_id: gmId, fiche_id: 'pc-2', version: 1, validated_at: now },
-    { gm_id: gmId, fiche_id: 'pc-3', version: 1, validated_at: now },
-    { gm_id: gmId, fiche_id: 'pc-4', version: 1, validated_at: now },
-    { gm_id: gmId, fiche_id: 'pc-5', version: 1, validated_at: now },
+    { gm_id: gmId, fiche_id: '613c1366-39b9-4485-a3b0-6df30dcfd2df', version: 12, validated_at: now }, // Setup du lobby
+    { gm_id: gmId, fiche_id: 'ac42e860-2671-4261-93d0-d9dd52944266', version: 14, validated_at: now }, // Accueil des clients
+    { gm_id: gmId, fiche_id: 'f100aef2-dcb2-4ec2-af1c-90390cd63bee', version: 2, validated_at: now }, // Check-in QR
+    { gm_id: gmId, fiche_id: '455b8c87-dc3f-4632-8e6f-b82c40390bf7', version: 15, validated_at: now }, // Setup Quest
+    { gm_id: gmId, fiche_id: '57d0cfd8-9991-444d-a8c1-96a4d4386f30', version: 9, validated_at: now }, // Setup Game
   ];
 }
 
@@ -156,7 +89,7 @@ export function hydrateTrainingFiche(fiche: ProcedureFiche): ProcedureFiche {
   const scope = defaultDemoScope(fiche);
   return {
     ...fiche,
-    version: fiche.id === 'pc-1' ? fiche.version ?? 2 : fiche.version ?? 1,
+    version: fiche.version ?? 1,
     is_required: fiche.is_required ?? true,
     deleted_at: fiche.deleted_at ?? null,
     sort_order: fiche.sort_order,

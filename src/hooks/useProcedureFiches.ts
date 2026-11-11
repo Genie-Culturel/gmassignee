@@ -100,9 +100,12 @@ export function useFichesByIncidentType(incidentType: string) {
   
   // Map incident types to fiche titles
   const relevantTitles: Record<string, string[]> = {
-    bug: ['🚧 Dépannage : Bug ou freeze en jeu'],
-    malaise: ['Dépannage : Malaise client'],
-    casse: ['🚧 Dépannage : Manette ou casque cassé'],
+    bug: [
+      'Spatial Anchor - Un client (joueur) est connecté mais reste au point 0 au SETUP game',
+      'Spatial Anchor - Un client (joueur) est décalé des autres joueurs pendant la partie.',
+    ],
+    malaise: ['Procédure incident - malaise '],
+    casse: ['Utiliser en dépannage un Quest de remplacement (en dernier recours)'],
   };
 
   const titles = relevantTitles[incidentType] || [];
