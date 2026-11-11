@@ -85,13 +85,6 @@ export function TrainingAdmin({ fiches, catalog, gmId, myValidations, onFichesCh
     if (query.fiche) setSelectedId(query.fiche);
   }, [query.fiche]);
 
-  useEffect(() => {
-    if (query.fiche) return;
-    setSelectedId(visible[0]?.id || '');
-    // Keep the current fiche after save/create; reset only when the game filter changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterGameId]);
-
   const editorFiches = useMemo(() => {
     if (selectedId && !visible.some((fiche) => fiche.id === selectedId)) {
       const extra = fiches.find((fiche) => fiche.id === selectedId);
@@ -523,10 +516,9 @@ function AdminFicheEditor({
     setError(null);
     setMessage(null);
     try {
-      const nextId = fiches.find((fiche) => fiche.id !== selected.id)?.id || '';
       await deleteFiche(selected.id);
       setConfirmDelete(false);
-      onSelect(nextId);
+      onSelect('');
       onFichesChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Suppression impossible');
@@ -608,6 +600,12 @@ function AdminFicheEditor({
           Nouvelle fiche
         </Button>
       </div>
+
+      {!selected && (
+        <p className="text-sm text-muted-foreground">
+          Sélectionne une fiche ou crée-en une nouvelle.
+        </p>
+      )}
 
       {selected && (
         <Card id="admin-fiche-editor" ref={editorRef} className="scroll-mt-20">

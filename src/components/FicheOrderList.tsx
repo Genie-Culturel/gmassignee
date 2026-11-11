@@ -71,7 +71,7 @@ export function FicheOrderList({
         if (!rows.length) return null;
         return (
           <details key={category} className="group/cat">
-            <summary className="flex cursor-pointer list-none items-center gap-1.5 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground [&::-webkit-details-marker]:hidden">
+            <summary className="flex cursor-pointer list-none items-center gap-1.5 py-1 text-xs font-bold uppercase tracking-wide text-muted-foreground [&::-webkit-details-marker]:hidden">
               <ChevronRight className="h-3.5 w-3.5 transition-transform group-open/cat:rotate-90" aria-hidden />
               {FICHE_CATEGORY_LABELS[category]} ({rows.length})
             </summary>
