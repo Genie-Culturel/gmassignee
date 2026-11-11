@@ -9,17 +9,30 @@ import {
   sessionMediaTooLargeMessage,
 } from '../src/lib/sessionMediaErrors.ts';
 
-const LABEL = '100 Mo';
-const FRIENDLY = 'Fichier trop lourd (max 100 Mo).';
+const LABEL = '50 Mo';
+const FRIENDLY = 'Fichier trop lourd (max 50 Mo).';
 
-test('SESSION_MEDIA_MAX_* = 100 Mo (104857600) dans sessionMedia.ts', () => {
-  const src = readFileSync(
-    join(dirname(fileURLToPath(import.meta.url)), '../src/lib/sessionMedia.ts'),
-    'utf8'
+const root = dirname(fileURLToPath(import.meta.url));
+
+test('SESSION_MEDIA_MAX_* = 50 Mo (52428800) dans sessionMedia.ts', () => {
+  const src = readFileSync(join(root, '../src/lib/sessionMedia.ts'), 'utf8');
+  assert.match(src, /SESSION_MEDIA_MAX_BYTES = 50 \* 1024 \* 1024/);
+  assert.match(src, /SESSION_MEDIA_MAX_LABEL = '50 Mo'/);
+  assert.equal(50 * 1024 * 1024, 52428800);
+  assert.match(src, /tooLargeMessageFor\(SESSION_MEDIA_MAX_LABEL\)/);
+  assert.match(src, /mapUploadError\(error, SESSION_MEDIA_MAX_LABEL\)/);
+});
+
+test('l’UI affiche le label et l’astuce 1080p, sans taille en dur', () => {
+  const src = readFileSync(join(root, '../src/components/SessionVideos.tsx'), 'utf8');
+  assert.match(src, /SESSION_MEDIA_MAX_LABEL/);
+  assert.match(src, /sessionMediaTooLargeMessage\(\)/);
+  assert.match(
+    src,
+    /une ou plusieurs vidéos de \{SESSION_MEDIA_MAX_LABEL\} max chacune \(environ 40 secondes\)/
   );
-  assert.match(src, /SESSION_MEDIA_MAX_BYTES = 100 \* 1024 \* 1024/);
-  assert.match(src, /SESSION_MEDIA_MAX_LABEL = '100 Mo'/);
-  assert.equal(100 * 1024 * 1024, 104857600);
+  assert.match(src, /filmées en 1080p plutôt qu[’']en 4K\./);
+  assert.doesNotMatch(src, /100 Mo|300 Mo/);
 });
 
 test('message trop lourd : une seule formulation, label injecté', () => {
