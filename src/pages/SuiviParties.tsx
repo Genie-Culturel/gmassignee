@@ -26,6 +26,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { INCIDENT_TYPE_LABELS, buildBugReporterUrl } from '@/lib/constants';
+import { isIncidentNoteRequired } from '@/lib/incidentNote';
 import { IncidentType, ProcedureFiche, SalesProduct, SessionStep } from '@/lib/database.types';
 import { FicheButton } from '@/components/FicheButton';
 import { useFichesByIncidentType } from '@/hooks/useProcedureFiches';
@@ -398,6 +399,11 @@ export function SuiviParties() {
 
   const handleEndSession = async () => {
     if (!activeSession) return;
+    if (isIncidentNoteRequired(incidentType, bugs.length) && !incidentDetails.trim()) {
+      setError('Veuillez préciser le problème');
+      return;
+    }
+    setError(null);
     setBusy(true);
     try {
       await flushPendingEdits();
@@ -795,7 +801,7 @@ export function SuiviParties() {
               ))}
             </div>
 
-            {incidentType && (
+            {incidentType && isIncidentNoteRequired(incidentType, bugs.length) && (
               <IncidentAlert
                 incidentType={incidentType}
                 details={incidentDetails}
@@ -804,21 +810,9 @@ export function SuiviParties() {
               />
             )}
 
-            {options.bugReporter && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => void handleOpenBugReporter()}
-                className="w-full"
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Ouvrir le Bug reporter
-              </Button>
-            )}
-
             {bugs.length > 0 && (
               <div className="space-y-2 pt-2 border-t">
-                <p className="text-sm font-medium">Bugs de cette session</p>
+                <p className="text-sm font-medium">Bugs signalés de cette session</p>
                 <ul className="space-y-2">
                   {bugs.map((bug) => (
                     <li
@@ -851,6 +845,18 @@ export function SuiviParties() {
                   </Button>
                 )}
               </div>
+            )}
+
+            {options.bugReporter && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void handleOpenBugReporter()}
+                className="w-full"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Ouvrir le Bug reporter
+              </Button>
             )}
           </CardContent>
         </Card>
