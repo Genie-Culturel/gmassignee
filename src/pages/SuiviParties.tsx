@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -260,6 +260,16 @@ export function SuiviParties() {
     // Refresh on this session id only; the whole activeSession object changes often.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSession?.sessionId, refreshBugs]);
+
+  // List → session view is in-page (same route). Without this, the session view
+  // inherits the list's scroll and can land on « Incident ? » / souvenirs.
+  useLayoutEffect(() => {
+    if (!activeSession) return;
+    window.scrollTo({ top: 0 });
+    const scroller = document.scrollingElement;
+    if (scroller) scroller.scrollTop = 0;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSession?.sessionId]);
 
   useEffect(() => {
     if (!assignmentsLoaded) return;
