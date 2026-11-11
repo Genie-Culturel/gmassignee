@@ -68,9 +68,12 @@ export const INCIDENT_TYPE_LABELS: Record<IncidentType, string> = {
 
 // Map incident types to relevant fiche titles for auto-opening
 export const INCIDENT_FICHE_MAPPING: Record<IncidentType, string[]> = {
-  bug: ['🚧 Dépannage : Bug ou freeze en jeu'],
-  malaise: ['Procédure incident avec un client'],
-  casse: ['🚧 Procédure problème matériel'],
+  bug: [
+    'Spatial Anchor - Un client (joueur) est connecté mais reste au point 0 au SETUP game',
+    'Spatial Anchor - Un client (joueur) est décalé des autres joueurs pendant la partie.',
+  ],
+  malaise: ['Procédure incident - malaise '],
+  casse: ['Utiliser en dépannage un Quest de remplacement (en dernier recours)'],
   autre: [],
 };
 

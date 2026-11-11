@@ -42,8 +42,8 @@ export const DEMO_GAMES: VenueGame[] = [
   { id: 'game-serviteur', location_id: 'loc-vr_center', slug: 'serviteur', name: 'Le Serviteur 1 & 2', sort_index: 2 },
   { id: 'game-saga', location_id: 'loc-vr_center', slug: 'saga', name: 'La Saga', sort_index: 3 },
   { id: 'game-schoolcrafter', location_id: 'loc-vr_center', slug: 'schoolcrafter', name: 'Schoolcrafter', sort_index: 4 },
-  { id: 'game-magi_room', location_id: 'loc-vr_center', slug: 'magi_room', name: 'Magi Room', sort_index: 5 },
-  { id: 'game-rave', location_id: 'loc-vr_center', slug: 'rave', name: 'RAVE', sort_index: 6 },
+  { id: 'game-magi_room', location_id: 'loc-vr_center', slug: 'magi_room', name: 'Magi Room', sort_index: 7 },
+  { id: 'game-rave', location_id: 'loc-vr_center', slug: 'rave', name: 'RAVE', sort_index: 8 },
   { id: 'game-archeogame', location_id: 'loc-archeo_sion', slug: 'archeogame', name: 'ARcheo Game', sort_index: 1 },
   { id: 'game-nettoyage', location_id: 'loc-nettoyage_center', slug: 'nettoyage', name: 'Nettoyage centre VR', sort_index: 1 },
   { id: 'game-usine_chandoline', location_id: 'loc-chandoline', slug: 'usine_chandoline', name: 'Novasphère', sort_index: 1 },
@@ -56,120 +56,8 @@ export const DEMO_GAMES: VenueGame[] = [
 
 export const DEMO_CATALOG: VenueCatalog = { locations: DEMO_LOCATIONS, games: DEMO_GAMES };
 
-function extraFiche(
-  id: string,
-  category: ProcedureFiche['category'],
-  title: string,
-  summary: string,
-  scope_kind: FicheScopeKind,
-  scope_location_ids: string[],
-  scope_game_ids: string[]
-): ProcedureFiche {
-  const now = new Date().toISOString();
-  return {
-    id,
-    category,
-    title,
-    summary,
-    content_steps: [{ order: 1, text: '🚧 À documenter' }],
-    is_placeholder: true,
-    tags: [],
-    is_active: true,
-    is_required: true,
-    version: 1,
-    deleted_at: null,
-    scope_kind,
-    scope_location_ids,
-    scope_game_ids,
-    created_at: now,
-    updated_at: now,
-  };
-}
-
-/** Demo-only example fiches for the non-VR venues + one « all locations » fiche. */
-export const DEMO_EXTRA_FICHES: ProcedureFiche[] = [
-  extraFiche(
-    'demo-all-rules',
-    'formation_technique',
-    'Règles générales GM',
-    'Règles communes à tous les lieux.',
-    'all',
-    [],
-    []
-  ),
-  extraFiche(
-    'demo-chandoline-accueil',
-    'procedure_deroulement',
-    'Accueil Usine de Chandoline',
-    'Accueil des visiteurs à Chandoline.',
-    'locations',
-    ['loc-chandoline'],
-    []
-  ),
-  extraFiche(
-    'demo-planta-launch',
-    'formation_technique',
-    '🚧 Lancement de la Planta',
-    'Lancement du jeu Planta.',
-    'games',
-    [],
-    ['game-planta']
-  ),
-  extraFiche(
-    'demo-saga-launch',
-    'formation_technique',
-    '🚧 Lancement de la Saga',
-    'Lancement du jeu Saga.',
-    'games',
-    [],
-    ['game-saga']
-  ),
-  extraFiche(
-    'demo-chandoline-launch',
-    'formation_technique',
-    '🚧 Lancement Novasphère',
-    'Lancement du jeu XR.',
-    'games',
-    [],
-    ['game-usine_chandoline']
-  ),
-  extraFiche(
-    'demo-novasphere-procedure',
-    'procedure_deroulement',
-    '🚧 Procédure Novasphère (à compléter)',
-    'Déroulement d’une partie Novasphère (en cours d’élaboration).',
-    'games',
-    [],
-    ['game-usine_chandoline']
-  ),
-  extraFiche(
-    'demo-schoolcrafter-procedure',
-    'procedure_deroulement',
-    '🚧 Procédure GM Schoolcrafter (à compléter)',
-    'Procédure GM Schoolcrafter (pas encore de document).',
-    'games',
-    [],
-    ['game-schoolcrafter']
-  ),
-  extraFiche(
-    'demo-davinci',
-    'procedure_deroulement',
-    'Briefing Davinci',
-    'Briefing Escape Life Sion.',
-    'games',
-    [],
-    ['game-davinci']
-  ),
-  extraFiche(
-    'demo-feux',
-    'procedure_deroulement',
-    'Briefing Feux sacrés',
-    'Briefing Escape Life Sierre.',
-    'games',
-    [],
-    ['game-feux_sacres']
-  ),
-];
+/** Former demo-only extras now exist in the live export (`DEMO_LIVE_FICHES`). */
+export const DEMO_EXTRA_FICHES: ProcedureFiche[] = [];
 
 export function gamesGroupedByLocation(catalog: VenueCatalog): { location: VenueLocation; games: VenueGame[] }[] {
   return [...catalog.locations]
