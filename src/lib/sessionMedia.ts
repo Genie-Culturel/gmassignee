@@ -8,11 +8,26 @@ import {
   isClientEmail,
   postMakeSouvenirsWebhook,
 } from './souvenirsMake';
+import {
+  mapSessionMediaUploadError as mapUploadError,
+  sessionMediaTooLargeMessage as tooLargeMessageFor,
+} from './sessionMediaErrors';
 
 export const SESSION_MEDIA_BUCKET = STORAGE_BUCKET_SESSION_MEDIA;
-export const SESSION_MEDIA_MAX_BYTES = 300 * 1024 * 1024;
-export const SESSION_MEDIA_MAX_LABEL = '300 Mo';
+export const SESSION_MEDIA_MAX_BYTES = 100 * 1024 * 1024;
+export const SESSION_MEDIA_MAX_LABEL = '100 Mo';
 export const SESSION_MEDIA_TTL_DAYS = 14;
+
+export { isSessionMediaSizeExceededError } from './sessionMediaErrors';
+
+/** GM-facing copy for a file that exceeds SESSION_MEDIA_MAX_BYTES (client or TUS 413). */
+export function sessionMediaTooLargeMessage(): string {
+  return tooLargeMessageFor(SESSION_MEDIA_MAX_LABEL);
+}
+
+export function mapSessionMediaUploadError(error: unknown): Error {
+  return mapUploadError(error, SESSION_MEDIA_MAX_LABEL);
+}
 
 export const FILMING_NOTICE =
   'La partie sera filmée (2 courtes vidéos) : vous recevrez un lien pour les télécharger, valable 14 jours, ensuite elles sont supprimées.';
@@ -105,11 +120,7 @@ export function uploadSessionFile(params: {
 }): Promise<SessionMediaFile> {
   const { sessionId, file } = params;
   if (file.size > SESSION_MEDIA_MAX_BYTES) {
-    return Promise.reject(
-      new Error(
-        `Fichier trop lourd (${formatBytes(file.size)}). Limite actuelle : ${SESSION_MEDIA_MAX_LABEL} par fichier (plan Pro Supabase).`
-      )
-    );
+    return Promise.reject(new Error(sessionMediaTooLargeMessage()));
   }
   if (!isAllowedMedia(file)) {
     return Promise.reject(new Error('Seules les vidéos et photos sont acceptées.'));
@@ -172,7 +183,7 @@ export function uploadSessionFile(params: {
             );
           },
           onError(error) {
-            reject(error instanceof Error ? error : new Error(String(error)));
+            reject(mapSessionMediaUploadError(error));
           },
           onProgress(bytesUploaded, bytesTotal) {
             params.onProgress(bytesTotal ? Math.round((bytesUploaded / bytesTotal) * 100) : 0);
@@ -204,7 +215,7 @@ export function uploadSessionFile(params: {
         });
         upload.start();
       } catch (err) {
-        reject(err instanceof Error ? err : new Error('Upload impossible'));
+        reject(mapSessionMediaUploadError(err instanceof Error ? err : new Error('Upload impossible')));
       }
     })();
   });

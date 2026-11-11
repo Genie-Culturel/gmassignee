@@ -97,7 +97,7 @@ Déjà appliqué sur **gm-vrcenter**. Colonnes `version`, `is_required`, `skip_v
 
 Fichier : `supabase/migrations/013_session_media.sql`
 
-Colonnes `client_email`, `videos_sent_at`, `videos_download_token` sur `vr_sessions` ; table `session_media` ; bucket privé `session-media` (300 Mo/fichier) ; RLS GM/admin ; fonction `cleanup_expired_session_media()`. Edge functions : `send-session-videos` (JWT), `session-media-download` (public, jeton), `cleanup-session-media` (`CRON_SECRET`).
+Colonnes `client_email`, `videos_sent_at`, `videos_download_token` sur `vr_sessions` ; table `session_media` ; bucket privé `session-media` (100 Mo/fichier) ; RLS GM/admin ; fonction `cleanup_expired_session_media()`. Edge functions : `send-session-videos` (JWT), `session-media-download` (public, jeton), `cleanup-session-media` (`CRON_SECRET`).
 
 #### 014 : Suppression logique des fiches
 

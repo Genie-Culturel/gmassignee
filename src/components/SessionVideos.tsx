@@ -11,9 +11,12 @@ import {
   SESSION_MEDIA_MAX_LABEL,
   formatBytes,
   isAllowedMedia,
+  isSessionMediaSizeExceededError,
   listSessionMedia,
+  mapSessionMediaUploadError,
   sendSessionVideos,
   sendSouvenirsToMake,
+  sessionMediaTooLargeMessage,
   uploadSessionFile,
   LocalUpload,
   SessionMediaFile,
@@ -107,9 +110,10 @@ export function SessionVideos({
       patchUpload(localId, { status: 'done', progress: 100, remote: remoteRow, error: undefined });
       setRemote((rows) => (rows.some((r) => r.path === remoteRow.path) ? rows : [...rows, remoteRow]));
     } catch (err) {
+      const mapped = mapSessionMediaUploadError(err);
       patchUpload(localId, {
-        status: 'error',
-        error: err instanceof Error ? err.message : 'Échec de l’upload — réessaie.',
+        status: isSessionMediaSizeExceededError(err) ? 'too_large' : 'error',
+        error: mapped.message || 'Échec de l’upload — réessaie.',
       });
     }
   };
@@ -135,7 +139,7 @@ export function SessionVideos({
             file,
             status: 'too_large',
             progress: 0,
-            error: `Trop lourd (${formatBytes(file.size)}). Limite actuelle : ${SESSION_MEDIA_MAX_LABEL} / fichier (plan Pro).`,
+            error: sessionMediaTooLargeMessage(),
           },
         ]);
         continue;
@@ -264,7 +268,7 @@ export function SessionVideos({
         <CardTitle>Vidéos &amp; photos souvenirs</CardTitle>
         <CardDescription>
           Filme avec ton téléphone, téléverse les vidéos ici, puis transmets le lien au client. Limite
-          actuelle : {SESSION_MEDIA_MAX_LABEL} par fichier (plan Pro). Photos acceptées pour les tests.
+          actuelle : {SESSION_MEDIA_MAX_LABEL} par fichier. Photos acceptées pour les tests.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
