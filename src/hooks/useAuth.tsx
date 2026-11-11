@@ -156,8 +156,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     client.auth.getSession().then(({ data }) => {
       if (cancelled) return;
       // onAuthStateChange already applied the restored session (avoids a stale getSession).
+      // Still wait for that enqueue (roles + handoff) so FeatureRoute does not see
+      // isAdmin=false and bounce Suivi/Formations to Historique.
       if (sawAuthChange) {
-        setLoading(false);
+        void queue.finally(() => {
+          if (!cancelled) setLoading(false);
+        });
         return;
       }
       void enqueue(data.session?.user ?? null, 'INITIAL_SESSION').finally(() => {

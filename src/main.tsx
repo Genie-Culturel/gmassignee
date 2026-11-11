@@ -2,9 +2,12 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { SouvenirsPage } from './pages/Souvenirs';
+import { applyPagesHashRoute } from './lib/appNav';
 import { captureAuthHandoff } from './lib/authHandoff';
 import './index.css';
 
+// Path URLs (/suivi-parties) and ?tab= → HashRouter (#/suivi-parties) before routing.
+applyPagesHashRoute();
 // Snapshot ?handoff=1&email= before HashRouter / history.replaceState can drop them.
 captureAuthHandoff();
 

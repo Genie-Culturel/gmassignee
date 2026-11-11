@@ -1,4 +1,5 @@
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { LayoutDashboard, PlayCircle, BookOpen, ExternalLink, Pencil } from 'lucide-react';
@@ -6,7 +7,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { useGmOptions } from '@/hooks/useGmOptions';
 import { isMockMode } from '@/lib/supabase';
 import { setDemoFlag } from '@/lib/config';
-import { formationEditorSearch, isFormationEditorPath } from '@/lib/formationNav';
+import { isFormationEditorPath } from '@/lib/formationNav';
+import {
+  appLocationChanged,
+  appNavTo,
+  appSectionFromPathname,
+  resolveAppLocation,
+} from '@/lib/appNav';
 
 const TAB_GRID: Record<number, string> = {
   2: 'grid-cols-2',
@@ -17,12 +24,41 @@ const TAB_GRID: Record<number, string> = {
 
 export function Layout() {
   const location = useLocation();
-  const currentPath = location.pathname.split('/')[1] || 'dashboard';
+  const navigate = useNavigate();
+  const currentPath = appSectionFromPathname(location.pathname);
   const editorTab = isFormationEditorPath(location.pathname, location.search);
   const tabValue = editorTab ? 'formation-editeur' : currentPath;
   const { user, displayName, isAdmin, isFormateur, switchAccount } = useAuth();
-  const { showSuiviParties, showFormations } = useGmOptions();
+  const { showSuiviParties, showFormations, loading: optionsLoading } = useGmOptions();
   const showEditeur = showFormations && isFormateur;
+
+  useEffect(() => {
+    if (optionsLoading) return;
+    const next = resolveAppLocation(location.pathname, location.search, {
+      showSuiviParties,
+      showFormations,
+    });
+    if (appLocationChanged(location.pathname, location.search, next)) {
+      navigate(next, { replace: true });
+    }
+  }, [
+    optionsLoading,
+    location.pathname,
+    location.search,
+    showSuiviParties,
+    showFormations,
+    navigate,
+  ]);
+
+  const onNavTab = (value: string) => {
+    if (value === 'formation-editeur') {
+      navigate(appNavTo('formation', { editor: true }));
+      return;
+    }
+    if (value === 'dashboard' || value === 'suivi-parties' || value === 'formation') {
+      navigate(appNavTo(value));
+    }
+  };
   const accountEmail = user?.email || '';
   const roleLabel = isAdmin ? 'admin' : isFormateur ? 'formateur' : '';
 
@@ -71,17 +107,17 @@ export function Layout() {
       </header>
 
       <div className="container px-4 py-6">
-        <Tabs value={tabValue} className="mb-6">
+        <Tabs value={tabValue} onValueChange={onNavTab} className="mb-6">
           <TabsList className={`grid w-full ${TAB_GRID[tabCount] || 'grid-cols-4'}`}>
             <TabsTrigger value="dashboard" asChild className="w-full justify-center">
-              <Link to="/dashboard" className="flex items-center gap-2" aria-label="Historique des sessions">
+              <Link to={appNavTo('dashboard')} className="flex items-center gap-2" aria-label="Historique des sessions">
                 <LayoutDashboard className="h-4 w-4" />
                 <span className="hidden sm:inline">Historique des sessions</span>
               </Link>
             </TabsTrigger>
             {showSuiviParties && (
               <TabsTrigger value="suivi-parties" asChild className="w-full justify-center">
-                <Link to="/suivi-parties" className="flex items-center gap-2" aria-label="Suivi parties">
+                <Link to={appNavTo('suivi-parties')} className="flex items-center gap-2" aria-label="Suivi parties">
                   <PlayCircle className="h-4 w-4" />
                   <span className="hidden sm:inline">Suivi parties</span>
                 </Link>
@@ -89,7 +125,7 @@ export function Layout() {
             )}
             {showFormations && (
               <TabsTrigger value="formation" asChild className="w-full justify-center">
-                <Link to="/formation" className="flex items-center gap-2" aria-label="Formations et procédures">
+                <Link to={appNavTo('formation')} className="flex items-center gap-2" aria-label="Formations et procédures">
                   <BookOpen className="h-4 w-4" />
                   <span className="hidden sm:inline">Formations et procédures</span>
                 </Link>
@@ -98,7 +134,7 @@ export function Layout() {
             {showEditeur && (
               <TabsTrigger value="formation-editeur" asChild className="w-full justify-center">
                 <Link
-                  to={`/formation${formationEditorSearch()}`}
+                  to={appNavTo('formation', { editor: true })}
                   className="flex items-center gap-2"
                   aria-label="Éditeur"
                 >
