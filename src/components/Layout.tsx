@@ -3,10 +3,11 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { LayoutDashboard, PlayCircle, BookOpen, ExternalLink, Pencil } from 'lucide-react';
+import { DemoBanner } from '@/components/DemoBanner';
 import { useAuth } from '@/hooks/useAuth';
 import { useGmOptions } from '@/hooks/useGmOptions';
 import { isMockMode } from '@/lib/supabase';
-import { setDemoFlag } from '@/lib/config';
+import { setDemoFlagAndReload } from '@/lib/config';
 import { isFormationEditorPath } from '@/lib/formationNav';
 import {
   appLocationChanged,
@@ -63,8 +64,7 @@ export function Layout() {
   const roleLabel = isAdmin ? 'admin' : isFormateur ? 'formateur' : '';
 
   const toggleDemo = () => {
-    setDemoFlag(!isMockMode);
-    window.location.reload();
+    setDemoFlagAndReload(!isMockMode);
   };
 
   const tabCount =
@@ -72,38 +72,41 @@ export function Layout() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center px-4 gap-3">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold">GMassignee</h1>
-            <p className="text-xs text-muted-foreground truncate">
-              {isMockMode ? (
-                'Mode démo'
-              ) : (
-                <>
-                  <span className="font-medium text-foreground">{accountEmail || displayName}</span>
-                  {accountEmail && displayName && displayName !== accountEmail
-                    ? ` · ${displayName}`
-                    : ''}
-                  {roleLabel ? ` · ${roleLabel}` : ''}
-                </>
-              )}
-            </p>
+      <div className="sticky top-0 z-40">
+        {isMockMode && <DemoBanner onQuit={toggleDemo} />}
+        <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="container flex h-16 items-center px-4 gap-3">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl font-bold">GMassignee</h1>
+              <p className="text-xs text-muted-foreground truncate">
+                {isMockMode ? (
+                  'Mode démo'
+                ) : (
+                  <>
+                    <span className="font-medium text-foreground">{accountEmail || displayName}</span>
+                    {accountEmail && displayName && displayName !== accountEmail
+                      ? ` · ${displayName}`
+                      : ''}
+                    {roleLabel ? ` · ${roleLabel}` : ''}
+                  </>
+                )}
+              </p>
+            </div>
+            {!isMockMode && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                onClick={() => void switchAccount()}
+                aria-label="Se déconnecter"
+              >
+                Se déconnecter
+              </Button>
+            )}
           </div>
-          {!isMockMode && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="shrink-0"
-              onClick={() => void switchAccount()}
-              aria-label="Se déconnecter"
-            >
-              Se déconnecter
-            </Button>
-          )}
-        </div>
-      </header>
+        </header>
+      </div>
 
       <div className="container px-4 py-6">
         <Tabs value={tabValue} onValueChange={onNavTab} className="mb-6">

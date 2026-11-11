@@ -1,3 +1,5 @@
+import { stripDemoQuery } from './demoUrl';
+
 /** Default Lovable project (shared with GMassignee planning). Overridable via VITE_SUPABASE_* env vars. */
 export const DEFAULT_SUPABASE_URL = 'https://dnxyidnkmtrmkxucqrry.supabase.co';
 export const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRueHlpZG5rbXRybWt4dWNxcnJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3NTM4NTUsImV4cCI6MjA2NjMyOTg1NX0.CQNSkJFpA1y_p2tpwzvavV0Ee4Cn1WrBcEx1IhIOdJo';
@@ -41,6 +43,21 @@ export function setDemoFlag(enabled: boolean) {
   } catch {
     /* ignore */
   }
+}
+
+/** Persist the demo flag then reload. Turning it off also removes `demo=1` from the URL. */
+export function setDemoFlagAndReload(enabled: boolean) {
+  setDemoFlag(enabled);
+  if (typeof window === 'undefined') return;
+  if (!enabled) {
+    const next = stripDemoQuery(window.location.href);
+    if (next !== window.location.href) {
+      // Hash-only changes (`#/dashboard?demo=1` → `#/dashboard`) do not reload the document.
+      const url = new URL(next);
+      window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+    }
+  }
+  window.location.reload();
 }
 
 /** Storage bucket name for session media (videos, photos). */
