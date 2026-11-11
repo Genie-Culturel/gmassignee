@@ -14,8 +14,8 @@ import {
 } from './sessionMediaErrors';
 
 export const SESSION_MEDIA_BUCKET = STORAGE_BUCKET_SESSION_MEDIA;
-export const SESSION_MEDIA_MAX_BYTES = 100 * 1024 * 1024;
-export const SESSION_MEDIA_MAX_LABEL = '100 Mo';
+export const SESSION_MEDIA_MAX_BYTES = 50 * 1024 * 1024;
+export const SESSION_MEDIA_MAX_LABEL = '50 Mo';
 export const SESSION_MEDIA_TTL_DAYS = 14;
 
 export { isSessionMediaSizeExceededError } from './sessionMediaErrors';

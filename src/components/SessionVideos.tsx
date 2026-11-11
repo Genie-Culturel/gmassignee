@@ -268,7 +268,9 @@ export function SessionVideos({
         <CardTitle>Vidéos &amp; photos souvenirs</CardTitle>
         <CardDescription>
           Filme avec ton téléphone, téléverse les vidéos ici, puis transmets le lien au client. Limite
-          actuelle : {SESSION_MEDIA_MAX_LABEL} par fichier. Photos acceptées pour les tests.
+          actuelle : {SESSION_MEDIA_MAX_LABEL} par fichier. Photos acceptées pour les tests. Astuce :
+          une ou plusieurs vidéos de {SESSION_MEDIA_MAX_LABEL} max chacune (environ 40 secondes),
+          filmées en 1080p plutôt qu’en 4K.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
