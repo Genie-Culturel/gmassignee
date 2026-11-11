@@ -97,10 +97,9 @@ export function Layout() {
               size="sm"
               className="shrink-0"
               onClick={() => void switchAccount()}
-              aria-label="Changer de compte"
+              aria-label="Se déconnecter"
             >
-              <span className="hidden sm:inline">Changer de compte</span>
-              <span className="sm:hidden">Compte</span>
+              Se déconnecter
             </Button>
           )}
         </div>

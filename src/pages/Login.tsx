@@ -51,7 +51,7 @@ export function Login() {
           <CardTitle>GMassignee</CardTitle>
           <CardDescription>
             {fromLovable
-              ? 'Pour ouvrir Formations / Suivi avec le même compte que le tableau de bord GM, reconnecte-toi.'
+              ? 'Connecte-toi pour accéder aux formations et au suivi.'
               : mode === 'in'
                 ? 'Connecte-toi pour suivre tes parties VR Center'
                 : 'Crée un compte GM (e-mail + mot de passe)'}
@@ -61,8 +61,7 @@ export function Login() {
           {fromLovable && (
             <Alert className="mb-4">
               <AlertDescription>
-                La session GitHub Pages n'est pas partagée avec Lovable. Connecte-toi
-                {handoffEmail ? ` avec ${handoffEmail}` : ''}.
+                Connecte-toi avec ton compte GM.
               </AlertDescription>
             </Alert>
           )}
