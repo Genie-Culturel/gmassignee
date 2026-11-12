@@ -1,19 +1,47 @@
-import { useState, type KeyboardEvent } from 'react';
+import { useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Banknote, Gift } from 'lucide-react';
+import { Plus, Trash2, Banknote, Gift, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { PaymentMethod, SalesProduct } from '@/lib/database.types';
 import { PAYMENT_METHOD_LABELS } from '@/lib/constants';
 import { SaleItem } from '@/lib/sessionRepository';
-import { computeSalesTotals, groupSalesProducts, saleLineTotal, toggleSaleOffered, UNIT_PRICE_STEP, isAllowedPriceDraft, commitUnitPrice, formatUnitPrice, stepUnitPrice, insertPriceDecimalSeparator } from '@/lib/salesLogic';
+import {
+  computeSalesTotals,
+  groupSalesProducts,
+  saleLineTotal,
+  toggleSaleOffered,
+  commitUnitPrice,
+  formatUnitPrice,
+  stepUnitPrice,
+  sanitizePriceDraft,
+  sanitizeQuantityDraft,
+  parseQuantityDraft,
+  commitQuantity,
+  stepQuantity,
+  type SalesCatalogStatus,
+} from '@/lib/salesLogic';
 
 export type { SaleItem };
 
+/** Copie sans la clé (même objet si absente, pour éviter un rendu inutile). */
+function withoutKey(drafts: Record<string, string>, id: string): Record<string, string> {
+  if (!(id in drafts)) return drafts;
+  const rest = { ...drafts };
+  delete rest[id];
+  return rest;
+}
+
 interface SessionSalesProps {
   products: SalesProduct[];
+  /** Origine du catalogue : « fallback » = liste officielle non chargée → avertissement. */
+  catalogStatus?: SalesCatalogStatus | null;
+  catalogError?: string;
+  catalogRetrying?: boolean;
+  onRetryCatalog?: () => void;
   groupName?: string;
   playerCount?: number;
   game?: string;
@@ -24,6 +52,10 @@ interface SessionSalesProps {
 
 export function SessionSales({
   products,
+  catalogStatus,
+  catalogError,
+  catalogRetrying,
+  onRetryCatalog,
   groupName,
   playerCount,
   game,
@@ -35,6 +67,11 @@ export function SessionSales({
   const [salesComment, setSalesComment] = useState(initialComment);
   // Brouillon texte par ligne, seulement pendant que le prix est focus (virgule, « 34. », vide…).
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
+  // Brouillon quantité : le champ peut rester vide pendant qu'on tape (sinon 1 revient et « 3 » donne 13).
+  const [qtyDrafts, setQtyDrafts] = useState<Record<string, string>>({});
+  // Champ qui vient de prendre le focus au clic : on garde la sélection « tout » posée au focus.
+  const justFocusedRef = useRef<HTMLInputElement | null>(null);
+  const catalogFallback = catalogStatus === 'fallback';
 
   const addSaleItem = () => {
     const defaultProduct = products.find(p => p.name === 'Autre') || products[0];
@@ -66,11 +103,8 @@ export function SessionSales({
   const removeSaleItem = (id: string) => {
     const updated = salesItems.filter(item => item.id !== id);
     setSalesItems(updated);
-    setPriceDrafts((drafts) => {
-      if (!(id in drafts)) return drafts;
-      const { [id]: _, ...rest } = drafts;
-      return rest;
-    });
+    clearQtyDraft(id);
+    setPriceDrafts((drafts) => withoutKey(drafts, id));
     onSalesChange?.(updated, salesComment);
   };
 
@@ -84,7 +118,8 @@ export function SessionSales({
         ? {
             ...item,
             productName: product.name,
-            productId: product.id,
+            // Catalogue démo de secours : pas d'identifiant produit démo dans la vraie base.
+            productId: catalogFallback ? undefined : product.id,
             // Offert : reste à 0, seul le prix de référence change.
             unitPrice: item.isOffered ? 0 : price,
             catalogUnitPrice: price,
@@ -92,11 +127,7 @@ export function SessionSales({
         : item
     );
     setSalesItems(updated);
-    setPriceDrafts((drafts) => {
-      if (!(id in drafts)) return drafts;
-      const { [id]: _, ...rest } = drafts;
-      return rest;
-    });
+    setPriceDrafts((drafts) => withoutKey(drafts, id));
     onSalesChange?.(updated, salesComment);
   };
 
@@ -105,20 +136,30 @@ export function SessionSales({
       item.id === id ? toggleSaleOffered(item, products) : item
     );
     setSalesItems(updated);
-    setPriceDrafts((drafts) => {
-      if (!(id in drafts)) return drafts;
-      const { [id]: _, ...rest } = drafts;
-      return rest;
-    });
+    setPriceDrafts((drafts) => withoutKey(drafts, id));
     onSalesChange?.(updated, salesComment);
   };
 
   const clearPriceDraft = (id: string) => {
-    setPriceDrafts((drafts) => {
-      if (!(id in drafts)) return drafts;
-      const { [id]: _, ...rest } = drafts;
-      return rest;
-    });
+    setPriceDrafts((drafts) => withoutKey(drafts, id));
+  };
+
+  const clearQtyDraft = (id: string) => {
+    setQtyDrafts((drafts) => withoutKey(drafts, id));
+  };
+
+  /** Focus : tout sélectionner pour retaper par-dessus (pas de « 034,4 » ni de « 13 »). */
+  const selectAllOnFocus = (el: HTMLInputElement) => {
+    justFocusedRef.current = el;
+    el.select();
+  };
+
+  /** Le mouseup qui suit le clic de focus annulerait la sélection : on l'ignore une fois. */
+  const keepSelectionOnMouseUp = (e: MouseEvent<HTMLInputElement>) => {
+    if (justFocusedRef.current === e.currentTarget) {
+      e.preventDefault();
+      justFocusedRef.current = null;
+    }
   };
 
   const priceInputValue = (item: SaleItem) => {
@@ -129,38 +170,24 @@ export function SessionSales({
 
   const handlePriceFocus = (item: SaleItem, el: HTMLInputElement) => {
     if (item.isOffered) return;
+    // Prix à 0 (ex. « Autre ») : champ vide, on tape directement 34,4.
     setPriceDrafts((drafts) =>
-      item.id in drafts ? drafts : { ...drafts, [item.id]: formatUnitPrice(item.unitPrice) }
+      item.id in drafts ? drafts : { ...drafts, [item.id]: item.unitPrice > 0 ? formatUnitPrice(item.unitPrice) : '' }
     );
-    // Sélectionner tout : on peut retaper 34,4 par-dessus 0.00 sans rester coincé avec un 0 devant.
-    el.select();
+    selectAllOnFocus(el);
   };
 
-  const handlePriceChange = (item: SaleItem, raw: string, inputType?: string) => {
+  // Champ texte (inputMode decimal) : la virgule suisse et le point sont gardés tels quels
+  // pendant la saisie ; la conversion en nombre se fait à la sortie du champ.
+  const handlePriceChange = (item: SaleItem, raw: string) => {
     if (item.isOffered) return;
-    if (!isAllowedPriceDraft(raw)) return;
-    setPriceDrafts((drafts) => ({ ...drafts, [item.id]: raw }));
-    // Stepper natif : pas de inputType de saisie → on valide tout de suite.
-    const typingTypes = new Set([
-      'insertText',
-      'insertCompositionText',
-      'insertFromPaste',
-      'insertFromDrop',
-      'insertReplacementText',
-      'deleteContentBackward',
-      'deleteContentForward',
-      'deleteByCut',
-      'deleteByDrag',
-      'deleteContent',
-      'deleteWordBackward',
-      'deleteWordForward',
-    ]);
-    if (!inputType || !typingTypes.has(inputType)) {
-      updateSaleItem(item.id, 'unitPrice', commitUnitPrice(raw));
-    }
+    const draft = sanitizePriceDraft(raw);
+    if (draft == null) return;
+    setPriceDrafts((drafts) => ({ ...drafts, [item.id]: draft }));
   };
 
   const handlePriceBlur = (item: SaleItem) => {
+    justFocusedRef.current = null;
     if (item.isOffered) {
       clearPriceDraft(item.id);
       return;
@@ -172,27 +199,57 @@ export function SessionSales({
 
   const handlePriceKeyDown = (item: SaleItem, e: KeyboardEvent<HTMLInputElement>) => {
     if (item.isOffered) return;
-    const el = e.currentTarget;
-    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-      e.preventDefault();
-      const base = item.id in priceDrafts ? commitUnitPrice(priceDrafts[item.id]) : item.unitPrice;
-      const next = stepUnitPrice(base, e.key === 'ArrowUp' ? 1 : -1);
-      const formatted = formatUnitPrice(next);
-      setPriceDrafts((drafts) => ({ ...drafts, [item.id]: formatted }));
-      updateSaleItem(item.id, 'unitPrice', next);
+    if (e.key === 'Enter') {
+      e.currentTarget.blur();
       return;
     }
-    if (e.key === ',') {
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       e.preventDefault();
-      const start = el.selectionStart ?? el.value.length;
-      const end = el.selectionEnd ?? start;
-      const next = insertPriceDecimalSeparator(el.value, start, end);
-      if (next == null) return;
-      setPriceDrafts((drafts) => ({ ...drafts, [item.id]: next }));
-      requestAnimationFrame(() => {
-        const caret = start + 1;
-        el.setSelectionRange(caret, caret);
-      });
+      justFocusedRef.current = null;
+      const base = item.id in priceDrafts ? commitUnitPrice(priceDrafts[item.id]) : item.unitPrice;
+      const next = stepUnitPrice(base, e.key === 'ArrowUp' ? 1 : -1);
+      setPriceDrafts((drafts) => ({ ...drafts, [item.id]: formatUnitPrice(next) }));
+      updateSaleItem(item.id, 'unitPrice', next);
+    }
+  };
+
+  const qtyInputValue = (item: SaleItem) =>
+    item.id in qtyDrafts ? qtyDrafts[item.id] : String(item.quantity);
+
+  const handleQtyFocus = (item: SaleItem, el: HTMLInputElement) => {
+    setQtyDrafts((drafts) => (item.id in drafts ? drafts : { ...drafts, [item.id]: String(item.quantity) }));
+    selectAllOnFocus(el);
+  };
+
+  const handleQtyChange = (item: SaleItem, raw: string) => {
+    const draft = sanitizeQuantityDraft(raw);
+    if (draft == null) return;
+    setQtyDrafts((drafts) => ({ ...drafts, [item.id]: draft }));
+    // Totaux à jour dès qu'un nombre valide est tapé ; vide = on attend la suite.
+    const n = parseQuantityDraft(draft);
+    if (n != null && n !== item.quantity) updateSaleItem(item.id, 'quantity', n);
+  };
+
+  const handleQtyBlur = (item: SaleItem) => {
+    justFocusedRef.current = null;
+    const raw = item.id in qtyDrafts ? qtyDrafts[item.id] : String(item.quantity);
+    const n = commitQuantity(raw);
+    if (n !== item.quantity) updateSaleItem(item.id, 'quantity', n);
+    clearQtyDraft(item.id);
+  };
+
+  const handleQtyKeyDown = (item: SaleItem, e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.currentTarget.blur();
+      return;
+    }
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      justFocusedRef.current = null;
+      const base = item.id in qtyDrafts ? commitQuantity(qtyDrafts[item.id]) : item.quantity;
+      const next = stepQuantity(base, e.key === 'ArrowUp' ? 1 : -1);
+      setQtyDrafts((drafts) => ({ ...drafts, [item.id]: String(next) }));
+      updateSaleItem(item.id, 'quantity', next);
     }
   };
 
@@ -233,6 +290,33 @@ export function SessionSales({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {catalogFallback && (
+          <Alert variant="destructive" className="border-2 bg-destructive/10" data-testid="sales-catalog-warning">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Liste officielle des produits non chargée</AlertTitle>
+            <AlertDescription className="space-y-2">
+              <p>
+                Les produits et prix affichés viennent du catalogue de démonstration : ils peuvent être faux
+                (anciens prix, produits désactivés). Vérifie chaque prix sur la carte du bar avant d'encaisser,
+                ou réessaie.
+              </p>
+              {catalogError && <p className="text-xs opacity-80">Détail : {catalogError}</p>}
+              {onRetryCatalog && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={onRetryCatalog}
+                  disabled={catalogRetrying}
+                  className="border-destructive/50"
+                >
+                  <RefreshCw className={`h-4 w-4 mr-1 ${catalogRetrying ? 'animate-spin' : ''}`} />
+                  Réessayer
+                </Button>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
         {salesItems.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
             Aucune vente enregistrée. Clique sur "Ajouter" pour commencer.
@@ -263,6 +347,7 @@ export function SessionSales({
                         {group.products.map((product) => (
                           <option key={product.id} value={product.name}>
                             {product.name} - CHF {Number(product.unit_price).toFixed(2)}
+                            {catalogFallback ? ' (prix démo ?)' : ''}
                             {product.min_quantity ? ` (min ${product.min_quantity})` : ''}
                           </option>
                         ))}
@@ -279,13 +364,16 @@ export function SessionSales({
                     </Label>
                     <input
                       id={`qty-${item.id}`}
-                      type="number"
-                      min="1"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="off"
                       className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
-                      value={item.quantity}
-                      onChange={(e) =>
-                        updateSaleItem(item.id, 'quantity', parseInt(e.target.value) || 1)
-                      }
+                      value={qtyInputValue(item)}
+                      onFocus={(e) => handleQtyFocus(item, e.currentTarget)}
+                      onMouseUp={keepSelectionOnMouseUp}
+                      onChange={(e) => handleQtyChange(item, e.target.value)}
+                      onBlur={() => handleQtyBlur(item)}
+                      onKeyDown={(e) => handleQtyKeyDown(item, e)}
                     />
                   </div>
                   <div>
@@ -295,17 +383,17 @@ export function SessionSales({
                     <div className="flex gap-1">
                       <input
                         id={`price-${item.id}`}
-                        type="number"
+                        type="text"
                         inputMode="decimal"
-                        step={UNIT_PRICE_STEP}
-                        min="0"
+                        autoComplete="off"
+                        placeholder="0.00"
+                        title="Virgule ou point (34,4 ou 34.4). Flèches ↑↓ : ±0.10"
                         disabled={item.isOffered}
                         className="flex h-9 w-full min-w-0 rounded-md border border-input bg-background px-3 py-1 text-sm disabled:opacity-60"
                         value={priceInputValue(item)}
                         onFocus={(e) => handlePriceFocus(item, e.currentTarget)}
-                        onChange={(e) =>
-                          handlePriceChange(item, e.target.value, (e.nativeEvent as InputEvent).inputType)
-                        }
+                        onMouseUp={keepSelectionOnMouseUp}
+                        onChange={(e) => handlePriceChange(item, e.target.value)}
                         onBlur={() => handlePriceBlur(item)}
                         onKeyDown={(e) => handlePriceKeyDown(item, e)}
                       />

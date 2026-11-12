@@ -69,7 +69,7 @@ export function toggleSaleOffered(item: SaleItem, products: SalesProduct[]): Sal
   return { ...item, isOffered: true, unitPrice: 0, catalogUnitPrice: reference };
 }
 
-/** Pas du stepper prix unitaire (flèches du navigateur). */
+/** Pas du stepper prix unitaire (flèches ↑↓ du clavier). */
 export const UNIT_PRICE_STEP = 0.1;
 
 /** Brouillons autorisés pendant la saisie (vide, virgule ou point, décimale en cours). */
@@ -125,8 +125,70 @@ export function stepUnitPrice(current: number, direction: 1 | -1, step = UNIT_PR
   return clampUnitPrice((cents + delta) / 100);
 }
 
-/** Insère un point décimal à la place de la sélection (virgule frappée → point). */
-export function insertPriceDecimalSeparator(raw: string, start: number, end: number): string | null {
-  const next = `${raw.slice(0, start)}.${raw.slice(end)}`;
-  return isAllowedPriceDraft(next) ? next : null;
+
+/**
+ * Nettoie un brouillon de prix tapé dans le champ texte (virgule ou point acceptés tels quels).
+ * Retourne null si la frappe doit être refusée (lettres, 2 séparateurs…).
+ * Supprime les zéros de tête (« 034,4 » → « 34,4 », « 00,5 » → « 0,5 »).
+ */
+export function sanitizePriceDraft(raw: string): string | null {
+  const s = raw.replace(/\s/g, '');
+  if (!isAllowedPriceDraft(s)) return null;
+  return s.replace(/^0+(?=\d)/, '');
+}
+
+/** Brouillon quantité : chiffres seulement, vide autorisé pendant la saisie, pas de zéro de tête. */
+export function sanitizeQuantityDraft(raw: string): string | null {
+  const s = raw.replace(/\s/g, '');
+  if (!/^\d*$/.test(s)) return null;
+  return s.replace(/^0+(?=\d)/, '');
+}
+
+/** Quantité en cours de saisie : nombre ≥ 1, ou null si vide / 0 (ne pas forcer 1 pendant l'édition). */
+export function parseQuantityDraft(raw: string): number | null {
+  const s = raw.trim();
+  if (!/^\d+$/.test(s)) return null;
+  const n = parseInt(s, 10);
+  return n >= 1 ? n : null;
+}
+
+/** Quantité validée à la sortie du champ : vide / 0 / invalide → 1. */
+export function commitQuantity(raw: string): number {
+  return parseQuantityDraft(raw) ?? 1;
+}
+
+/** Flèches clavier sur la quantité : ±1, plancher 1. */
+export function stepQuantity(current: number, direction: 1 | -1): number {
+  const base = Number.isFinite(current) && current >= 1 ? Math.floor(current) : 1;
+  return Math.max(1, base + direction);
+}
+
+/** Origine du catalogue affiché dans Ventes. */
+export type SalesCatalogStatus = 'live' | 'demo' | 'fallback';
+
+export interface SalesCatalog {
+  products: SalesProduct[];
+  /** live = liste officielle chargée ; demo = mode démo voulu ; fallback = échec du chargement live. */
+  status: SalesCatalogStatus;
+  /** Raison de l'échec (fallback seulement). */
+  error?: string;
+}
+
+/**
+ * Décide quel catalogue montrer. En mode live, une erreur ou une liste vide n'est JAMAIS
+ * présentée comme un succès : status « fallback » → avertissement visible pour le GM.
+ */
+export function resolveSalesCatalog(
+  input: { mockMode: boolean; data?: SalesProduct[] | null; error?: { message?: string } | string | null },
+  demoProducts: SalesProduct[]
+): SalesCatalog {
+  if (input.mockMode) return { products: demoProducts, status: 'demo' };
+  if (input.error) {
+    const message = typeof input.error === 'string' ? input.error : input.error.message || 'erreur inconnue';
+    return { products: demoProducts, status: 'fallback', error: message };
+  }
+  if (!input.data?.length) {
+    return { products: demoProducts, status: 'fallback', error: 'aucun produit actif reçu' };
+  }
+  return { products: input.data, status: 'live' };
 }
