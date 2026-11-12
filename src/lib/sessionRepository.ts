@@ -213,13 +213,14 @@ async function loadParts(sessionId: string): Promise<{
 }
 
 export async function fetchSalesProducts(): Promise<SalesProduct[]> {
-  if (isMockMode || !supabase) return mockSalesProducts;
+  const activeMock = mockSalesProducts.filter((p) => p.is_active);
+  if (isMockMode || !supabase) return activeMock;
   const { data, error } = await supabase
     .from('gh_sales_products')
     .select('*')
     .eq('is_active', true)
     .order('order_index', { ascending: true });
-  if (error || !data?.length) return mockSalesProducts;
+  if (error || !data?.length) return activeMock;
   return data;
 }
 
