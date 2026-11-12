@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Banknote } from 'lucide-react';
+import { Plus, Trash2, Banknote, Gift } from 'lucide-react';
 import { PaymentMethod, SalesProduct } from '@/lib/database.types';
 import { PAYMENT_METHOD_LABELS } from '@/lib/constants';
 import { SaleItem } from '@/lib/sessionRepository';
+import { computeSalesTotals, groupSalesProducts, saleLineTotal, toggleSaleOffered } from '@/lib/salesLogic';
 
 export type { SaleItem };
 
@@ -41,8 +42,10 @@ export function SessionSales({
       id: `sale-${Date.now()}`,
       productName: defaultProduct.name,
       quantity: 1,
-      unitPrice: defaultProduct.unit_price,
+      unitPrice: Number(defaultProduct.unit_price),
       paymentMethod: 'twint',
+      isOffered: false,
+      catalogUnitPrice: Number(defaultProduct.unit_price),
     };
     
     const updated = [...salesItems, newItem];
@@ -68,33 +71,40 @@ export function SessionSales({
     const product = products.find(p => p.name === productName);
     if (!product) return;
 
+    const price = Number(product.unit_price);
     const updated = salesItems.map(item =>
-      item.id === id 
-        ? { ...item, productName: product.name, unitPrice: product.unit_price }
+      item.id === id
+        ? {
+            ...item,
+            productName: product.name,
+            productId: product.id,
+            // Offert : reste à 0, seul le prix de référence change.
+            unitPrice: item.isOffered ? 0 : price,
+            catalogUnitPrice: price,
+          }
         : item
     );
     setSalesItems(updated);
     onSalesChange?.(updated, salesComment);
   };
 
+  const toggleOffered = (id: string) => {
+    const updated = salesItems.map(item =>
+      item.id === id ? toggleSaleOffered(item, products) : item
+    );
+    setSalesItems(updated);
+    onSalesChange?.(updated, salesComment);
+  };
+
+  const productGroups = groupSalesProducts(products);
+
   const updateComment = (comment: string) => {
     setSalesComment(comment);
     onSalesChange?.(salesItems, comment);
   };
 
-  // Calculate totals
-  const totals = salesItems.reduce(
-    (acc, item) => {
-      const lineTotal = item.quantity * item.unitPrice;
-      if (item.paymentMethod === 'facture') {
-        acc.toInvoice += lineTotal;
-      } else {
-        acc.collected += lineTotal;
-      }
-      return acc;
-    },
-    { collected: 0, toInvoice: 0 }
-  );
+  // Calculate totals (les lignes offertes ne comptent ni dans encaissé ni dans à facturer)
+  const totals = computeSalesTotals(salesItems);
 
   return (
     <Card>
@@ -145,11 +155,18 @@ export function SessionSales({
                     value={item.productName}
                     onChange={(e) => handleProductChange(item.id, e.target.value)}
                   >
-                    {products.map((product) => (
-                      <option key={product.id} value={product.name}>
-                        {product.name} - CHF {product.unit_price.toFixed(2)}
-                        {product.min_quantity && ` (min ${product.min_quantity})`}
-                      </option>
+                    {!products.some((p) => p.name === item.productName) && (
+                      <option value={item.productName}>{item.productName}</option>
+                    )}
+                    {productGroups.map((group) => (
+                      <optgroup key={group.category} label={group.label}>
+                        {group.products.map((product) => (
+                          <option key={product.id} value={product.name}>
+                            {product.name} - CHF {Number(product.unit_price).toFixed(2)}
+                            {product.min_quantity ? ` (min ${product.min_quantity})` : ''}
+                          </option>
+                        ))}
+                      </optgroup>
                     ))}
                   </select>
                 </div>
@@ -175,17 +192,43 @@ export function SessionSales({
                     <Label htmlFor={`price-${item.id}`} className="text-xs">
                       Prix unit. CHF
                     </Label>
-                    <input
-                      id={`price-${item.id}`}
-                      type="number"
-                      step="0.50"
-                      min="0"
-                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
-                      value={item.unitPrice}
-                      onChange={(e) =>
-                        updateSaleItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)
-                      }
-                    />
+                    <div className="flex gap-1">
+                      <input
+                        id={`price-${item.id}`}
+                        type="number"
+                        step="0.50"
+                        min="0"
+                        disabled={item.isOffered}
+                        className="flex h-9 w-full min-w-0 rounded-md border border-input bg-background px-3 py-1 text-sm disabled:opacity-60"
+                        value={item.isOffered ? 0 : item.unitPrice}
+                        onChange={(e) =>
+                          updateSaleItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)
+                        }
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={item.isOffered ? 'default' : 'outline'}
+                        aria-pressed={!!item.isOffered}
+                        onClick={() => toggleOffered(item.id)}
+                        className="h-9 shrink-0 px-2"
+                        title={item.isOffered ? 'Annuler « Offert » (remet le prix catalogue)' : 'Offrir : prix à CHF 0, quantité gardée'}
+                      >
+                        <Gift className="h-4 w-4 sm:mr-1" />
+                        <span className="text-xs">Offert</span>
+                      </Button>
+                    </div>
+                    {item.isOffered && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Offert
+                        {item.catalogUnitPrice ? (
+                          <>
+                            {' · '}
+                            <span className="line-through">CHF {Number(item.catalogUnitPrice).toFixed(2)}</span>
+                          </>
+                        ) : null}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -220,8 +263,13 @@ export function SessionSales({
                   <div className="text-sm">
                     <span className="text-muted-foreground">Total ligne : </span>
                     <span className="font-semibold">
-                      CHF {(item.quantity * item.unitPrice).toFixed(2)}
+                      CHF {saleLineTotal(item).toFixed(2)}
                     </span>
+                    {item.isOffered && (
+                      <Badge variant="secondary" className="ml-2">
+                        Offert
+                      </Badge>
+                    )}
                   </div>
                   <Button
                     variant="ghost"
@@ -252,6 +300,12 @@ export function SessionSales({
                 <Badge variant="secondary" className="text-base">
                   CHF {totals.toInvoice.toFixed(2)}
                 </Badge>
+              </div>
+            )}
+            {totals.offeredQuantity > 0 && (
+              <div className="flex justify-between items-center text-sm text-muted-foreground">
+                <span>Offert ({totals.offeredQuantity} article{totals.offeredQuantity > 1 ? 's' : ''}) :</span>
+                <span>valeur CHF {totals.offeredValue.toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between items-center pt-2 border-t">

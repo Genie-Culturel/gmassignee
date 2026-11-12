@@ -128,6 +128,8 @@ export interface SessionSale {
   line_total: number;
   payment_method: PaymentMethod;
   is_invoiced: boolean;
+  is_offered: boolean;
+  catalog_unit_price: number | null;
   notes: string | null;
   created_at: string;
   updated_at: string;

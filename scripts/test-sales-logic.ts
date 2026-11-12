@@ -1,0 +1,25 @@
+// Test logique Ventes (catalogue carte bar + « Offert »). Lancer : npx tsx scripts/test-sales-logic.ts
+import { mockSalesProducts as P } from '../src/lib/mockData';
+import { computeSalesTotals, groupSalesProducts, saleLineTotal, toggleSaleOffered } from '../src/lib/salesLogic';
+let fail = 0; const ok = (c: boolean, m: string) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fail++; };
+const target = [['Coca-Cola',3.5,'boisson'],['Coca-Cola Zéro',3.5,'boisson'],['Neastea Citron',4.5,'boisson'],['Neastea Pêche',4.5,'boisson'],['Red Bull',3.9,'boisson'],['Café',3.6,'boisson'],['Eau',3.6,'boisson'],['Fendant 75 cl',20,'alcool'],['Fendant 50 cl',15,'alcool'],['Assemblage Rouge 75cl',23,'alcool'],['Bière Valaisanne',3.6,'alcool'],['Pop Corn',4,'snack'],['Planchettes',20,'option'],['SVELTE',55,'option'],['DODU',89,'option'],['Pack Birthday',15,'option'],['EVJF Escape & Pole',79,'option'],['Autre',0,'autre']];
+const sorted = [...P].filter(p=>p.is_active).sort((a,b)=>a.order_index-b.order_index);
+ok(JSON.stringify(sorted.map(p=>[p.name,Number(p.unit_price),p.category]))===JSON.stringify(target), 'mock catalog = carte (18 produits, ordre, prix, catégories)');
+ok(P.find(p=>p.name==='SVELTE')!.min_quantity===4 && P.find(p=>p.name==='DODU')!.max_quantity===12 && P.find(p=>p.name==='EVJF Escape & Pole')!.min_quantity===6, 'options min/max inchangés');
+const g = groupSalesProducts(sorted); ok(g.map(x=>x.label).join('|')==='Boissons|Alcool|Snacks|Options|Autre', 'groupes: '+g.map(x=>`${x.label}(${x.products.length})`).join(', '));
+const cafe = { id:'1', productName:'Café', quantity:3, unitPrice:3.6, paymentMethod:'twint' as const, catalogUnitPrice:3.6 };
+const off = toggleSaleOffered(cafe, P);
+ok(off.isOffered===true && off.unitPrice===0 && off.quantity===3 && off.catalogUnitPrice===3.6, 'Offert: prix 0, quantité 3 gardée, réf 3.60');
+ok(saleLineTotal(off)===0, 'ligne offerte = 0');
+const back = toggleSaleOffered(off, P); ok(!back.isOffered && back.unitPrice===3.6 && back.paymentMethod==='twint', '2e clic: prix catalogue 3.60 restauré, paiement intact');
+const fact = { id:'2', productName:'DODU', quantity:4, unitPrice:89, paymentMethod:'facture' as const };
+const offFact = toggleSaleOffered(fact, P);
+const t = computeSalesTotals([off, fact, { id:'3', productName:'Red Bull', quantity:2, unitPrice:3.9, paymentMethod:'carte' }, offFact]);
+ok(Math.abs(t.collected-7.8)<1e-9, 'encaissé = 7.80 (offert exclu) -> '+t.collected);
+ok(t.toInvoice===356, 'à facturer = 356 (DODU payé compté, DODU offert exclu) -> '+t.toInvoice);
+ok(t.offeredQuantity===7 && Math.abs(t.offeredValue-(3*3.6+4*89))<1e-9, `offert: ${t.offeredQuantity} articles, valeur ${t.offeredValue.toFixed(2)}`);
+const t2 = computeSalesTotals([fact, { id:'4', productName:'Autre', quantity:1, unitPrice:0, paymentMethod:'twint' }]);
+ok(t2.toInvoice===356 && t2.collected===0 && t2.offeredQuantity===0, 'facture DODU 4×89 = 356, Autre à 0 non compté comme offert');
+const autreOff = toggleSaleOffered({ id:'5', productName:'Autre', quantity:1, unitPrice:12, paymentMethod:'especes' }, P);
+ok(autreOff.unitPrice===0 && autreOff.catalogUnitPrice===12 && toggleSaleOffered(autreOff,P).unitPrice===12, 'Autre prix manuel 12 offert puis restauré à 12');
+process.exit(fail?1:0);
