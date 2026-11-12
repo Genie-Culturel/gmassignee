@@ -19,6 +19,7 @@ import { getParcoursById, getParcoursOrDefault } from '@/lib/parcours';
 import { PersistedSession } from '@/lib/sessionRepository';
 import { RecordedSessionRow, buildSessionSteps, loadSessionForConsultation } from '@/lib/sessionView';
 import { formatDate, formatDateTime, formatTime } from '@/lib/utils';
+import { computeSalesTotals, saleLineTotal } from '@/lib/salesLogic';
 
 interface SessionConsultSheetProps {
   row: RecordedSessionRow | null;
@@ -98,13 +99,7 @@ export function SessionConsultSheet({
     : '—';
 
   const totals = useMemo(() => {
-    const result = { collected: 0, toInvoice: 0 };
-    for (const item of session?.sales || []) {
-      const line = item.quantity * item.unitPrice;
-      if (item.paymentMethod === 'facture') result.toInvoice += line;
-      else result.collected += line;
-    }
-    return result;
+    return computeSalesTotals(session?.sales || []);
   }, [session]);
 
   const doneCount = steps.filter((step) => session?.stepTimes[step.key]).length;
@@ -254,10 +249,12 @@ export function SessionConsultSheet({
                             <span className="min-w-0">
                               {item.quantity} × {item.productName}
                               <span className="block text-xs text-muted-foreground">
-                                {PAYMENT_METHOD_LABELS[item.paymentMethod] || item.paymentMethod} · {chf(item.unitPrice)} / u.
+                                {item.isOffered
+                                  ? `Offert${item.catalogUnitPrice ? ` · valeur ${chf(item.catalogUnitPrice)} / u.` : ''}`
+                                  : `${PAYMENT_METHOD_LABELS[item.paymentMethod] || item.paymentMethod} · ${chf(item.unitPrice)} / u.`}
                               </span>
                             </span>
-                            <span className="shrink-0 tabular-nums">{chf(item.quantity * item.unitPrice)}</span>
+                            <span className="shrink-0 tabular-nums">{chf(saleLineTotal(item))}</span>
                           </li>
                         ))}
                       </ul>

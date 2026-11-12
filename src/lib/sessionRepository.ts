@@ -14,6 +14,7 @@ import {
 } from './activitySessionLink';
 import { DEFAULT_PARCOURS_ID, ParcoursStepDef } from './parcours';
 import { mockSalesProducts } from './mockData';
+import { computeSalesTotals } from './salesLogic';
 import { ACTIVE_SESSION_STORAGE_KEY } from './config';
 
 export interface SaleItem {
@@ -23,6 +24,10 @@ export interface SaleItem {
   quantity: number;
   unitPrice: number;
   paymentMethod: PaymentMethod;
+  /** « Offert » : prix facturé 0, quantité conservée (consommation). */
+  isOffered?: boolean;
+  /** Prix catalogue de référence (valeur offerte). */
+  catalogUnitPrice?: number | null;
 }
 
 export interface PersistedSession {
@@ -200,6 +205,8 @@ async function loadParts(sessionId: string): Promise<{
       quantity: s.quantity,
       unitPrice: Number(s.unit_price),
       paymentMethod: s.payment_method,
+      isOffered: Boolean(s.is_offered),
+      catalogUnitPrice: s.catalog_unit_price == null ? null : Number(s.catalog_unit_price),
     })),
     salesComment: sessionRes.data?.sales_comment || '',
   };
@@ -657,23 +664,18 @@ export async function replaceSales(
         product_id: item.productId || product?.id || null,
         product_name: item.productName,
         quantity: item.quantity,
-        unit_price: item.unitPrice,
+        unit_price: item.isOffered ? 0 : item.unitPrice,
         payment_method: item.paymentMethod,
-        is_invoiced: item.paymentMethod === 'facture',
+        is_invoiced: !item.isOffered && item.paymentMethod === 'facture',
+        is_offered: Boolean(item.isOffered),
+        catalog_unit_price:
+          item.catalogUnitPrice ?? (product ? Number(product.unit_price) : null),
       };
     });
     const { error } = await supabase.from('gh_session_sales').insert(rows);
     throwIfError(error, 'Ventes');
   }
-  const totals = items.reduce(
-    (acc, item) => {
-      const line = item.quantity * item.unitPrice;
-      if (item.paymentMethod === 'facture') acc.toInvoice += line;
-      else acc.collected += line;
-      return acc;
-    },
-    { collected: 0, toInvoice: 0 }
-  );
+  const totals = computeSalesTotals(items);
   await updateSessionFields(sessionId, {
     salesComment: comment,
     salesRecordedAt: recordedAt,
