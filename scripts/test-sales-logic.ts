@@ -1,6 +1,6 @@
 // Test logique Ventes (catalogue carte bar + « Offert » + saisie prix). Lancer : npx tsx scripts/test-sales-logic.ts
 import { mockSalesProducts as P } from '../src/lib/mockData';
-import { computeSalesTotals, groupSalesProducts, saleLineTotal, toggleSaleOffered, UNIT_PRICE_STEP, isAllowedPriceDraft, parseUnitPriceInput, commitUnitPrice, formatUnitPrice, stepUnitPrice, insertPriceDecimalSeparator } from '../src/lib/salesLogic';
+import { computeSalesTotals, groupSalesProducts, saleLineTotal, toggleSaleOffered, UNIT_PRICE_STEP, isAllowedPriceDraft, parseUnitPriceInput, commitUnitPrice, formatUnitPrice, stepUnitPrice, sanitizePriceDraft, sanitizeQuantityDraft, parseQuantityDraft, commitQuantity, stepQuantity, resolveSalesCatalog } from '../src/lib/salesLogic';
 let fail = 0; const ok = (c: boolean, m: string) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fail++; };
 const target = [['Coca-Cola',3.5,'boisson'],['Coca-Cola Zéro',3.5,'boisson'],['Neastea Citron',4.5,'boisson'],['Neastea Pêche',4.5,'boisson'],['Red Bull',3.9,'boisson'],['Café',3.6,'boisson'],['Eau',3.6,'boisson'],['Fendant 75 cl',20,'alcool'],['Fendant 50 cl',15,'alcool'],['Assemblage Rouge 75cl',23,'alcool'],['Bière Valaisanne',3.6,'alcool'],['Pop Corn',4,'snack'],['Planchettes',20,'option'],['SVELTE',55,'option'],['DODU',89,'option'],['Pack Birthday',15,'option'],['EVJF Escape & Pole',79,'option'],['Autre',0,'autre']];
 const sorted = [...P].filter(p=>p.is_active).sort((a,b)=>a.order_index-b.order_index);
@@ -40,5 +40,24 @@ ok(commitUnitPrice('3,5') === 3.5 && commitUnitPrice('34,4') === 34.4, 'blur 3,5
 ok(commitUnitPrice('34.') === 34 && commitUnitPrice('034,4') === 34.4, 'blur 34. → 34, 034,4 → 34.4 (pas de piège du 0 initial)');
 ok(commitUnitPrice('-10') === 0 && commitUnitPrice('abc') === 0, 'blur négatif ou invalide → 0');
 ok(formatUnitPrice(3.5) === '3.50' && formatUnitPrice(0) === '0.00' && formatUnitPrice(34.4) === '34.40', 'affichage hors édition : 2 décimales');
-ok(insertPriceDecimalSeparator('34', 2, 2) === '34.' && insertPriceDecimalSeparator('3.5', 1, 1) === null, 'virgule → point si pas déjà de séparateur');
+// Champ texte : la virgule est gardée telle quelle pendant la saisie (plus de conversion au keydown)
+ok(['3','34','34,','34,4'].every((d) => sanitizePriceDraft(d) === d), 'frappe 3 → 34 → 34, → 34,4 conservée');
+ok(sanitizePriceDraft('034,4') === '34,4' && sanitizePriceDraft('00,5') === '0,5' && sanitizePriceDraft('0') === '0', 'zéros de tête retirés (034,4 → 34,4), 0,5 gardé');
+ok(sanitizePriceDraft('34,4,') === null && sanitizePriceDraft('3a') === null && sanitizePriceDraft('-1') === null, 'frappe invalide refusée');
+ok(sanitizePriceDraft(' 3,5 ') === '3,5', 'espaces ignorés');
+ok(commitUnitPrice(sanitizePriceDraft('34,4')!) === 34.4 && formatUnitPrice(commitUnitPrice('34,4')) === '34.40', '34,4 → 34.40 au blur');
+ok(formatUnitPrice(commitUnitPrice('3,5')) === '3.50', '3,5 → 3.50 au blur');
+// Quantité
+ok(sanitizeQuantityDraft('') === '' && parseQuantityDraft('') === null, 'quantité vide autorisée pendant la saisie (pas de 1 forcé)');
+ok(sanitizeQuantityDraft('3') === '3' && parseQuantityDraft('3') === 3, 'quantité 3 → 3');
+ok(sanitizeQuantityDraft('03') === '3' && sanitizeQuantityDraft('3,') === null && sanitizeQuantityDraft('-2') === null, 'quantité : 03 → 3, virgule / négatif refusés');
+ok(commitQuantity('') === 1 && commitQuantity('0') === 1 && commitQuantity('12') === 12, 'blur quantité : vide/0 → 1, 12 → 12');
+ok(stepQuantity(1, -1) === 1 && stepQuantity(3, 1) === 4, 'flèches quantité ±1, plancher 1');
+// Catalogue : pas de bascule silencieuse sur la démo
+const live = [P[0]];
+ok(resolveSalesCatalog({ mockMode: false, data: live, error: null }, P).status === 'live' && resolveSalesCatalog({ mockMode: false, data: live }, P).products === live, 'live chargé → status live');
+const failErr = resolveSalesCatalog({ mockMode: false, data: null, error: { message: 'permission denied' } }, P);
+ok(failErr.status === 'fallback' && failErr.error === 'permission denied' && failErr.products === P, 'erreur live → fallback avec raison (avertissement)');
+ok(resolveSalesCatalog({ mockMode: false, data: [], error: null }, P).status === 'fallback', 'liste live vide → fallback (avertissement)');
+ok(resolveSalesCatalog({ mockMode: true }, P).status === 'demo', 'mode démo voulu → demo (pas d’avertissement)');
 process.exit(fail?1:0);

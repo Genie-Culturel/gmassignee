@@ -14,7 +14,7 @@ import {
 } from './activitySessionLink';
 import { DEFAULT_PARCOURS_ID, ParcoursStepDef } from './parcours';
 import { mockSalesProducts } from './mockData';
-import { computeSalesTotals } from './salesLogic';
+import { computeSalesTotals, resolveSalesCatalog, type SalesCatalog } from './salesLogic';
 import { ACTIVE_SESSION_STORAGE_KEY } from './config';
 
 export interface SaleItem {
@@ -212,15 +212,29 @@ async function loadParts(sessionId: string): Promise<{
   };
 }
 
-export async function fetchSalesProducts(): Promise<SalesProduct[]> {
-  if (isMockMode || !supabase) return mockSalesProducts;
-  const { data, error } = await supabase
-    .from('gh_sales_products')
-    .select('*')
-    .eq('is_active', true)
-    .order('order_index', { ascending: true });
-  if (error || !data?.length) return mockSalesProducts;
-  return data;
+/**
+ * Catalogue Ventes. Si la liste officielle (gh_sales_products) ne se charge pas, on renvoie
+ * le catalogue démo avec status « fallback » : l'écran Ventes affiche alors un avertissement
+ * (jamais de bascule silencieuse sur des prix démo).
+ */
+export async function fetchSalesProducts(): Promise<SalesCatalog> {
+  if (isMockMode || !supabase) return resolveSalesCatalog({ mockMode: true }, mockSalesProducts);
+  try {
+    const { data, error } = await supabase
+      .from('gh_sales_products')
+      .select('*')
+      .eq('is_active', true)
+      .order('order_index', { ascending: true });
+    const catalog = resolveSalesCatalog({ mockMode: false, data, error }, mockSalesProducts);
+    if (catalog.status === 'fallback') {
+      console.error('[Ventes] Catalogue officiel non chargé :', catalog.error);
+    }
+    return catalog;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[Ventes] Catalogue officiel non chargé :', message);
+    return resolveSalesCatalog({ mockMode: false, error: message }, mockSalesProducts);
+  }
 }
 
 export async function loadSession(sessionId: string): Promise<PersistedSession | null> {

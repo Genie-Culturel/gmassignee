@@ -56,6 +56,7 @@ import { findGame, gamesGroupedByLocation } from '@/lib/venues';
 import { useVenueCatalog } from '@/hooks/useVenueCatalog';
 import { useParcoursList } from '@/hooks/useParcoursList';
 import { isMockMode } from '@/lib/supabase';
+import type { SalesCatalogStatus } from '@/lib/salesLogic';
 import { useAuth } from '@/hooks/useAuth';
 import { useGmOptions } from '@/hooks/useGmOptions';
 import { buildSessionSteps } from '@/lib/sessionView';
@@ -164,6 +165,9 @@ export function SuiviParties() {
   const [salesItems, setSalesItems] = useState<SaleItem[]>([]);
   const [salesComment, setSalesComment] = useState('');
   const [products, setProducts] = useState<SalesProduct[]>([]);
+  const [catalogStatus, setCatalogStatus] = useState<SalesCatalogStatus | null>(null);
+  const [catalogError, setCatalogError] = useState<string | undefined>(undefined);
+  const [catalogRetrying, setCatalogRetrying] = useState(false);
   const [bugs, setBugs] = useState<SessionBug[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -195,6 +199,18 @@ export function SuiviParties() {
     setSalesComment(row.salesComment);
     if (row.endedAt || row.cancelledAt) rememberActiveSession(null);
     else rememberActiveSession(row.sessionId);
+  }, []);
+
+  const retryCatalog = useCallback(async () => {
+    setCatalogRetrying(true);
+    try {
+      const catalog = await fetchSalesProducts();
+      setProducts(catalog.products);
+      setCatalogStatus(catalog.status);
+      setCatalogError(catalog.error);
+    } finally {
+      setCatalogRetrying(false);
+    }
   }, []);
 
   const refreshBugs = useCallback(async (sessionId: string) => {
@@ -229,8 +245,11 @@ export function SuiviParties() {
         }
       });
     
-    fetchSalesProducts().then((rows) => {
-      if (!cancelled) setProducts(rows);
+    fetchSalesProducts().then((catalog) => {
+      if (cancelled) return;
+      setProducts(catalog.products);
+      setCatalogStatus(catalog.status);
+      setCatalogError(catalog.error);
     });
     
     if (!isMockMode && user) {
@@ -904,6 +923,10 @@ export function SuiviParties() {
           <SessionSales
             key={activeSession.sessionId}
             products={products}
+            catalogStatus={catalogStatus}
+            catalogError={catalogError}
+            catalogRetrying={catalogRetrying}
+            onRetryCatalog={retryCatalog}
             groupName={activeSession.groupName}
             playerCount={activeSession.playerCount}
             game={activeSession.game}
@@ -912,7 +935,8 @@ export function SuiviParties() {
             onSalesChange={(items, comment) => {
               setSalesItems(items);
               setSalesComment(comment);
-              replaceSales(activeSession.sessionId, items, comment, products).catch((err) =>
+              // Catalogue démo de secours : ne pas écrire ses identifiants produits dans la vraie base.
+              replaceSales(activeSession.sessionId, items, comment, catalogStatus === 'fallback' ? [] : products).catch((err) =>
                 setError(err instanceof Error ? err.message : 'Ventes non enregistrées')
               );
             }}
