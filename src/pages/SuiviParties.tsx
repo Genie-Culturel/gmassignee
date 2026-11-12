@@ -851,7 +851,7 @@ export function SuiviParties() {
                     onClick={() => void handleOpenBugReporter()}
                   >
                     <ExternalLink className="h-4 w-4 mr-2" />
-                    Rouvrir le Bug reporter
+                    Rouvrir le Bug reporter (PIN 1950)
                   </Button>
                 )}
               </div>
@@ -865,7 +865,7 @@ export function SuiviParties() {
                 className="w-full"
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
-                Ouvrir le Bug reporter
+                Ouvrir le Bug reporter (PIN 1950)
               </Button>
             )}
           </CardContent>
