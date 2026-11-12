@@ -1,6 +1,6 @@
-// Test logique Ventes (catalogue carte bar + « Offert »). Lancer : npx tsx scripts/test-sales-logic.ts
+// Test logique Ventes (catalogue carte bar + « Offert » + saisie prix). Lancer : npx tsx scripts/test-sales-logic.ts
 import { mockSalesProducts as P } from '../src/lib/mockData';
-import { computeSalesTotals, groupSalesProducts, saleLineTotal, toggleSaleOffered } from '../src/lib/salesLogic';
+import { computeSalesTotals, groupSalesProducts, saleLineTotal, toggleSaleOffered, UNIT_PRICE_STEP, isAllowedPriceDraft, parseUnitPriceInput, commitUnitPrice, formatUnitPrice, stepUnitPrice, insertPriceDecimalSeparator } from '../src/lib/salesLogic';
 let fail = 0; const ok = (c: boolean, m: string) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fail++; };
 const target = [['Coca-Cola',3.5,'boisson'],['Coca-Cola Zéro',3.5,'boisson'],['Neastea Citron',4.5,'boisson'],['Neastea Pêche',4.5,'boisson'],['Red Bull',3.9,'boisson'],['Café',3.6,'boisson'],['Eau',3.6,'boisson'],['Fendant 75 cl',20,'alcool'],['Fendant 50 cl',15,'alcool'],['Assemblage Rouge 75cl',23,'alcool'],['Bière Valaisanne',3.6,'alcool'],['Pop Corn',4,'snack'],['Planchettes',20,'option'],['SVELTE',55,'option'],['DODU',89,'option'],['Pack Birthday',15,'option'],['EVJF Escape & Pole',79,'option'],['Autre',0,'autre']];
 const sorted = [...P].filter(p=>p.is_active).sort((a,b)=>a.order_index-b.order_index);
@@ -22,4 +22,23 @@ const t2 = computeSalesTotals([fact, { id:'4', productName:'Autre', quantity:1, 
 ok(t2.toInvoice===356 && t2.collected===0 && t2.offeredQuantity===0, 'facture DODU 4×89 = 356, Autre à 0 non compté comme offert');
 const autreOff = toggleSaleOffered({ id:'5', productName:'Autre', quantity:1, unitPrice:12, paymentMethod:'especes' }, P);
 ok(autreOff.unitPrice===0 && autreOff.catalogUnitPrice===12 && toggleSaleOffered(autreOff,P).unitPrice===12, 'Autre prix manuel 12 offert puis restauré à 12');
+
+// Saisie prix unitaire : pas 0.10, virgule suisse, pas de 0 forcé en cours d'édition
+ok(UNIT_PRICE_STEP === 0.1, 'pas du stepper = 0.10');
+ok(stepUnitPrice(3.5, 1) === 3.6 && stepUnitPrice(3.6, 1) === 3.7, '3.50 → 3.60 → 3.70');
+ok(stepUnitPrice(3.5, -1) === 3.4 && stepUnitPrice(0, -1) === 0, 'décrément 3.50 → 3.40, plancher 0');
+ok(parseUnitPriceInput('3,5') === 3.5, 'parse 3,5 → 3.5');
+ok(parseUnitPriceInput('34,4') === 34.4, 'parse 34,4 → 34.4');
+ok(parseUnitPriceInput('34.4') === 34.4 && parseUnitPriceInput('3.5') === 3.5, 'parse point 34.4 / 3.5');
+ok(parseUnitPriceInput('') === null && parseUnitPriceInput('   ') === null, 'vide pendant l’édition : pas forcé à 0');
+ok(parseUnitPriceInput('34.') === null && parseUnitPriceInput('34,') === null && parseUnitPriceInput('.') === null && parseUnitPriceInput(',') === null && parseUnitPriceInput('0.') === null, 'séparateur final : encore un brouillon');
+ok(parseUnitPriceInput('.5') === 0.5 && parseUnitPriceInput(',5') === 0.5, 'parse .5 / ,5 → 0.5');
+ok(isAllowedPriceDraft('') && isAllowedPriceDraft('34.') && isAllowedPriceDraft('34,') && isAllowedPriceDraft('0.') && isAllowedPriceDraft('.5') && isAllowedPriceDraft('3,5') && isAllowedPriceDraft('034,4'), 'brouillons intermédiaires autorisés');
+ok(!isAllowedPriceDraft('-1') && !isAllowedPriceDraft('3,5,0') && !isAllowedPriceDraft('abc') && !isAllowedPriceDraft('3.5.0'), 'brouillons invalides rejetés');
+ok(commitUnitPrice('') === 0 && commitUnitPrice('   ') === 0, 'blur vide → 0');
+ok(commitUnitPrice('3,5') === 3.5 && commitUnitPrice('34,4') === 34.4, 'blur 3,5 → 3.5, 34,4 → 34.4');
+ok(commitUnitPrice('34.') === 34 && commitUnitPrice('034,4') === 34.4, 'blur 34. → 34, 034,4 → 34.4 (pas de piège du 0 initial)');
+ok(commitUnitPrice('-10') === 0 && commitUnitPrice('abc') === 0, 'blur négatif ou invalide → 0');
+ok(formatUnitPrice(3.5) === '3.50' && formatUnitPrice(0) === '0.00' && formatUnitPrice(34.4) === '34.40', 'affichage hors édition : 2 décimales');
+ok(insertPriceDecimalSeparator('34', 2, 2) === '34.' && insertPriceDecimalSeparator('3.5', 1, 1) === null, 'virgule → point si pas déjà de séparateur');
 process.exit(fail?1:0);
