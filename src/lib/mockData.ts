@@ -3,7 +3,8 @@ import { SalesProduct } from './database.types';
 /** Live-export fiches (64), remapped to loc-{slug} / game-{slug} scopes. */
 export { DEMO_LIVE_FICHES as mockFiches } from './demoLiveData';
 
-// Sales products catalog — miroir de gh_sales_products (carte Self Service Bar, migration 060).
+// Sales products catalog — miroir de gh_sales_products (carte Self Service Bar, migrations 060–062).
+// Les 5 forfaits VR (Planchettes, SVELTE, DODU, Pack Birthday, EVJF Escape & Pole) sont inactifs (062).
 export const mockSalesProducts: SalesProduct[] = [
   {
     id: 'sp-1',
@@ -169,7 +170,7 @@ export const mockSalesProducts: SalesProduct[] = [
     description: 'Viande valaisanne, fromage, cornichons, oignons, pain de seigle - CHF 20.-/pers',
     min_quantity: null,
     max_quantity: null,
-    is_active: true,
+    is_active: false,
     order_index: 20,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -182,7 +183,7 @@ export const mockSalesProducts: SalesProduct[] = [
     description: '6 vins et mini-jeux « éveil des sens » avec encaveur, planchette taille repas - Environ 1h - Min. 4 pers.',
     min_quantity: 4,
     max_quantity: null,
-    is_active: true,
+    is_active: false,
     order_index: 21,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -195,7 +196,7 @@ export const mockSalesProducts: SalesProduct[] = [
     description: 'Comme SVELTE avec café et raclette à gogo - Min. 4, max. 12 pers.',
     min_quantity: 4,
     max_quantity: 12,
-    is_active: true,
+    is_active: false,
     order_index: 22,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -208,7 +209,7 @@ export const mockSalesProducts: SalesProduct[] = [
     description: '1h de célébration après le jeu, boisson sans alcool offerte, ballons, enceinte, diffusion photos/vidéos, gâteau apporté - CHF 15.-/pers (enfants 9-13 ans)',
     min_quantity: null,
     max_quantity: null,
-    is_active: true,
+    is_active: false,
     order_index: 23,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -221,7 +222,7 @@ export const mockSalesProducts: SalesProduct[] = [
     description: 'Planchette, initiation pole dance Air Pole, champagne - Min. 6 pers., environ 1h, session 9h30 ou 14h30',
     min_quantity: 6,
     max_quantity: null,
-    is_active: true,
+    is_active: false,
     order_index: 24,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
