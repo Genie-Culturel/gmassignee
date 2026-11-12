@@ -3,8 +3,9 @@ import { SalesProduct } from './database.types';
 /** Live-export fiches (64), remapped to loc-{slug} / game-{slug} scopes. */
 export { DEMO_LIVE_FICHES as mockFiches } from './demoLiveData';
 
-// Sales products catalog — miroir de gh_sales_products (carte Self Service Bar, migrations 060–062).
+// Sales products catalog — miroir de gh_sales_products (carte Self Service Bar, migrations 060–063).
 // Les 5 forfaits VR (Planchettes, SVELTE, DODU, Pack Birthday, EVJF Escape & Pole) sont inactifs (062).
+// Neastea Citron et Neastea Pêche à 3.50 (063).
 export const mockSalesProducts: SalesProduct[] = [
   {
     id: 'sp-1',
@@ -35,7 +36,7 @@ export const mockSalesProducts: SalesProduct[] = [
   {
     id: 'sp-3',
     name: 'Neastea Citron',
-    unit_price: 4.50,
+    unit_price: 3.50,
     category: 'boisson',
     description: null,
     min_quantity: null,
@@ -48,7 +49,7 @@ export const mockSalesProducts: SalesProduct[] = [
   {
     id: 'sp-4',
     name: 'Neastea Pêche',
-    unit_price: 4.50,
+    unit_price: 3.50,
     category: 'boisson',
     description: null,
     min_quantity: null,

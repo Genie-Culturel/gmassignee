@@ -2,7 +2,7 @@
 import { mockSalesProducts as P } from '../src/lib/mockData';
 import { computeSalesTotals, groupSalesProducts, saleLineTotal, toggleSaleOffered } from '../src/lib/salesLogic';
 let fail = 0; const ok = (c: boolean, m: string) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fail++; };
-const target = [['Coca-Cola',3.5,'boisson'],['Coca-Cola Zéro',3.5,'boisson'],['Neastea Citron',4.5,'boisson'],['Neastea Pêche',4.5,'boisson'],['Red Bull',3.9,'boisson'],['Café',3.6,'boisson'],['Eau',3.6,'boisson'],['Fendant 75 cl',20,'alcool'],['Fendant 50 cl',15,'alcool'],['Assemblage Rouge 75cl',23,'alcool'],['Bière Valaisanne',3.6,'alcool'],['Pop Corn',4,'snack'],['Autre',0,'autre']];
+const target = [['Coca-Cola',3.5,'boisson'],['Coca-Cola Zéro',3.5,'boisson'],['Neastea Citron',3.5,'boisson'],['Neastea Pêche',3.5,'boisson'],['Red Bull',3.9,'boisson'],['Café',3.6,'boisson'],['Eau',3.6,'boisson'],['Fendant 75 cl',20,'alcool'],['Fendant 50 cl',15,'alcool'],['Assemblage Rouge 75cl',23,'alcool'],['Bière Valaisanne',3.6,'alcool'],['Pop Corn',4,'snack'],['Autre',0,'autre']];
 const sorted = [...P].filter(p=>p.is_active).sort((a,b)=>a.order_index-b.order_index);
 ok(JSON.stringify(sorted.map(p=>[p.name,Number(p.unit_price),p.category]))===JSON.stringify(target), 'mock catalog actif = carte (13 produits, forfaits VR inactifs, Autre conservé)');
 ok(P.find(p=>p.name==='SVELTE')!.min_quantity===4 && P.find(p=>p.name==='DODU')!.max_quantity===12 && P.find(p=>p.name==='EVJF Escape & Pole')!.min_quantity===6, 'forfaits conservés dans mockData, min/max inchangés');
